@@ -1,0 +1,15 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+/config/local.php
+
+# Dependencies and runtime files
+/vendor/
+/node_modules/
+*.log
+.DS_Store
+
+# Editor / OS
+.vscode/
+.idea/
