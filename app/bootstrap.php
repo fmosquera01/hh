@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/Security/Session.php';
-require_once __DIR__ . '/Auth/LdapAuthenticator.php';
+require_once __DIR__ . '/Auth/GlpiOAuthClient.php';
 
 SecureSession::start();
 
