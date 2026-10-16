@@ -4,6 +4,8 @@ declare(strict_types=1);
 use Glpi\Plugin\Hooks;
 use GlpiPlugin\Hh\Dashboard;
 
+require_once __DIR__ . '/src/Dashboard.php';
+
 define('PLUGIN_HH_VERSION', '0.1.0');
 define('PLUGIN_HH_MIN_GLPI', '11.0.0');
 define('PLUGIN_HH_MAX_GLPI', '11.99.99');
