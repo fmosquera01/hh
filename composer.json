@@ -1,0 +1,14 @@
+{
+  "name": "fmosquera01/glpi-hh",
+  "description": "Plugin GLPI 11 para gestión de cotizaciones y reparaciones de hardware",
+  "type": "glpi-plugin",
+  "license": "GPL-3.0-or-later",
+  "require": {
+    "php": ">=8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "GlpiPlugin\\Hh\\": "src/"
+    }
+  }
+}
