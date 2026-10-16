@@ -14,7 +14,8 @@ $itemId = filter_input(INPUT_GET, 'items_id', FILTER_VALIDATE_INT);
 $itemId = $itemId !== false && $itemId !== null && $itemId > 0 ? $itemId : 0;
 
 $item = null;
-if ($itemType !== '' && $itemId > 0 && is_a($itemType, CommonDBTM::class, true)) {
+$allowedTypes = ['Computer', 'Phone'];
+if (in_array($itemType, $allowedTypes, true) && $itemId > 0) {
     $candidate = new $itemType();
     if ($candidate->getFromDB($itemId)) {
         $item = $candidate;
