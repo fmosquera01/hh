@@ -1,53 +1,47 @@
-# HH — Plugin de gestión de reparaciones para GLPI 11
+# Gestión de reparaciones — Plugin para GLPI 11
 
-HH se desarrolla como un **plugin nativo de GLPI 11** para funcionar dentro de `https://soporte.songa.com`.
+HH es un **plugin nativo de GLPI 11** para funcionar dentro de la instancia de Songa.
 
-## Ventajas de esta arquitectura
+## Integración con activos
 
-- Utiliza la sesión ya autenticada de GLPI; no implementa otro login, LDAP ni OAuth entre aplicaciones.
-- La autenticación continúa siendo responsabilidad de GLPI y de su configuración corporativa de Active Directory/LDAP.
-- Guarda la información propia de HH en tablas con prefijo `glpi_plugin_hh_`, sin alterar las tablas nativas de GLPI.
-- El inventario se integrará en modo de lectura una vez validado el modelo real de GLPI. Este esqueleto no contiene consultas de inventario ni actualizaciones de activos.
-- La desinstalación del plugin no elimina los datos empresariales, para evitar pérdida accidental de cotizaciones e historial.
+- Añade la pestaña **Gestión de reparaciones** a las fichas de **Computadoras** y **Teléfonos**.
+- La pestaña recibe automáticamente el tipo y el ID del activo desde GLPI; no hay que buscar ni seleccionar de nuevo el equipo.
+- Muestra el nombre, número de serie y número de inventario disponibles en la ficha del activo.
+- Utiliza la sesión autenticada de GLPI; no implementa otro inicio de sesión.
+- Conserva los datos propios de HH en tablas con prefijo `glpi_plugin_hh_`, sin alterar las tablas nativas.
+
+## Estado actual
+
+La versión 0.2.0 incorpora la pestaña contextual y la visualización básica del activo. **Todavía no implementa** el registro de cotizaciones, repuestos, puntos, aprobaciones, garantías ni historial de reparaciones. La pantalla lo indica expresamente; no se crean cotizaciones ficticias.
 
 ## Estructura
 
-- `setup.php`: metadatos, compatibilidad GLPI 11 y registro del menú.
-- `hook.php`: instalación mediante la clase `Migration` de GLPI.
+- `setup.php`: metadatos, compatibilidad GLPI 11 y registro de pestaña.
+- `hook.php`: creación de las tablas propias mediante la clase Migration.
 - `src/Dashboard.php`: entrada del plugin en el menú.
-- `front/index.php`: pantalla inicial protegida por la sesión GLPI.
+- `src/RepairTab.php`: pestaña que GLPI incorpora a las fichas de activos.
+- `front/index.php`: pantalla inicial que puede conservar el contexto del activo.
 - Tablas iniciales:
   - `glpi_plugin_hh_pointvalues`: valor del punto y vigencias.
   - `glpi_plugin_hh_quotes`: cotización y copia del valor monetario aplicado.
   - `glpi_plugin_hh_quotedetails`: puntos y valor por línea.
   - `glpi_plugin_hh_quotehistory`: historial de estados y usuarios.
 
-## Instalación en un entorno de pruebas
+## Instalación en entorno de pruebas
 
-1. Realizar un respaldo de la base de datos y de los archivos de GLPI.
-2. Copiar el repositorio completo a `<GLPI_ROOT>/plugins/hh`. El nombre del directorio debe ser exactamente `hh`.
-3. Confirmar que el usuario del servidor web puede leer los archivos.
-4. Entrar a GLPI con un usuario administrador y abrir **Configuración > Plugins**.
-5. Instalar y activar **HH - Gestión de reparaciones**.
-6. Abrir el menú **Plugins > HH - Gestión de reparaciones**.
+1. Copiar el repositorio completo a `<GLPI_ROOT>/plugins/hh`; el directorio debe llamarse exactamente `hh`.
+2. Confirmar que el servidor web pueda leer los archivos.
+3. En **Configuración > Plugins**, actualizar/activar el plugin si ya estaba instalado.
+4. Abrir un activo tipo **Computadora** o **Teléfono** y verificar la pestaña **Gestión de reparaciones**.
+5. Si la pestaña no aparece, revisar los registros de GLPI/PHP y confirmar que el plugin esté activo.
 
-No instalar inicialmente en producción sin probar primero la instalación y la activación en una instancia de pruebas. La instalación crea solo las tablas propias del plugin. No se crean datos de ejemplo ni se modifica el inventario.
+No se requiere modificar archivos del núcleo de GLPI ni recrear las tablas para este cambio. Validar primero en la instancia de pruebas GLPI 11.0.9.
 
-## Valor del punto e historial de precios
+## Diseño de datos
 
-El diseño almacena cada valor por punto con fecha de inicio y fin de vigencia, moneda, motivo y usuario responsable. Cada cotización y cada detalle conserva una copia del valor monetario aplicado y del importe calculado. Por eso, cambiar el valor vigente no debe recalcular ni alterar cotizaciones anteriores.
-
-El valor real inicial **no está precargado**. La pantalla de administración para registrar y cambiar el valor se implementará después de validar el plugin instalado.
-
-## Seguridad y próximos pasos
-
-- El plugin no administra contraseñas ni inicia sesiones propias: usa el control de acceso de GLPI.
-- Antes de producción deben definirse permisos específicos por perfil para técnicos, aprobadores y administradores, y comprobarse en todas las páginas y acciones.
-- En GLPI 11, las operaciones de base de datos y migraciones deben usar las APIs del framework; no se deben emitir consultas SQL directas para leer o modificar inventario.
-- No hay consultas de inventario implementadas. La integración se realizará cuando se confirme el tipo de activo, los campos necesarios y las asociaciones reales.
-- La compatibilidad de código debe verificarse en una instancia de prueba con la versión exacta de GLPI 11 instalada en Songa.
+El diseño conserva el valor monetario aplicado a cada cotización y detalle para que cambios futuros en el valor por punto no alteren cotizaciones anteriores. El valor real inicial no está precargado y aún falta la pantalla de administración para configurarlo.
 
 ## Referencia oficial
 
-La estructura y los requisitos del plugin siguen la documentación de desarrollo de GLPI:
-https://glpi-developer-documentation.readthedocs.io/en/master/plugins/
+La integración de pestañas sigue la documentación de desarrollo de GLPI:
+https://glpi-developer-documentation.readthedocs.io/en/master/plugins/tips.html
