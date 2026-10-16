@@ -9,7 +9,7 @@ final class Dashboard extends CommonGLPI
 {
     public static function getTypeName($nb = 0): string
     {
-        return __('HH - Gestión de reparaciones', 'hh');
+        return __('Gestión de reparaciones', 'hh');
     }
 
     public static function getMenuName($nb = 0): string
@@ -19,11 +19,9 @@ final class Dashboard extends CommonGLPI
 
     public static function getMenuContent(): array
     {
-        $url = '/plugins/hh/front/index.php';
-
         return [
             'title' => self::getMenuName(),
-            'page'  => $url,
+            'page'  => '/plugins/hh/front/index.php',
             'icon'  => 'ti ti-tool',
         ];
     }
