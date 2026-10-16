@@ -8,7 +8,7 @@ use GlpiPlugin\Hh\RepairTab;
 require_once __DIR__ . '/src/Dashboard.php';
 require_once __DIR__ . '/src/RepairTab.php';
 
-define('PLUGIN_HH_VERSION', '0.2.0');
+define('PLUGIN_HH_VERSION', '0.3.0');
 define('PLUGIN_HH_MIN_GLPI', '11.0.0');
 define('PLUGIN_HH_MAX_GLPI', '11.99.99');
 
@@ -20,7 +20,6 @@ function plugin_init_hh(): void
         'plugins' => Dashboard::class,
     ];
 
-    // Add a native tab to supported asset forms in GLPI.
     Plugin::registerClass(RepairTab::class, [
         'addtabon' => [
             'Computer',
