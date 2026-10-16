@@ -43,13 +43,37 @@ final class RepairTab extends CommonGLPI
         $serial = (string) ($fields['serial'] ?? '');
         $assetTag = (string) ($fields['otherserial'] ?? '');
         $manufacturer = (string) ($fields['manufacturers_id'] ?? '');
-        $model = (string) ($fields['computermodels_id'] ?? $fields['phonemodels_id'] ?? '');
         $status = (string) ($fields['states_id'] ?? '');
+
+        // GLPI native asset fields. Warranty/contract fields vary by item type
+        // and by installed plugins, so unavailable values are shown as unknown.
+        $purchaseDate = self::displayDate($fields['date_purchase'] ?? '');
+        $warrantyType = self::firstField($fields, ['warranty_info', 'warranty_type', 'warranty_type_name']);
+        $warrantyStart = self::displayDate(self::firstField($fields, ['warranty_date_start', 'warranty_start_date', 'date_warranty_start']));
+        $warrantyEndRaw = self::firstField($fields, ['warranty_date_expiration', 'warranty_date_end', 'warranty_end_date', 'date_warranty_end']);
+        if ($warrantyEndRaw === '' && !empty($fields['date_purchase']) && (int) ($fields['warranty_duration'] ?? 0) > 0) {
+            try {
+                $purchase = new \\DateTimeImmutable((string) $fields['date_purchase']);
+                $warrantyEndRaw = $purchase->modify('+' . (int) $fields['warranty_duration'] . ' months')->format('Y-m-d');
+            } catch (\\Throwable $e) {
+                $warrantyEndRaw = '';
+            }
+        }
+        $warrantyEnd = self::displayDate($warrantyEndRaw);
+        $warrantyDuration = (int) ($fields['warranty_duration'] ?? 0);
+        if ($warrantyType === '' && $warrantyDuration > 0) {
+            $warrantyType = sprintf(__('Garantía de %d meses', 'hh'), $warrantyDuration);
+        }
+        $contractStart = self::displayDate(self::firstField($fields, ['contract_date_start', 'date_contract_start']));
+        $contractEnd = self::displayDate(self::firstField($fields, ['contract_date_expiration', 'contract_date_end', 'date_contract_end']));
 
         echo "<div class='container-fluid hh-repairs'>";
         echo "<style>
             .hh-repairs .hh-hero{border:0;border-radius:.65rem;background:linear-gradient(120deg,#17365d,#245b83);color:#fff}
             .hh-repairs .hh-hero .text-muted{color:#d8e6f2!important}
+            .hh-repairs .hh-asset-detail{height:100%;border:1px solid rgba(255,255,255,.22);border-radius:.45rem;padding:.65rem .75rem;background:rgba(255,255,255,.06)}
+            .hh-repairs .hh-asset-detail .hh-detail-label{font-size:.72rem;color:#d8e6f2;margin-bottom:.15rem}
+            .hh-repairs .hh-asset-detail strong{overflow-wrap:anywhere}
             .hh-repairs .hh-stat{height:100%;border:1px solid var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1rem;background:var(--tblr-card-bg,#fff)}
             .hh-repairs .hh-stat .hh-stat-value{font-size:1.3rem;font-weight:700;margin-top:.25rem}
             .hh-repairs .hh-section{scroll-margin-top:1rem}
@@ -68,12 +92,21 @@ final class RepairTab extends CommonGLPI
         echo "<div class='text-muted'>" . self::e($name !== '' ? $name : __('Activo sin nombre', 'hh')) . " · " . self::e($itemType) . " #" . $itemId . "</div></div>";
         echo "<span class='badge bg-warning text-dark'>" . self::e(__('Prototipo visual', 'hh')) . "</span>";
         echo "</div><hr class='border-light opacity-25'>";
-        echo "<div class='row g-3'>";
-        echo "<div class='col-md-3'><div class='small text-muted'>" . self::e(__('Número de serie', 'hh')) . "</div><strong>" . self::e($serial !== '' ? $serial : '—') . "</strong></div>";
-        echo "<div class='col-md-3'><div class='small text-muted'>" . self::e(__('N.º de inventario', 'hh')) . "</div><strong>" . self::e($assetTag !== '' ? $assetTag : '—') . "</strong></div>";
-        echo "<div class='col-md-3'><div class='small text-muted'>" . self::e(__('Fabricante (ID GLPI)', 'hh')) . "</div><strong>" . self::e($manufacturer !== '' && $manufacturer !== '0' ? $manufacturer : '—') . "</strong></div>";
-        echo "<div class='col-md-3'><div class='small text-muted'>" . self::e(__('Estado (ID GLPI)', 'hh')) . "</div><strong>" . self::e($status !== '' && $status !== '0' ? $status : '—') . "</strong></div>";
-        echo "</div></div></div>";
+        echo "<div class='row g-2'>";
+        self::assetDetail(__('Número de serie', 'hh'), $serial);
+        self::assetDetail(__('N.º de inventario', 'hh'), $assetTag);
+        self::assetDetail(__('Fabricante (ID GLPI)', 'hh'), $manufacturer !== '' && $manufacturer !== '0' ? $manufacturer : '');
+        self::assetDetail(__('Estado (ID GLPI)', 'hh'), $status !== '' && $status !== '0' ? $status : '');
+        self::assetDetail(__('Fecha de compra', 'hh'), $purchaseDate);
+        self::assetDetail(__('Tipo / información de garantía', 'hh'), $warrantyType);
+        self::assetDetail(__('Inicio de garantía', 'hh'), $warrantyStart);
+        self::assetDetail(__('Fin de garantía', 'hh'), $warrantyEnd);
+        self::assetDetail(__('Inicio de contrato', 'hh'), $contractStart);
+        self::assetDetail(__('Fin de contrato', 'hh'), $contractEnd);
+        self::assetDetail(__('Puntos usados en reparaciones anteriores', 'hh'), __('Pendiente de historial', 'hh'));
+        echo "</div>";
+        echo "<div class='small mt-3 text-muted'>" . self::e(__('Los datos que GLPI no entregue directamente aparecerán como no disponibles hasta conectar los contratos y el historial de reparaciones.', 'hh')) . "</div>";
+        echo "</div></div>";
 
         echo "<div class='alert alert-info d-flex align-items-start gap-2 mb-3' role='status'>";
         echo "<i class='ti ti-info-circle fs-2'></i><div><strong>" . self::e(__('Vista de diseño: no guarda información', 'hh')) . "</strong><br>";
@@ -156,6 +189,39 @@ final class RepairTab extends CommonGLPI
         echo "<p class='text-muted small'>" . self::e(__('Activo contextualizado desde GLPI. Toda la experiencia de reparación se mantendrá dentro de esta pestaña.')) . "</p>";
         echo "</div>";
         return true;
+    }
+
+    private static function assetDetail(string $label, string $value): void
+    {
+        $display = trim($value) !== '' && $value !== '0' ? $value : '—';
+        echo "<div class='col-6 col-md-4 col-xl-3'><div class='hh-asset-detail'>";
+        echo "<div class='hh-detail-label'>" . self::e($label) . "</div>";
+        echo "<strong>" . self::e($display) . "</strong>";
+        echo "</div></div>";
+    }
+
+    private static function firstField(array $fields, array $keys): string
+    {
+        foreach ($keys as $key) {
+            if (isset($fields[$key]) && is_scalar($fields[$key]) && trim((string) $fields[$key]) !== '') {
+                return (string) $fields[$key];
+            }
+        }
+
+        return '';
+    }
+
+    private static function displayDate($value): string
+    {
+        if (!is_scalar($value) || trim((string) $value) === '' || str_starts_with((string) $value, '0000-00-00')) {
+            return '';
+        }
+
+        try {
+            return (new \\DateTimeImmutable((string) $value))->format('Y-m-d');
+        } catch (\\Throwable $e) {
+            return (string) $value;
+        }
     }
 
     private static function statCard(string $label, string $value, string $description): void
