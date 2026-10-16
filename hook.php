@@ -1,9 +1,6 @@
 <?php
 declare(strict_types=1);
 
-use DBConnection;
-use Migration;
-
 function plugin_hh_install(): bool
 {
     global $DB;
@@ -81,7 +78,7 @@ function plugin_hh_install(): bool
 
 function plugin_hh_uninstall(): bool
 {
-    // Preserve business data on uninstall. Removal of HH tables must be a separate,
-    // explicit and backed-up maintenance operation to prevent accidental data loss.
+    // Preserve business data on uninstall. Dropping HH tables must be an explicit,
+    // separate maintenance action after a verified backup.
     return true;
 }
