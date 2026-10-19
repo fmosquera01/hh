@@ -94,11 +94,19 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Proveedor del contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_supplier'] ?? '') : '—');
         echo "</div></div></div>";
 
-        echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>"
-            . self::e(__('Cotizaciones e historial de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
-        echo "<div class='hh-empty'><strong>" . self::e(__('La lectura del activo ya está conectada', 'hh')) . "</strong><div class='text-muted mt-1'>"
-            . self::e(__('Esta versión consulta los datos nativos de GLPI en modo lectura. El almacenamiento de cotizaciones, puntos e historial se implementará después.', 'hh'))
-            . "</div></div></div></div>";
+        $catalogUrl = Plugin::getWebDir('hh', false) . '/front/catalog.php';
+        echo "<div class='card mb-4'><div class='card-header d-flex justify-content-between align-items-center flex-wrap gap-2'><h3 class='card-title mb-0'>"
+            . self::e(__('Cotizaciones e historial de reparaciones', 'hh')) . "</h3>";
+        echo "<a class='btn btn-outline-primary' href='" . self::e($catalogUrl) . "'><i class='ti ti-package me-1'></i>"
+            . self::e(__('Administrar catálogo de repuestos y servicios', 'hh')) . "</a></div><div class='card-body'>";
+        echo "<div class='row g-3'>";
+        echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Cotizaciones', 'hh')) . "</h4><p class='text-muted mb-0'>"
+            . self::e(__('En el siguiente paso conectaremos la creación de cotizaciones con este activo y sus artículos.', 'hh')) . "</p></div></div>";
+        echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Catálogo', 'hh')) . "</h4><p class='text-muted mb-0'>"
+            . self::e(__('Registre repuestos, mano de obra y servicios con su código y valor en puntos.', 'hh')) . "</p></div></div>";
+        echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Historial', 'hh')) . "</h4><p class='text-muted mb-0'>"
+            . self::e(__('El historial se asociará a este activo y conservará el estado de cada cotización.', 'hh')) . "</p></div></div>";
+        echo "</div></div></div>";
         echo "</div>";
         return true;
     }
