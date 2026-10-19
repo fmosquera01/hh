@@ -268,16 +268,18 @@ final class RepairTab extends CommonGLPI
             }
         }
 
-        // Contracts are related by itemtype + items_id; there may be more than one.
-        // Prefer a contract that is not deleted, and select the first matching record.
+        // Contracts are related by itemtype + items_id. Only an unexpired contract
+        // is shown as current coverage; expired contracts do not override equipment warranty.
         $links = $DB->request([
             'FROM' => 'glpi_contracts_items',
             'WHERE' => [
                 'itemtype' => $itemType,
                 'items_id' => $itemId,
             ],
-            'ORDER' => ['id DESC'],
         ]);
+
+        $today = (new \\DateTimeImmutable('today'))->format('Y-m-d');
+        $selectedContractStart = '';
 
         foreach ($links as $link) {
             $contractId = (int) ($link['contracts_id'] ?? 0);
@@ -297,45 +299,59 @@ final class RepairTab extends CommonGLPI
                 continue;
             }
 
+            $beginDate = (string) ($contract['begin_date'] ?? '');
+            $duration = (int) ($contract['duration'] ?? 0);
+            if ($beginDate === '' || str_starts_with($beginDate, '0000-00-00') || $duration <= 0) {
+                continue;
+            }
+
+            try {
+                $contractEnd = (new \\DateTimeImmutable($beginDate))
+                    ->modify('+' . $duration . ' months')
+                    ->format('Y-m-d');
+            } catch (\\Throwable $e) {
+                continue;
+            }
+
+            if ($contractEnd < $today) {
+                continue;
+            }
+
+            // If multiple contracts are active, show the one with the latest start date.
+            if ($selectedContractStart !== '' && $beginDate <= $selectedContractStart) {
+                continue;
+            }
+
             $contractTypeId = (int) ($contract['contracttypes_id'] ?? 0);
+            $typeRow = [];
             if ($contractTypeId > 0) {
                 $typeRow = self::fetchOne($DB->request([
                     'FROM' => 'glpi_contracttypes',
                     'WHERE' => ['id' => $contractTypeId],
                     'LIMIT' => 1,
                 ]));
-                $info['contract_type'] = (string) ($typeRow['name'] ?? '');
-            }
-            $info['contract_start'] = (string) ($contract['begin_date'] ?? '');
-            $duration = (int) ($contract['duration'] ?? 0);
-            $beginDate = (string) ($contract['begin_date'] ?? '');
-            if ($beginDate !== '' && !str_starts_with($beginDate, '0000-00-00') && $duration > 0) {
-                try {
-                    $info['contract_end'] = (new \DateTimeImmutable($beginDate))
-                        ->modify('+' . $duration . ' months')
-                        ->format('Y-m-d');
-                } catch (\Throwable $e) {
-                    $info['contract_end'] = '';
-                }
             }
 
-            // The contract supplier is independent of the asset's purchase supplier.
             $contractSupplierLink = self::fetchOne($DB->request([
                 'FROM' => 'glpi_contracts_suppliers',
                 'WHERE' => ['contracts_id' => $contractId],
                 'LIMIT' => 1,
             ]));
             $supplierId = (int) ($contractSupplierLink['suppliers_id'] ?? 0);
+            $supplier = [];
             if ($supplierId > 0) {
                 $supplier = self::fetchOne($DB->request([
                     'FROM' => 'glpi_suppliers',
                     'WHERE' => ['id' => $supplierId],
                     'LIMIT' => 1,
                 ]));
-                $info['contract_supplier'] = (string) ($supplier['name'] ?? '');
             }
 
-            break;
+            $info['contract_type'] = (string) ($typeRow['name'] ?? '');
+            $info['contract_start'] = $beginDate;
+            $info['contract_end'] = $contractEnd;
+            $info['contract_supplier'] = (string) ($supplier['name'] ?? '');
+            $selectedContractStart = $beginDate;
         }
 
         return $info;
@@ -356,54 +372,7 @@ final class RepairTab extends CommonGLPI
             return '';
         }
 
-        return '    {
-        $display = trim($value) !== '' && $value !== '0' ? $value : '—';
-        echo "<div class='col-6 col-md-4 col-xl-3'><div class='hh-asset-detail'>";
-        echo "<div class='hh-detail-label'>" . self::e($label) . "</div>";
-        echo "<strong>" . self::e($display) . "</strong>";
-        echo "</div></div>";
-    }
-
-    private static function firstField(array $fields, array $keys): string
-    {
-        foreach ($keys as $key) {
-            if (isset($fields[$key]) && is_scalar($fields[$key]) && trim((string) $fields[$key]) !== '') {
-                return (string) $fields[$key];
-            }
-        }
-
-        return '';
-    }
-
-    private static function displayDate($value): string
-    {
-        if (!is_scalar($value) || trim((string) $value) === '' || str_starts_with((string) $value, '0000-00-00')) {
-            return '';
-        }
-
-        try {
-            return (new \DateTimeImmutable((string) $value))->format('Y-m-d');
-        } catch (\Throwable $e) {
-            return (string) $value;
-        }
-    }
-
-    private static function statCard(string $label, string $value, string $description): void
-    {
-        echo "<div class='col-6 col-xl-3'><div class='hh-stat'><div class='text-muted'>" . self::e($label) . "</div><div class='hh-stat-value'>" . self::e($value) . "</div><div class='small text-muted mt-1'>" . self::e($description) . "</div></div></div>";
-    }
-
-    private static function formField(string $label, string $control): void
-    {
-        echo "<div class='col-md-6 col-xl-4'><label class='form-label'>" . self::e($label) . "</label>" . $control . "</div>";
-    }
-
-    private static function e(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    }
-}
- . number_format((float) $value, 2, '.', ',');
+        return '$' . number_format((float) $value, 2, '.', ',');
     }
 
     private static function assetDetail(string $label, string $value): void
@@ -415,17 +384,6 @@ final class RepairTab extends CommonGLPI
         echo "</div></div>";
     }
 
-    private static function firstField(array $fields, array $keys): string
-    {
-        foreach ($keys as $key) {
-            if (isset($fields[$key]) && is_scalar($fields[$key]) && trim((string) $fields[$key]) !== '') {
-                return (string) $fields[$key];
-            }
-        }
-
-        return '';
-    }
-
     private static function displayDate($value): string
     {
         if (!is_scalar($value) || trim((string) $value) === '' || str_starts_with((string) $value, '0000-00-00')) {
@@ -433,8 +391,8 @@ final class RepairTab extends CommonGLPI
         }
 
         try {
-            return (new \DateTimeImmutable((string) $value))->format('Y-m-d');
-        } catch (\Throwable $e) {
+            return (new \\DateTimeImmutable((string) $value))->format('Y-m-d');
+        } catch (\\Throwable $e) {
             return (string) $value;
         }
     }
