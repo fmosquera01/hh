@@ -259,10 +259,10 @@ final class RepairTab extends CommonGLPI
             $warrantyStart = (string) (($infocom['warranty_date'] ?? '') ?: ($infocom['buy_date'] ?? ''));
             if ($warrantyStart !== '' && !str_starts_with($warrantyStart, '0000-00-00') && $warrantyMonths > 0) {
                 try {
-                    $info['equipment_warranty_end'] = (new \\DateTimeImmutable($warrantyStart))
+                    $info['equipment_warranty_end'] = (new \DateTimeImmutable($warrantyStart))
                         ->modify('+' . $warrantyMonths . ' months')
                         ->format('Y-m-d');
-                } catch (\\Throwable $e) {
+                } catch (\Throwable $e) {
                     $info['equipment_warranty_end'] = '';
                 }
             }
@@ -311,10 +311,10 @@ final class RepairTab extends CommonGLPI
             $beginDate = (string) ($contract['begin_date'] ?? '');
             if ($beginDate !== '' && !str_starts_with($beginDate, '0000-00-00') && $duration > 0) {
                 try {
-                    $info['contract_end'] = (new \\DateTimeImmutable($beginDate))
+                    $info['contract_end'] = (new \DateTimeImmutable($beginDate))
                         ->modify('+' . $duration . ' months')
                         ->format('Y-m-d');
-                } catch (\\Throwable $e) {
+                } catch (\Throwable $e) {
                     $info['contract_end'] = '';
                 }
             }
