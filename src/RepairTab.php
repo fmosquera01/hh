@@ -90,7 +90,7 @@ final class RepairTab extends CommonGLPI
         echo "<hr class='border-light opacity-25'><div class='row g-2'>";
 
         self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
-        self::assetDetail(__('N.º de inventario', 'hh'), (string) ($fields['otherserial'] ?? ''));
+        self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
         self::assetDetail(__('Fabricante', 'hh'), (string) ($native['manufacturer'] ?? ''));
         self::assetDetail(__('Modelo', 'hh'), (string) ($native['model'] ?? ''));
         self::assetDetail(__('Marca', 'hh'), (string) ($native['brand'] ?? ''));
@@ -98,8 +98,8 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
         self::assetDetail(__('Valor de compra', 'hh'), self::displayMoney($native['purchase_value'] ?? null));
         self::assetDetail(__('Tipo / información de garantía', 'hh'), $warrantyType);
-        self::assetDetail(__('Cobertura aplicada desde', 'hh'), $coverageStart);
-        self::assetDetail(__('Fin de garantía propia del equipo', 'hh'), self::displayDate($warrantyEnd));
+        self::assetDetail(__('Inicio de contrato', 'hh'), $currentContracts !== [] ? self::displayDate($currentContracts[0]['begin_date'] ?? null) : '—');
+        self::assetDetail(__('Fin de contrato', 'hh'), $currentContracts !== [] ? self::displayDate($currentContracts[0]['contract_end_date'] ?? null) : '—');
         self::assetDetail(__('Proveedor del equipo', 'hh'), (string) ($native['supplier'] ?? ''));
         self::assetDetail(__('Orden de compra', 'hh'), (string) ($native['order_number'] ?? ''));
         self::assetDetail(__('Factura', 'hh'), (string) ($native['bill'] ?? ''));
@@ -172,7 +172,6 @@ final class RepairTab extends CommonGLPI
 
         $table = $tables[$itemType];
         $assetTable = $table['asset'];
-
         $info = [
             'buy_date' => null,
             'use_date' => null,
@@ -192,140 +191,151 @@ final class RepairTab extends CommonGLPI
             'contracts' => [],
         ];
 
-        // Read the asset and its catalog relationships using GLPI's DB API.
-        $assetSelect = [
-            $assetTable . '.id',
-            'glpi_manufacturers.name AS manufacturer',
-            $table['model'] . '.name AS model',
-            'glpi_states.name AS status',
-        ];
-        // GLPI phones have a brand field; computers do not.
-        if ($itemType === 'Phone') {
-            $assetSelect[] = $assetTable . '.brand';
-        }
-
+        // Avoid JOIN/FKEY query-builder edge cases across GLPI versions.
+        // Every read uses GLPI's DB request API; no direct SQL query is executed.
         $assetRows = $DB->request([
-            'SELECT' => $assetSelect,
+            'SELECT' => '*',
             'FROM' => $assetTable,
-            'LEFT JOIN' => [
-                'glpi_manufacturers' => [
-                    'FKEY' => [
-                        $assetTable => 'manufacturers_id',
-                        'glpi_manufacturers' => 'id',
-                    ],
-                ],
-                $table['model'] => [
-                    'FKEY' => [
-                        $assetTable => $table['model_field'],
-                        $table['model'] => 'id',
-                    ],
-                ],
-                'glpi_states' => [
-                    'FKEY' => [
-                        $assetTable => 'states_id',
-                        'glpi_states' => 'id',
-                    ],
-                ],
-            ],
             'WHERE' => [
-                $assetTable . '.id' => $itemId,
-                $assetTable . '.is_deleted' => 0,
+                'id' => $itemId,
+                'is_deleted' => 0,
             ],
             'LIMIT' => 1,
         ]);
 
+        $asset = [];
         foreach ($assetRows as $row) {
-            $info = array_merge($info, $row);
+            $asset = $row;
             break;
         }
 
-        // Infocoms are stored separately and are keyed by both item ID and item type.
+        if ($asset === []) {
+            return $info;
+        }
+
+        if ($itemType === 'Phone') {
+            $info['brand'] = (string) ($asset['brand'] ?? '');
+        }
+        $info['manufacturer'] = self::lookupName('glpi_manufacturers', (int) ($asset['manufacturers_id'] ?? 0));
+        $info['model'] = self::lookupName($table['model'], (int) ($asset[$table['model_field']] ?? 0));
+        $info['status'] = self::lookupName('glpi_states', (int) ($asset['states_id'] ?? 0));
+
+        // Purchase and native equipment warranty data.
         $infoRows = $DB->request([
-            'SELECT' => [
-                'glpi_infocoms.buy_date',
-                'glpi_infocoms.use_date',
-                'glpi_infocoms.warranty_date',
-                'glpi_infocoms.warranty_duration',
-                'glpi_infocoms.warranty_info',
-                'glpi_infocoms.value AS purchase_value',
-                'glpi_infocoms.warranty_value',
-                'glpi_infocoms.suppliers_id',
-                'glpi_infocoms.order_number',
-                'glpi_infocoms.bill',
-                'glpi_suppliers.name AS supplier',
-            ],
+            'SELECT' => '*',
             'FROM' => 'glpi_infocoms',
-            'LEFT JOIN' => [
-                'glpi_suppliers' => [
-                    'FKEY' => [
-                        'glpi_infocoms' => 'suppliers_id',
-                        'glpi_suppliers' => 'id',
-                    ],
-                ],
-            ],
             'WHERE' => [
-                'glpi_infocoms.items_id' => $itemId,
-                'glpi_infocoms.itemtype' => $itemType,
+                'items_id' => $itemId,
+                'itemtype' => $itemType,
             ],
             'LIMIT' => 1,
         ]);
 
         foreach ($infoRows as $row) {
-            $info = array_merge($info, $row);
+            $info['buy_date'] = $row['buy_date'] ?? null;
+            $info['use_date'] = $row['use_date'] ?? null;
+            $info['warranty_date'] = $row['warranty_date'] ?? null;
+            $info['warranty_duration'] = (int) ($row['warranty_duration'] ?? 0);
+            $info['warranty_info'] = $row['warranty_info'] ?? null;
+            $info['purchase_value'] = $row['value'] ?? null;
+            $info['warranty_value'] = $row['warranty_value'] ?? null;
+            $info['suppliers_id'] = (int) ($row['suppliers_id'] ?? 0);
+            $info['order_number'] = $row['order_number'] ?? null;
+            $info['bill'] = $row['bill'] ?? null;
+            $info['supplier'] = self::lookupName('glpi_suppliers', (int) ($row['suppliers_id'] ?? 0));
             break;
         }
 
-        // Retrieve every linked, non-deleted contract. End dates are calculated in PHP.
-        $contractRows = $DB->request([
-            'SELECT' => [
-                'glpi_contracts_items.items_id',
-                'glpi_contracts_items.itemtype',
-                'glpi_contracts.id AS contract_id',
-                'glpi_contracts.name AS contract_name',
-                'glpi_contracts.num AS contract_number',
-                'glpi_contracts.begin_date',
-                'glpi_contracts.duration AS contract_duration_months',
-                'glpi_contracts.comment AS contract_conditions',
-                'glpi_contracttypes.name AS contract_type',
-            ],
+        // Retrieve all associated contracts. Resolve contract type separately to avoid joins.
+        $linkRows = $DB->request([
+            'SELECT' => ['contracts_id'],
             'FROM' => 'glpi_contracts_items',
-            'INNER JOIN' => [
-                'glpi_contracts' => [
-                    'FKEY' => [
-                        'glpi_contracts_items' => 'contracts_id',
-                        'glpi_contracts' => 'id',
-                    ],
-                ],
-            ],
-            'LEFT JOIN' => [
-                'glpi_contracttypes' => [
-                    'FKEY' => [
-                        'glpi_contracts' => 'contracttypes_id',
-                        'glpi_contracttypes' => 'id',
-                    ],
-                ],
-            ],
             'WHERE' => [
-                'glpi_contracts_items.itemtype' => $itemType,
-                'glpi_contracts_items.items_id' => $itemId,
-                'glpi_contracts.is_deleted' => 0,
-                'glpi_contracts.is_template' => 0,
-            ],
-            'ORDER' => [
-                'glpi_contracts.begin_date DESC',
-                'glpi_contracts.id DESC',
+                'itemtype' => $itemType,
+                'items_id' => $itemId,
             ],
         ]);
 
-        foreach ($contractRows as $contract) {
-            $contract['contract_end_date'] = self::addMonths(
-                (string) ($contract['begin_date'] ?? ''),
-                (int) ($contract['contract_duration_months'] ?? 0)
-            );
-            $info['contracts'][] = $contract;
+        foreach ($linkRows as $link) {
+            $contractId = (int) ($link['contracts_id'] ?? 0);
+            if ($contractId < 1) {
+                continue;
+            }
+
+            $contractRows = $DB->request([
+                'SELECT' => '*',
+                'FROM' => 'glpi_contracts',
+                'WHERE' => [
+                    'id' => $contractId,
+                    'is_deleted' => 0,
+                    'is_template' => 0,
+                ],
+                'LIMIT' => 1,
+            ]);
+
+            foreach ($contractRows as $contract) {
+                $contract['contract_id'] = $contractId;
+                $contract['contract_name'] = (string) ($contract['name'] ?? '');
+                $contract['contract_number'] = (string) ($contract['num'] ?? '');
+                $contract['contract_duration_months'] = (int) ($contract['duration'] ?? 0);
+                $contract['contract_conditions'] = (string) ($contract['comment'] ?? '');
+                $contract['contract_type'] = self::lookupName(
+                    'glpi_contracttypes',
+                    (int) ($contract['contracttypes_id'] ?? 0)
+                );
+                $contract['contract_end_date'] = self::addMonths(
+                    (string) ($contract['begin_date'] ?? ''),
+                    (int) ($contract['duration'] ?? 0)
+                );
+                $info['contracts'][] = $contract;
+                break;
+            }
         }
 
+        usort($info['contracts'], static function (array $a, array $b): int {
+            return strcmp(
+                (string) ($b['begin_date'] ?? ''),
+                (string) ($a['begin_date'] ?? '')
+            );
+        });
+
         return $info;
+    }
+
+    /** Resolve a native GLPI catalogue name without SQL joins. */
+    private static function lookupName(string $table, int $id): string
+    {
+        global $DB;
+
+        if ($id < 1) {
+            return '';
+        }
+
+        // Tables are selected only from fixed internal allowlists/call sites.
+        $allowedTables = [
+            'glpi_manufacturers',
+            'glpi_phonemodels',
+            'glpi_computermodels',
+            'glpi_states',
+            'glpi_suppliers',
+            'glpi_contracttypes',
+        ];
+        if (!in_array($table, $allowedTables, true)) {
+            return '';
+        }
+
+        $rows = $DB->request([
+            'SELECT' => ['name'],
+            'FROM' => $table,
+            'WHERE' => ['id' => $id],
+            'LIMIT' => 1,
+        ]);
+
+        foreach ($rows as $row) {
+            return (string) ($row['name'] ?? '');
+        }
+
+        return '';
     }
 
     private static function isContractCurrent(array $contract, string $today): bool
