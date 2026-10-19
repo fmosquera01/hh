@@ -34,8 +34,10 @@ final class RepairTab extends CommonGLPI
         $fields = $item->fields ?? [];
         $native = self::loadNativeAssetInfo($itemType, $itemId);
         $contracts = $native['contracts'];
-        $warrantyStart = self::validDate($native['warranty_date'] ?? null)
-            ? (string) $native['warranty_date'] : (string) ($native['buy_date'] ?? '');
+        // La garantía propia del equipo se calcula aparte del contrato extendido.
+        // La fecha de compra es el inicio preferente de la garantía nativa.
+        $warrantyStart = self::validDate($native['buy_date'] ?? null)
+            ? (string) $native['buy_date'] : (string) ($native['warranty_date'] ?? '');
         $warrantyMonths = (int) ($native['warranty_duration'] ?? 0);
         $warrantyEnd = self::addMonths($warrantyStart, $warrantyMonths);
         $today = date('Y-m-d');
@@ -45,6 +47,7 @@ final class RepairTab extends CommonGLPI
             static fn(array $contract): bool => self::isContractCurrent($contract, $today)
         ));
 
+        // El contrato vigente manda sobre la garantía propia del equipo.
         if ($currentContracts !== []) {
             $types = array_values(array_unique(array_filter(array_map(
                 static fn(array $contract): string => trim((string) ($contract['contract_type'] ?? '')),
@@ -52,12 +55,12 @@ final class RepairTab extends CommonGLPI
             ))));
             $warrantyType = $types !== [] ? implode(', ', $types) : __('Contrato vigente', 'hh');
             $serviceLevel = self::serviceLevelForContracts($currentContracts);
-            $coverageSource = __('Contrato de servicio vigente', 'hh');
+            $coverageSource = __('Contrato de servicio vigente; prevalece sobre la garantía propia del equipo', 'hh');
             $coverageStart = self::displayDate($currentContracts[0]['begin_date'] ?? null);
         } elseif ($warrantyEnd !== '' && $warrantyEnd >= $today) {
             $warrantyType = __('Garantía del equipo', 'hh');
             $serviceLevel = __('Aplican las condiciones de la garantía del fabricante', 'hh');
-            $coverageSource = __('Garantía nativa registrada en GLPI', 'hh');
+            $coverageSource = __('Garantía propia del equipo registrada en GLPI', 'hh');
             $coverageStart = self::displayDate($warrantyStart);
         } else {
             $warrantyType = __('Sin garantía ni contrato vigente', 'hh');
@@ -231,7 +234,7 @@ final class RepairTab extends CommonGLPI
         $levels = [];
         foreach ($contracts as $contract) {
             $type = trim((string) ($contract['contract_type'] ?? ''));
-            $normalized = mb_strtolower($type);
+            $normalized = strtolower($type);
             if ($normalized === 'platinum') {
                 $levels[] = __('Platinum: cubre todo tipo de daño; objetivo de atención 2 días', 'hh');
             } elseif ($normalized === 'gold') {
