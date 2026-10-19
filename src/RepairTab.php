@@ -39,33 +39,25 @@ final class RepairTab extends CommonGLPI
         $itemType = $item::getType();
         $itemId = (int) $item->getID();
         $fields = $item->fields ?? [];
-        $name = (string) ($fields['name'] ?? '');
-        $serial = (string) ($fields['serial'] ?? '');
-        $assetTag = (string) ($fields['otherserial'] ?? '');
-        $manufacturer = (string) ($fields['manufacturers_id'] ?? '');
-        $status = (string) ($fields['states_id'] ?? '');
 
-        // GLPI native asset fields. Warranty/contract fields vary by item type
-        // and by installed plugins, so unavailable values are shown as unknown.
-        $purchaseDate = self::displayDate($fields['date_purchase'] ?? '');
-        $warrantyType = self::firstField($fields, ['warranty_info', 'warranty_type', 'warranty_type_name']);
-        $warrantyStart = self::displayDate(self::firstField($fields, ['warranty_date_start', 'warranty_start_date', 'date_warranty_start']));
-        $warrantyEndRaw = self::firstField($fields, ['warranty_date_expiration', 'warranty_date_end', 'warranty_end_date', 'date_warranty_end']);
-        if ($warrantyEndRaw === '' && !empty($fields['date_purchase']) && (int) ($fields['warranty_duration'] ?? 0) > 0) {
-            try {
-                $purchase = new \DateTimeImmutable((string) $fields['date_purchase']);
-                $warrantyEndRaw = $purchase->modify('+' . (int) $fields['warranty_duration'] . ' months')->format('Y-m-d');
-            } catch (\Throwable $e) {
-                $warrantyEndRaw = '';
-            }
-        }
-        $warrantyEnd = self::displayDate($warrantyEndRaw);
-        $warrantyDuration = (int) ($fields['warranty_duration'] ?? 0);
-        if ($warrantyType === '' && $warrantyDuration > 0) {
-            $warrantyType = sprintf(__('Garantía de %d meses', 'hh'), $warrantyDuration);
-        }
-        $contractStart = self::displayDate(self::firstField($fields, ['contract_date_start', 'date_contract_start']));
-        $contractEnd = self::displayDate(self::firstField($fields, ['contract_date_expiration', 'contract_date_end', 'date_contract_end']));
+        // Read GLPI-native information through DBmysql::request() only.
+        // Do not use direct SQL queries or custom join criteria here: GLPI 11
+        // blocks direct queries and validates request joins strictly.
+        $native = self::loadNativeAssetInfo($itemType, $itemId, $fields);
+
+        $name = (string) ($native['name'] ?? '');
+        $serial = (string) ($native['serial'] ?? '');
+        $assetTag = (string) ($native['asset_tag'] ?? '');
+        $manufacturer = (string) ($native['manufacturer'] ?? '');
+        $model = (string) ($native['model'] ?? '');
+        $status = (string) ($native['status'] ?? '');
+        $purchaseDate = self::displayDate($native['purchase_date'] ?? '');
+        $purchaseValue = self::displayMoney($native['purchase_value'] ?? null);
+        $equipmentWarrantyEnd = self::displayDate($native['equipment_warranty_end'] ?? '');
+        $contractType = (string) ($native['contract_type'] ?? '');
+        $contractStart = self::displayDate($native['contract_start'] ?? '');
+        $contractEnd = self::displayDate($native['contract_end'] ?? '');
+        $contractSupplier = (string) ($native['contract_supplier'] ?? '');
 
         echo "<div class='container-fluid hh-repairs'>";
         echo "<style>
@@ -93,19 +85,21 @@ final class RepairTab extends CommonGLPI
         echo "<span class='badge bg-warning text-dark'>" . self::e(__('Prototipo visual', 'hh')) . "</span>";
         echo "</div><hr class='border-light opacity-25'>";
         echo "<div class='row g-2'>";
+        self::assetDetail(__('N.º de activo fijo (inventario)', 'hh'), $assetTag);
         self::assetDetail(__('Número de serie', 'hh'), $serial);
-        self::assetDetail(__('N.º de inventario', 'hh'), $assetTag);
-        self::assetDetail(__('Fabricante (ID GLPI)', 'hh'), $manufacturer !== '' && $manufacturer !== '0' ? $manufacturer : '');
-        self::assetDetail(__('Estado (ID GLPI)', 'hh'), $status !== '' && $status !== '0' ? $status : '');
+        self::assetDetail(__('Fabricante', 'hh'), $manufacturer);
+        self::assetDetail(__('Modelo', 'hh'), $model);
+        self::assetDetail(__('Estado', 'hh'), $status);
+        self::assetDetail(__('Tipo / información de garantía', 'hh'), $contractType);
         self::assetDetail(__('Fecha de compra', 'hh'), $purchaseDate);
-        self::assetDetail(__('Tipo / información de garantía', 'hh'), $warrantyType);
-        self::assetDetail(__('Inicio de garantía', 'hh'), $warrantyStart);
-        self::assetDetail(__('Fin de garantía', 'hh'), $warrantyEnd);
+        self::assetDetail(__('Valor de compra', 'hh'), $purchaseValue);
+        self::assetDetail(__('Fin de garantía del equipo', 'hh'), $equipmentWarrantyEnd);
         self::assetDetail(__('Inicio de contrato', 'hh'), $contractStart);
         self::assetDetail(__('Fin de contrato', 'hh'), $contractEnd);
+        self::assetDetail(__('Proveedor del contrato', 'hh'), $contractSupplier);
         self::assetDetail(__('Puntos usados en reparaciones anteriores', 'hh'), __('Pendiente de historial', 'hh'));
         echo "</div>";
-        echo "<div class='small mt-3 text-muted'>" . self::e(__('Los datos que GLPI no entregue directamente aparecerán como no disponibles hasta conectar los contratos y el historial de reparaciones.', 'hh')) . "</div>";
+        echo "<div class='small mt-3 text-muted'>" . self::e(__('Los datos del activo, la compra, la garantía del equipo y los contratos se consultan desde GLPI. Las cotizaciones y el historial propio de reparaciones se implementarán en una etapa posterior.', 'hh')) . "</div>";
         echo "</div></div>";
 
         echo "<div class='alert alert-info d-flex align-items-start gap-2 mb-3' role='status'>";
@@ -189,6 +183,227 @@ final class RepairTab extends CommonGLPI
         echo "<p class='text-muted small'>" . self::e(__('Activo contextualizado desde GLPI. Toda la experiencia de reparación se mantendrá dentro de esta pestaña.')) . "</p>";
         echo "</div>";
         return true;
+    }
+
+    /**
+     * Read the asset's GLPI-native data using separate requests.
+     * Separate reads deliberately avoid fragile joins and GLPI's blocked direct SQL API.
+     */
+    private static function loadNativeAssetInfo(string $itemType, int $itemId, array $assetFields): array
+    {
+        global $DB;
+
+        $info = [
+            'name' => (string) ($assetFields['name'] ?? ''),
+            'serial' => (string) ($assetFields['serial'] ?? ''),
+            'asset_tag' => (string) ($assetFields['otherserial'] ?? ''),
+            'manufacturer' => '',
+            'model' => '',
+            'status' => '',
+            'purchase_date' => '',
+            'purchase_value' => null,
+            'equipment_warranty_end' => '',
+            'contract_type' => '',
+            'contract_start' => '',
+            'contract_end' => '',
+            'contract_supplier' => '',
+        ];
+
+        // Resolve manufacturer, model and status from GLPI catalog tables.
+        $manufacturerId = (int) ($assetFields['manufacturers_id'] ?? 0);
+        if ($manufacturerId > 0) {
+            $row = self::fetchOne($DB->request([
+                'FROM' => 'glpi_manufacturers',
+                'WHERE' => ['id' => $manufacturerId],
+                'LIMIT' => 1,
+            ]));
+            $info['manufacturer'] = (string) ($row['name'] ?? '');
+        }
+
+        $modelField = $itemType === 'Phone' ? 'phonemodels_id' : 'computermodels_id';
+        $modelTable = $itemType === 'Phone' ? 'glpi_phonemodels' : 'glpi_computermodels';
+        $modelId = (int) ($assetFields[$modelField] ?? 0);
+        if ($modelId > 0) {
+            $row = self::fetchOne($DB->request([
+                'FROM' => $modelTable,
+                'WHERE' => ['id' => $modelId],
+                'LIMIT' => 1,
+            ]));
+            $info['model'] = (string) ($row['name'] ?? '');
+        }
+
+        $stateId = (int) ($assetFields['states_id'] ?? 0);
+        if ($stateId > 0) {
+            $row = self::fetchOne($DB->request([
+                'FROM' => 'glpi_states',
+                'WHERE' => ['id' => $stateId],
+                'LIMIT' => 1,
+            ]));
+            $info['status'] = (string) ($row['name'] ?? '');
+        }
+
+        // GLPI stores purchase and equipment warranty information in infocoms.
+        $infocom = self::fetchOne($DB->request([
+            'FROM' => 'glpi_infocoms',
+            'WHERE' => [
+                'items_id' => $itemId,
+                'itemtype' => $itemType,
+            ],
+            'LIMIT' => 1,
+        ]));
+
+        if ($infocom !== []) {
+            $info['purchase_date'] = (string) ($infocom['buy_date'] ?? '');
+            $info['purchase_value'] = $infocom['value'] ?? null;
+            $warrantyMonths = (int) ($infocom['warranty_duration'] ?? 0);
+            $warrantyStart = (string) (($infocom['warranty_date'] ?? '') ?: ($infocom['buy_date'] ?? ''));
+            if ($warrantyStart !== '' && !str_starts_with($warrantyStart, '0000-00-00') && $warrantyMonths > 0) {
+                try {
+                    $info['equipment_warranty_end'] = (new \\DateTimeImmutable($warrantyStart))
+                        ->modify('+' . $warrantyMonths . ' months')
+                        ->format('Y-m-d');
+                } catch (\\Throwable $e) {
+                    $info['equipment_warranty_end'] = '';
+                }
+            }
+        }
+
+        // Contracts are related by itemtype + items_id; there may be more than one.
+        // Prefer a contract that is not deleted, and select the first matching record.
+        $links = $DB->request([
+            'FROM' => 'glpi_contracts_items',
+            'WHERE' => [
+                'itemtype' => $itemType,
+                'items_id' => $itemId,
+            ],
+            'ORDER' => ['id DESC'],
+        ]);
+
+        foreach ($links as $link) {
+            $contractId = (int) ($link['contracts_id'] ?? 0);
+            if ($contractId <= 0) {
+                continue;
+            }
+
+            $contract = self::fetchOne($DB->request([
+                'FROM' => 'glpi_contracts',
+                'WHERE' => [
+                    'id' => $contractId,
+                    'is_deleted' => 0,
+                ],
+                'LIMIT' => 1,
+            ]));
+            if ($contract === []) {
+                continue;
+            }
+
+            $contractTypeId = (int) ($contract['contracttypes_id'] ?? 0);
+            if ($contractTypeId > 0) {
+                $typeRow = self::fetchOne($DB->request([
+                    'FROM' => 'glpi_contracttypes',
+                    'WHERE' => ['id' => $contractTypeId],
+                    'LIMIT' => 1,
+                ]));
+                $info['contract_type'] = (string) ($typeRow['name'] ?? '');
+            }
+            $info['contract_start'] = (string) ($contract['begin_date'] ?? '');
+            $duration = (int) ($contract['duration'] ?? 0);
+            $beginDate = (string) ($contract['begin_date'] ?? '');
+            if ($beginDate !== '' && !str_starts_with($beginDate, '0000-00-00') && $duration > 0) {
+                try {
+                    $info['contract_end'] = (new \\DateTimeImmutable($beginDate))
+                        ->modify('+' . $duration . ' months')
+                        ->format('Y-m-d');
+                } catch (\\Throwable $e) {
+                    $info['contract_end'] = '';
+                }
+            }
+
+            // The contract supplier is independent of the asset's purchase supplier.
+            $contractSupplierLink = self::fetchOne($DB->request([
+                'FROM' => 'glpi_contracts_suppliers',
+                'WHERE' => ['contracts_id' => $contractId],
+                'LIMIT' => 1,
+            ]));
+            $supplierId = (int) ($contractSupplierLink['suppliers_id'] ?? 0);
+            if ($supplierId > 0) {
+                $supplier = self::fetchOne($DB->request([
+                    'FROM' => 'glpi_suppliers',
+                    'WHERE' => ['id' => $supplierId],
+                    'LIMIT' => 1,
+                ]));
+                $info['contract_supplier'] = (string) ($supplier['name'] ?? '');
+            }
+
+            break;
+        }
+
+        return $info;
+    }
+
+    private static function fetchOne(iterable $rows): array
+    {
+        foreach ($rows as $row) {
+            return is_array($row) ? $row : [];
+        }
+
+        return [];
+    }
+
+    private static function displayMoney($value): string
+    {
+        if (!is_numeric($value)) {
+            return '';
+        }
+
+        return '    {
+        $display = trim($value) !== '' && $value !== '0' ? $value : '—';
+        echo "<div class='col-6 col-md-4 col-xl-3'><div class='hh-asset-detail'>";
+        echo "<div class='hh-detail-label'>" . self::e($label) . "</div>";
+        echo "<strong>" . self::e($display) . "</strong>";
+        echo "</div></div>";
+    }
+
+    private static function firstField(array $fields, array $keys): string
+    {
+        foreach ($keys as $key) {
+            if (isset($fields[$key]) && is_scalar($fields[$key]) && trim((string) $fields[$key]) !== '') {
+                return (string) $fields[$key];
+            }
+        }
+
+        return '';
+    }
+
+    private static function displayDate($value): string
+    {
+        if (!is_scalar($value) || trim((string) $value) === '' || str_starts_with((string) $value, '0000-00-00')) {
+            return '';
+        }
+
+        try {
+            return (new \DateTimeImmutable((string) $value))->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
+    }
+
+    private static function statCard(string $label, string $value, string $description): void
+    {
+        echo "<div class='col-6 col-xl-3'><div class='hh-stat'><div class='text-muted'>" . self::e($label) . "</div><div class='hh-stat-value'>" . self::e($value) . "</div><div class='small text-muted mt-1'>" . self::e($description) . "</div></div></div>";
+    }
+
+    private static function formField(string $label, string $control): void
+    {
+        echo "<div class='col-md-6 col-xl-4'><label class='form-label'>" . self::e($label) . "</label>" . $control . "</div>";
+    }
+
+    private static function e(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+}
+ . number_format((float) $value, 2, '.', ',');
     }
 
     private static function assetDetail(string $label, string $value): void
