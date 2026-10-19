@@ -9,19 +9,18 @@ HH es un **plugin nativo de GLPI 11**. La experiencia se trabaja dentro de la pe
 - Muestra datos de contexto del activo disponibles en la ficha.
 - No modifica tablas nativas de GLPI.
 
-## Estado actual — versión 0.3.0
+## Estado actual — versión 0.3.1
 
-La pestaña contiene una **maqueta visual integral** para validar la experiencia antes de conectar datos y persistencia:
+La pestaña nativa consulta en modo lectura los datos de activos, compra, garantía y contratos asociados para **Computadoras** y **Teléfonos**. El tipo del contrato vigente es el valor que se muestra en **Tipo / información de garantía** y prevalece sobre la garantía propia del equipo para determinar la cobertura.
 
-- Resumen del activo y tarjetas de indicadores.
-- Listado vacío de cotizaciones.
-- Formulario visual para una cotización y sus detalles.
-- Sección de lista maestra de repuestos, piezas y trabajos.
-- Vista de parámetros para el valor por punto.
-- Indicadores para reparación repetida en 60 días y umbral del 40% del valor de compra.
-- Flujo visual de aprobación y sección de historial.
+Reglas de cobertura:
+- **Platinum:** cubre todo tipo de daño; objetivo de atención de 2 días.
+- **Gold:** excluye la placa principal; objetivo de atención de 5 días.
+- **Inveligent:** cobertura mediante puntos.
+- Sin contrato vigente, se evalúa la garantía propia del equipo registrada en GLPI; si tampoco está vigente, se muestra sin cobertura.
 
-**Importante:** esta etapa es únicamente visual. Los controles de edición y guardado están deshabilitados y no se guardan cotizaciones ni ítems. No se muestran registros ficticios como si fueran reales. La lectura ampliada del inventario y las tablas definitivas se implementarán después de validar el diseño.
+La versión 0.3.1 mantiene la consulta en modo lectura. No crea ni modifica datos nativos de GLPI y todavía no habilita el guardado de cotizaciones, puntos ni historial.
+
 
 ## Estructura
 
