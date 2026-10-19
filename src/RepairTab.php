@@ -291,6 +291,8 @@ final class RepairTab extends CommonGLPI
                           AND ci.items_id = " . (int) $itemId . "
                           AND c.is_deleted = 0
                           AND c.is_template = 0
+                          AND (c.begin_date IS NULL OR c.begin_date <= CURDATE())
+                          AND (c.duration <= 0 OR DATE_ADD(c.begin_date, INTERVAL c.duration MONTH) >= CURDATE())
                         ORDER BY c.begin_date DESC, c.id DESC";
         $contractResult = $DB->query($contractSql);
         if ($contractResult) {
@@ -308,11 +310,11 @@ final class RepairTab extends CommonGLPI
         foreach ($types as $type) {
             $normalized = mb_strtolower(trim($type));
             if ($normalized === 'platinum') {
-                $levels[] = __('Platinum: atención objetivo en 2 días', 'hh');
+                $levels[] = __('Platinum: cobertura de todo tipo de daño; atención objetivo en 2 días', 'hh');
             } elseif ($normalized === 'gold') {
-                $levels[] = __('Gold: atención objetivo en 5 días', 'hh');
+                $levels[] = __('Gold: no cubre la placa principal; atención objetivo en 5 días', 'hh');
             } elseif ($normalized === 'inveligent') {
-                $levels[] = __('Inveligent: cobertura por puntos', 'hh');
+                $levels[] = __('Inveligent: cobertura únicamente mediante puntos', 'hh');
             } else {
                 $levels[] = sprintf(__('Tipo %s: nivel de servicio por definir', 'hh'), $type);
             }
