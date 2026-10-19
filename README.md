@@ -25,12 +25,12 @@ La versión 0.3.2 mantiene la consulta en modo lectura. No crea ni modifica dato
 ## Estructura
 
 - `setup.php`: metadatos, compatibilidad GLPI 11 y registro de pestaña.
-- `hook.php`: tablas iniciales del plugin creadas mediante Migration.
+- `hook.php`: tablas del plugin y migración aditiva del catálogo maestro, compatibilidad por tipo/modelo y cabecera/detalle de cotizaciones.
 - `src/Dashboard.php`: entrada del plugin en el menú.
 - `src/RepairTab.php`: experiencia visual dentro de la ficha de activo.
 - `front/index.php`: pantalla de entrada del plugin.
 
-Las tablas existentes con prefijo `glpi_plugin_hh_` se conservan. En la próxima etapa se revisará el modelo de datos antes de agregar tablas para el catálogo maestro y las cotizaciones.
+Las tablas existentes con prefijo `glpi_plugin_hh_` se conservan. La estructura ahora contempla catálogo maestro de ítems (`glpi_plugin_hh_items`), asignación por tipo/modelo (`glpi_plugin_hh_itemtypes`), cabecera (`glpi_plugin_hh_quotes`) y detalle (`glpi_plugin_hh_quotedetails`). Las migraciones agregan columnas faltantes sin borrar los datos existentes. La interfaz todavía no guarda cotizaciones.
 
 ## Instalar en entorno de pruebas
 
