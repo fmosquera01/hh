@@ -36,8 +36,9 @@ final class RepairTab extends CommonGLPI
         $contracts = $native['contracts'];
         // La garantía propia del equipo se calcula aparte del contrato extendido.
         // La fecha de compra es el inicio preferente de la garantía nativa.
-        $warrantyStart = self::validDate($native['buy_date'] ?? null)
-            ? (string) $native['buy_date'] : (string) ($native['warranty_date'] ?? '');
+        $warrantyStart = self::validDate($native['warranty_date'] ?? null)
+            ? (string) $native['warranty_date']
+            : (string) ($native['buy_date'] ?? '');
         $warrantyMonths = (int) ($native['warranty_duration'] ?? 0);
         $warrantyEnd = self::addMonths($warrantyStart, $warrantyMonths);
         $today = date('Y-m-d');
@@ -208,18 +209,21 @@ final class RepairTab extends CommonGLPI
             'FROM' => $assetTable,
             'LEFT JOIN' => [
                 'glpi_manufacturers' => [
-                    'ON' => [
-                        'glpi_manufacturers.id' => $assetTable . '.manufacturers_id',
+                    'FKEY' => [
+                        $assetTable => 'manufacturers_id',
+                        'glpi_manufacturers' => 'id',
                     ],
                 ],
                 $table['model'] => [
-                    'ON' => [
-                        $table['model'] . '.id' => $assetTable . '.' . $table['model_field'],
+                    'FKEY' => [
+                        $assetTable => $table['model_field'],
+                        $table['model'] => 'id',
                     ],
                 ],
                 'glpi_states' => [
-                    'ON' => [
-                        'glpi_states.id' => $assetTable . '.states_id',
+                    'FKEY' => [
+                        $assetTable => 'states_id',
+                        'glpi_states' => 'id',
                     ],
                 ],
             ],
@@ -253,8 +257,9 @@ final class RepairTab extends CommonGLPI
             'FROM' => 'glpi_infocoms',
             'LEFT JOIN' => [
                 'glpi_suppliers' => [
-                    'ON' => [
-                        'glpi_suppliers.id' => 'glpi_infocoms.suppliers_id',
+                    'FKEY' => [
+                        'glpi_infocoms' => 'suppliers_id',
+                        'glpi_suppliers' => 'id',
                     ],
                 ],
             ],
@@ -286,15 +291,17 @@ final class RepairTab extends CommonGLPI
             'FROM' => 'glpi_contracts_items',
             'INNER JOIN' => [
                 'glpi_contracts' => [
-                    'ON' => [
-                        'glpi_contracts.id' => 'glpi_contracts_items.contracts_id',
+                    'FKEY' => [
+                        'glpi_contracts_items' => 'contracts_id',
+                        'glpi_contracts' => 'id',
                     ],
                 ],
             ],
             'LEFT JOIN' => [
                 'glpi_contracttypes' => [
-                    'ON' => [
-                        'glpi_contracttypes.id' => 'glpi_contracts.contracttypes_id',
+                    'FKEY' => [
+                        'glpi_contracts' => 'contracttypes_id',
+                        'glpi_contracttypes' => 'id',
                     ],
                 ],
             ],
