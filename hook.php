@@ -22,11 +22,43 @@ function plugin_hh_install(): bool
             PRIMARY KEY (`id`),
             KEY `idx_hh_pointvalues_validity` (`valid_from`, `valid_until`)
         ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_items' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_items` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `code` varchar(40) NOT NULL,
+            `name` varchar(180) NOT NULL,
+            `description` text DEFAULT NULL,
+            `category` varchar(30) NOT NULL DEFAULT 'part',
+            `points_each` decimal(12,2) NOT NULL DEFAULT 0,
+            `is_active` tinyint NOT NULL DEFAULT 1,
+            `users_id` int unsigned NOT NULL,
+            `date_creation` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `date_mod` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `unicity_code` (`code`),
+            KEY `idx_hh_items_category_active` (`category`, `is_active`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_itemtypes' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_itemtypes` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `plugin_hh_items_id` int unsigned NOT NULL,
+            `itemtype` varchar(100) NOT NULL,
+            `models_id` int unsigned DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `unicity_item_type_model` (`plugin_hh_items_id`, `itemtype`, `models_id`),
+            KEY `idx_hh_itemtypes_type_model` (`itemtype`, `models_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
         'glpi_plugin_hh_quotes' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_quotes` (
             `id` int unsigned NOT NULL AUTO_INCREMENT,
             `name` varchar(40) NOT NULL,
             `itemtype` varchar(100) DEFAULT NULL,
             `items_id` int unsigned DEFAULT NULL,
+            `quote_date` date DEFAULT NULL,
+            `suppliers_id` int unsigned DEFAULT NULL,
+            `supplier_name_snapshot` varchar(180) DEFAULT NULL,
+            `supplier_quote_number` varchar(100) DEFAULT NULL,
+            `repair_type` varchar(30) NOT NULL DEFAULT 'corrective',
+            `priority` varchar(20) NOT NULL DEFAULT 'normal',
+            `diagnosis` text DEFAULT NULL,
+            `observations` text DEFAULT NULL,
             `status` varchar(20) NOT NULL DEFAULT 'draft',
             `total_points` decimal(12,2) NOT NULL DEFAULT 0,
             `point_value_snapshot` decimal(12,4) NOT NULL,
@@ -43,6 +75,9 @@ function plugin_hh_install(): bool
         'glpi_plugin_hh_quotedetails' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_quotedetails` (
             `id` int unsigned NOT NULL AUTO_INCREMENT,
             `plugin_hh_quotes_id` int unsigned NOT NULL,
+            `plugin_hh_items_id` int unsigned DEFAULT NULL,
+            `code_snapshot` varchar(40) DEFAULT NULL,
+            `category_snapshot` varchar(30) DEFAULT NULL,
             `description_snapshot` varchar(255) NOT NULL,
             `quantity` decimal(10,2) NOT NULL DEFAULT 1,
             `points_each` decimal(12,2) NOT NULL DEFAULT 0,
@@ -68,6 +103,34 @@ function plugin_hh_install(): bool
     foreach ($tables as $table => $sql) {
         if (!$DB->tableExists($table)) {
             $migration->addPostQuery($sql);
+        }
+    }
+
+    // Upgrade tables created by earlier HH versions without dropping existing data.
+    // MariaDB supports ADD COLUMN IF NOT EXISTS, which makes this migration repeatable.
+    $upgrades = [
+        'glpi_plugin_hh_quotes' => [
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `quote_date` date DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `suppliers_id` int unsigned DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `supplier_name_snapshot` varchar(180) DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `supplier_quote_number` varchar(100) DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `repair_type` varchar(30) NOT NULL DEFAULT 'corrective'",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `priority` varchar(20) NOT NULL DEFAULT 'normal'",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `diagnosis` text DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `observations` text DEFAULT NULL",
+        ],
+        'glpi_plugin_hh_quotedetails' => [
+            "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `plugin_hh_items_id` int unsigned DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `code_snapshot` varchar(40) DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `category_snapshot` varchar(30) DEFAULT NULL",
+        ],
+    ];
+
+    foreach ($upgrades as $table => $queries) {
+        if ($DB->tableExists($table)) {
+            foreach ($queries as $query) {
+                $migration->addPostQuery($query);
+            }
         }
     }
 
