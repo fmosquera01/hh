@@ -53,9 +53,9 @@ final class RepairTab extends CommonGLPI
         $warrantyEndRaw = self::firstField($fields, ['warranty_date_expiration', 'warranty_date_end', 'warranty_end_date', 'date_warranty_end']);
         if ($warrantyEndRaw === '' && !empty($fields['date_purchase']) && (int) ($fields['warranty_duration'] ?? 0) > 0) {
             try {
-                $purchase = new \\DateTimeImmutable((string) $fields['date_purchase']);
+                $purchase = new \DateTimeImmutable((string) $fields['date_purchase']);
                 $warrantyEndRaw = $purchase->modify('+' . (int) $fields['warranty_duration'] . ' months')->format('Y-m-d');
-            } catch (\\Throwable $e) {
+            } catch (\Throwable $e) {
                 $warrantyEndRaw = '';
             }
         }
@@ -218,8 +218,8 @@ final class RepairTab extends CommonGLPI
         }
 
         try {
-            return (new \\DateTimeImmutable((string) $value))->format('Y-m-d');
-        } catch (\\Throwable $e) {
+            return (new \DateTimeImmutable((string) $value))->format('Y-m-d');
+        } catch (\Throwable $e) {
             return (string) $value;
         }
     }
