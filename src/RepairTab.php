@@ -36,9 +36,9 @@ final class RepairTab extends CommonGLPI
         $contracts = $native['contracts'];
         // La garantía propia del equipo se calcula aparte del contrato extendido.
         // La fecha de compra es el inicio preferente de la garantía nativa.
-        $warrantyStart = self::validDate($native['warranty_date'] ?? null)
-            ? (string) $native['warranty_date']
-            : (string) ($native['buy_date'] ?? '');
+        $warrantyStart = self::validDate($native['buy_date'] ?? null)
+            ? (string) $native['buy_date']
+            : (string) ($native['warranty_date'] ?? '');
         $warrantyMonths = (int) ($native['warranty_duration'] ?? 0);
         $warrantyEnd = self::addMonths($warrantyStart, $warrantyMonths);
         $today = date('Y-m-d');
@@ -48,27 +48,20 @@ final class RepairTab extends CommonGLPI
             static fn(array $contract): bool => self::isContractCurrent($contract, $today)
         ));
 
-        // El contrato vigente manda sobre la garantía propia del equipo.
+        // El tipo de contrato vigente es la información principal de cobertura.
+        // Si no hay contrato vigente, se muestra la garantía propia del equipo si aplica.
         if ($currentContracts !== []) {
             $types = array_values(array_unique(array_filter(array_map(
                 static fn(array $contract): string => trim((string) ($contract['contract_type'] ?? '')),
                 $currentContracts
             ))));
             $warrantyType = $types !== [] ? implode(', ', $types) : __('Contrato vigente', 'hh');
-            $serviceLevel = self::serviceLevelForContracts($currentContracts);
-            $coverageSource = __('Contrato de servicio vigente; prevalece sobre la garantía propia del equipo', 'hh');
-            $coverageStart = self::displayDate($currentContracts[0]['begin_date'] ?? null);
         } elseif ($warrantyEnd !== '' && $warrantyEnd >= $today) {
             $warrantyType = __('Garantía del equipo', 'hh');
-            $serviceLevel = __('Aplican las condiciones de la garantía del fabricante', 'hh');
-            $coverageSource = __('Garantía propia del equipo registrada en GLPI', 'hh');
-            $coverageStart = self::displayDate($warrantyStart);
         } else {
             $warrantyType = __('Sin garantía ni contrato vigente', 'hh');
-            $serviceLevel = __('No aplica un nivel de servicio de contrato', 'hh');
-            $coverageSource = __('Sin cobertura vigente detectada', 'hh');
-            $coverageStart = '—';
         }
+
 
         echo "<div class='container-fluid hh-repairs'>";
         echo "<style>
@@ -89,55 +82,20 @@ final class RepairTab extends CommonGLPI
         echo "<span class='badge bg-success-lt'>" . self::e(__('Consulta nativa activa', 'hh')) . "</span></div>";
         echo "<hr class='border-light opacity-25'><div class='row g-2'>";
 
-        self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
         self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
+        self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
         self::assetDetail(__('Fabricante', 'hh'), (string) ($native['manufacturer'] ?? ''));
         self::assetDetail(__('Modelo', 'hh'), (string) ($native['model'] ?? ''));
-        self::assetDetail(__('Marca', 'hh'), (string) ($native['brand'] ?? ''));
         self::assetDetail(__('Estado', 'hh'), (string) ($native['status'] ?? ''));
+        self::assetDetail(__('Tipo / información de garantía', 'hh'), $warrantyType);
         self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
         self::assetDetail(__('Valor de compra', 'hh'), self::displayMoney($native['purchase_value'] ?? null));
-        self::assetDetail(__('Tipo / información de garantía', 'hh'), $warrantyType);
+        self::assetDetail(__('Fin de garantía del equipo', 'hh'), self::displayDate($warrantyEnd));
+        self::assetDetail(__('Tipo de contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_type'] ?? '—') : '—');
         self::assetDetail(__('Inicio de contrato', 'hh'), $currentContracts !== [] ? self::displayDate($currentContracts[0]['begin_date'] ?? null) : '—');
         self::assetDetail(__('Fin de contrato', 'hh'), $currentContracts !== [] ? self::displayDate($currentContracts[0]['contract_end_date'] ?? null) : '—');
-        self::assetDetail(__('Proveedor del equipo', 'hh'), (string) ($native['supplier'] ?? ''));
-        self::assetDetail(__('Orden de compra', 'hh'), (string) ($native['order_number'] ?? ''));
-        self::assetDetail(__('Factura', 'hh'), (string) ($native['bill'] ?? ''));
-        self::assetDetail(__('Origen de cobertura', 'hh'), $coverageSource);
-        self::assetDetail(__('Nivel de servicio', 'hh'), $serviceLevel);
+        self::assetDetail(__('Proveedor del contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_supplier'] ?? '') : '—');
         echo "</div></div></div>";
-
-        echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>"
-            . self::e(__('Contratos asociados al activo', 'hh')) . "</h3></div><div class='card-body'>";
-        if ($contracts === []) {
-            echo "<div class='hh-empty'><strong>" . self::e(__('No se encontraron contratos asociados', 'hh'))
-                . "</strong><div class='text-muted mt-1'>" . self::e(__('Se evaluará la garantía propia del equipo si está registrada y vigente.', 'hh')) . "</div></div>";
-        } else {
-            echo "<div class='table-responsive'><table class='table table-vcenter'><thead><tr>";
-            foreach ([__('Contrato'), __('Tipo'), __('Inicio'), __('Vencimiento'), __('Estado'), __('Condiciones')] as $heading) {
-                echo '<th>' . self::e($heading) . '</th>';
-            }
-            echo "</tr></thead><tbody>";
-            foreach ($contracts as $contract) {
-                $isCurrent = self::isContractCurrent($contract, $today);
-                echo '<tr><td>' . self::e((string) ($contract['contract_name'] ?? '—')) . '</td>';
-                echo '<td>' . self::e((string) ($contract['contract_type'] ?? '—')) . '</td>';
-                echo '<td>' . self::e(self::displayDate($contract['begin_date'] ?? null)) . '</td>';
-                echo '<td>' . self::e(self::displayDate($contract['contract_end_date'] ?? null)) . '</td>';
-                echo '<td><span class="badge ' . ($isCurrent ? 'bg-success-lt' : 'bg-secondary-lt') . '">'
-                    . self::e($isCurrent ? __('Vigente', 'hh') : __('No vigente', 'hh')) . '</span></td>';
-                echo '<td>' . self::e((string) ($contract['contract_conditions'] ?? '')) . '</td></tr>';
-            }
-            echo "</tbody></table></div>";
-        }
-        echo "</div></div>";
-
-        echo "<div class='alert alert-info' role='status'><strong>" . self::e(__('Reglas de cobertura', 'hh')) . "</strong><ul class='mb-0 mt-2'>";
-        echo "<li>" . self::e(__('Platinum: cubre todo tipo de daño; tiempo objetivo de atención de 2 días.', 'hh')) . "</li>";
-        echo "<li>" . self::e(__('Gold: no cubre la placa principal; tiempo objetivo de atención de 5 días.', 'hh')) . "</li>";
-        echo "<li>" . self::e(__('Inveligent: cobertura mediante puntos.', 'hh')) . "</li>";
-        echo "<li>" . self::e(__('Sin contrato vigente, se evalúa la garantía propia del equipo; si tampoco está vigente, el activo queda sin cobertura.', 'hh')) . "</li>";
-        echo "</ul></div>";
 
         echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>"
             . self::e(__('Cotizaciones e historial de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
@@ -283,6 +241,7 @@ final class RepairTab extends CommonGLPI
                     'glpi_contracttypes',
                     (int) ($contract['contracttypes_id'] ?? 0)
                 );
+                $contract['contract_supplier'] = self::lookupContractSupplier($contractId);
                 $contract['contract_end_date'] = self::addMonths(
                     (string) ($contract['begin_date'] ?? ''),
                     (int) ($contract['duration'] ?? 0)
@@ -338,6 +297,35 @@ final class RepairTab extends CommonGLPI
         return '';
     }
 
+    /** Resolve supplier linked to a contract through GLPI's native relation table. */
+    private static function lookupContractSupplier(int $contractId): string
+    {
+        global $DB;
+
+        if ($contractId < 1) {
+            return '';
+        }
+
+        $links = $DB->request([
+            'SELECT' => ['suppliers_id'],
+            'FROM' => 'glpi_contracts_suppliers',
+            'WHERE' => ['contracts_id' => $contractId],
+        ]);
+
+        $names = [];
+        foreach ($links as $link) {
+            $supplierId = (int) ($link['suppliers_id'] ?? 0);
+            if ($supplierId > 0) {
+                $name = self::lookupName('glpi_suppliers', $supplierId);
+                if ($name !== '') {
+                    $names[] = $name;
+                }
+            }
+        }
+
+        return implode(', ', array_values(array_unique($names)));
+    }
+
     private static function isContractCurrent(array $contract, string $today): bool
     {
         $start = (string) ($contract['begin_date'] ?? '');
@@ -351,25 +339,6 @@ final class RepairTab extends CommonGLPI
             return false;
         }
         return true;
-    }
-
-    private static function serviceLevelForContracts(array $contracts): string
-    {
-        $levels = [];
-        foreach ($contracts as $contract) {
-            $type = trim((string) ($contract['contract_type'] ?? ''));
-            $normalized = strtolower($type);
-            if ($normalized === 'platinum') {
-                $levels[] = __('Platinum: cubre todo tipo de daño; objetivo de atención 2 días', 'hh');
-            } elseif ($normalized === 'gold') {
-                $levels[] = __('Gold: excluye la placa principal; objetivo de atención 5 días', 'hh');
-            } elseif ($normalized === 'inveligent') {
-                $levels[] = __('Inveligent: cobertura por puntos', 'hh');
-            } elseif ($type !== '') {
-                $levels[] = sprintf(__('Contrato %s: nivel de servicio por definir', 'hh'), $type);
-            }
-        }
-        return $levels !== [] ? implode('; ', array_unique($levels)) : __('Consultar condiciones del contrato', 'hh');
     }
 
     private static function addMonths(string $start, int $months): string
