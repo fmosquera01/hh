@@ -192,14 +192,19 @@ final class RepairTab extends CommonGLPI
         ];
 
         // Read the asset and its catalog relationships using GLPI's DB API.
+        $assetSelect = [
+            $assetTable . '.id',
+            'glpi_manufacturers.name AS manufacturer',
+            $table['model'] . '.name AS model',
+            'glpi_states.name AS status',
+        ];
+        // GLPI phones have a brand field; computers do not.
+        if ($itemType === 'Phone') {
+            $assetSelect[] = $assetTable . '.brand';
+        }
+
         $assetRows = $DB->request([
-            'SELECT' => [
-                $assetTable . '.id',
-                $assetTable . '.brand',
-                'glpi_manufacturers.name AS manufacturer',
-                $table['model'] . '.name AS model',
-                'glpi_states.name AS status',
-            ],
+            'SELECT' => $assetSelect,
             'FROM' => $assetTable,
             'LEFT JOIN' => [
                 'glpi_manufacturers' => [
