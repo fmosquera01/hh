@@ -408,7 +408,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 .hh-quotes #hh-quote-form .form-control,.hh-quotes #hh-quote-form .form-select{min-height:28px;padding:3px 6px;font-size:11.5px}
 .hh-quotes #hh-quote-form textarea.form-control{min-height:38px;height:38px;resize:vertical}
 .hh-quotes #hh-quote-form .text-muted{font-size:10px}
-@media(max-width:767px){.hh-quotes #hh-quote-form [class*="col-md-"]{width:100%}}
+@media(min-width:768px){.hh-quotes #hh-quote-form .col-md-4{width:33.33333333%}.hh-quotes #hh-quote-form .col-md-6{width:50%}}@media(min-width:576px) and (max-width:767.98px){.hh-quotes #hh-quote-form .col-md-4{width:50%}.hh-quotes #hh-quote-form .col-md-6{width:50%}.hh-quotes #hh-quote-form [class*="col-md-"]{width:50%}}@media(max-width:575.98px){.hh-quotes #hh-quote-form [class*="col-md-"]{width:100%}}
 
 .hh-quotes{font-size:12.5px;line-height:1.32}
 .hh-quotes .card{margin-bottom:9px;border-radius:8px}
