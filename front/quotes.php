@@ -417,13 +417,22 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
   </div>
  </div>
 
- <div class="card">
-  <div class="card-header"><h3 class="card-title">Listado de cotizaciones</h3></div>
-  <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>N.º</th><th>Fecha</th><th>Activo</th><th>Proveedor</th><th>Estado</th><th class="text-end">Puntos</th><th class="text-end">Total USD</th><th>Acción</th></tr></thead><tbody>
-  <?php foreach($allQuotes as $quote): $label=hhQAssetLabel((string)$quote['itemtype'],(int)$quote['items_id']); ?>
-   <tr><td><?=hhQe((string)$quote['name'])?></td><td><?=hhQe((string)($quote['quote_date'] ?? ''))?></td><td><?=hhQe($allowedTypes[(string)$quote['itemtype']] ?? (string)$quote['itemtype'])?> #<?=(int)$quote['items_id']?><div class="small text-muted"><?=hhQe($label)?></div></td><td><?=hhQe((string)($quote['supplier_name_snapshot'] ?? '—'))?></td><td><span class="badge bg-<?=$quote['status']==='approved'?'success':($quote['status']==='rejected'?'danger':'secondary')?>"><?=hhQe($statuses[(string)$quote['status']] ?? (string)$quote['status'])?></span></td><td class="text-end"><?=number_format((float)$quote['total_points'],2)?></td><td class="text-end">$<?=number_format((float)$quote['total_amount_snapshot'],2)?></td><td><a class="btn btn-sm btn-outline-primary" href="/plugins/hh/front/quotes.php?<?= $embedded ? 'embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&' : '' ?>edit=<?=(int)$quote['id']?>">Ver / <?=((string)$quote['status']==='draft'?'Editar':'detalle')?></a></td></tr>
+ <div class="card hh-section mb-4">
+  <div class="hh-section-head"><h3 class="card-title mb-0">Cotización actual</h3><small class="text-muted">Solo borradores pendientes de decisión. Cada activo puede tener un único borrador.</small></div>
+  <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>N.º</th><th>Fecha</th><th>Activo</th><th>Proveedor</th><th class="text-end">Puntos</th><th class="text-end">Total USD</th><th>Acción</th></tr></thead><tbody>
+  <?php $draftCount = 0; foreach ($allQuotes as $quote): if ((string)$quote['status'] !== 'draft') continue; $draftCount++; $label = hhQAssetLabel((string)$quote['itemtype'], (int)$quote['items_id']); ?>
+   <tr><td><strong><?=hhQe((string)$quote['name'])?></strong><div class="small text-muted">Borrador editable</div></td><td><?=hhQe((string)($quote['quote_date'] ?? ''))?></td><td><?=hhQe($allowedTypes[(string)$quote['itemtype']] ?? (string)$quote['itemtype'])?> #<?=(int)$quote['items_id']?><div class="small text-muted"><?=hhQe($label)?></div></td><td><?=hhQe((string)($quote['supplier_name_snapshot'] ?? '—'))?></td><td class="text-end"><?=number_format((float)$quote['total_points'],2)?></td><td class="text-end fw-bold">$<?=number_format((float)$quote['total_amount_snapshot'],2)?></td><td><a class="btn btn-sm btn-primary" href="/plugins/hh/front/quotes.php?<?= $embedded ? 'embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&' : '' ?>edit=<?=(int)$quote['id']?>">Abrir / editar</a></td></tr>
   <?php endforeach; ?>
-  <?php if($allQuotes===[]): ?><tr><td colspan="8" class="text-center text-muted p-4">Todavía no hay cotizaciones.</td></tr><?php endif; ?>
+  <?php if ($draftCount === 0): ?><tr><td colspan="7" class="text-center text-muted p-4">No hay borradores pendientes. Puede crear una cotización nueva.</td></tr><?php endif; ?>
+  </tbody></table></div>
+ </div>
+ <div class="card hh-section">
+  <div class="hh-section-head"><h3 class="card-title mb-0">Historial de cotizaciones</h3><small class="text-muted">Las cotizaciones aprobadas o rechazadas se conservan aquí y no bloquean una nueva cotización.</small></div>
+  <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>N.º</th><th>Fecha</th><th>Activo</th><th>Proveedor</th><th>Decisión</th><th class="text-end">Puntos</th><th class="text-end">Total USD</th><th>Detalle</th></tr></thead><tbody>
+  <?php $historyCount = 0; foreach ($allQuotes as $quote): if ((string)$quote['status'] === 'draft') continue; $historyCount++; $label = hhQAssetLabel((string)$quote['itemtype'], (int)$quote['items_id']); ?>
+   <tr><td><?=hhQe((string)$quote['name'])?></td><td><?=hhQe((string)($quote['quote_date'] ?? ''))?></td><td><?=hhQe($allowedTypes[(string)$quote['itemtype']] ?? (string)$quote['itemtype'])?> #<?=(int)$quote['items_id']?><div class="small text-muted"><?=hhQe($label)?></div></td><td><?=hhQe((string)($quote['supplier_name_snapshot'] ?? '—'))?></td><td><span class="badge bg-<?=$quote['status'] === 'approved' ? 'success' : 'danger'?>"><?=hhQe($statuses[(string)$quote['status']] ?? (string)$quote['status'])?></span></td><td class="text-end"><?=number_format((float)$quote['total_points'],2)?></td><td class="text-end">$<?=number_format((float)$quote['total_amount_snapshot'],2)?></td><td><a class="btn btn-sm btn-outline-secondary" href="/plugins/hh/front/quotes.php?<?= $embedded ? 'embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&' : '' ?>edit=<?=(int)$quote['id']?>">Ver detalle</a></td></tr>
+  <?php endforeach; ?>
+  <?php if ($historyCount === 0): ?><tr><td colspan="8" class="text-center text-muted p-4">Todavía no hay decisiones registradas.</td></tr><?php endif; ?>
   </tbody></table></div>
  </div>
 </div>
