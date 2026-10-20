@@ -127,6 +127,7 @@ function plugin_hh_install(): bool
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `category_snapshot` varchar(30) DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `source_itemtype` varchar(100) DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `source_items_id` int unsigned DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `is_warranty` tinyint NOT NULL DEFAULT 0",
         ],
     ];
 
