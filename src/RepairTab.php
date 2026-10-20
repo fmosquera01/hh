@@ -65,20 +65,31 @@ final class RepairTab extends CommonGLPI
 
         echo "<div class='container-fluid hh-repairs'>";
         echo "<style>
-            .hh-repairs .hh-hero{border:0;border-radius:.65rem;background:linear-gradient(120deg,#17365d,#245b83);color:#fff}
+            .hh-repairs{font-size:13px;line-height:1.3;padding-left:.35rem;padding-right:.35rem}
+            .hh-repairs .hh-hero{border:0;border-radius:.55rem;background:linear-gradient(120deg,#17365d,#245b83);color:#fff}
             .hh-repairs .hh-hero .text-muted{color:#d8e6f2!important}
-            .hh-repairs .hh-asset-detail{height:100%;border:1px solid rgba(255,255,255,.22);border-radius:.45rem;padding:.65rem .75rem;background:rgba(255,255,255,.06)}
-            .hh-repairs .hh-detail-label{font-size:.72rem;color:#d8e6f2;margin-bottom:.15rem}
-            .hh-repairs .hh-asset-detail strong{overflow-wrap:anywhere;white-space:normal}
-            .hh-repairs .hh-empty{border:1px dashed var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1.5rem 1rem;text-align:center}
+            .hh-repairs .hh-hero .card-body{padding:.7rem 1rem!important}
+            .hh-repairs .hh-hero h2{font-size:1.15rem;line-height:1.25;margin-bottom:.35rem!important}
+            .hh-repairs .hh-asset-detail{height:100%;min-height:0;border:1px solid rgba(255,255,255,.22);border-radius:.35rem;padding:.38rem .5rem;background:rgba(255,255,255,.06)}
+            .hh-repairs .hh-detail-label{font-size:.65rem;line-height:1.2;color:#d8e6f2;margin-bottom:.08rem}
+            .hh-repairs .hh-asset-detail strong{font-size:.78rem;line-height:1.2;overflow-wrap:anywhere;white-space:normal}
+            .hh-repairs .row.g-2{--tblr-gutter-x:.4rem;--tblr-gutter-y:.4rem}
+            .hh-repairs .hh-empty{border:1px dashed var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1rem;text-align:center}
+            .hh-repairs>.card{margin-bottom:.6rem!important}
+            .hh-repairs>.card>.card-header{padding:.55rem .8rem}
+            .hh-repairs>.card>.card-header .card-title{font-size:.95rem}
+            .hh-repairs>.card>.card-body{padding:.65rem .8rem}
+            .hh-repairs .nav-tabs .nav-link{padding:.35rem .6rem;font-size:.82rem}
+            .hh-repairs [data-hh-panel]{padding-top:.45rem!important}
+            .hh-repairs iframe{display:block}
         </style>";
 
-        echo "<div class='card hh-hero mb-3'><div class='card-body p-4'>";
+        echo "<div class='card hh-hero mb-2'><div class='card-body p-3'>";
         
         echo "<h2 class='mb-1'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h2>";
       
         
-        echo "<br class='border-light opacity-25'><div class='row g-2'>";
+        echo "<div class='row g-2'>";
 
         self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
         self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
