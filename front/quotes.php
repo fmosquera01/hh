@@ -11,6 +11,22 @@ $embedded = (($_GET['embedded'] ?? '') === '1');
 $contextItemType = (string)($_GET['itemtype'] ?? '');
 $contextItemsId = (int)($_GET['items_id'] ?? 0);
 $contextAssetName = ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) ? hhQAssetLabel($contextItemType, $contextItemsId) : '';
+$purchaseValue = null;
+$purchaseItemType = $contextItemType;
+$purchaseItemsId = $contextItemsId;
+if (isset($_GET['edit']) && (int)$_GET['edit'] > 0) {
+    foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$_GET['edit']], ['itemtype', 'items_id']) as $assetQuote) {
+        $purchaseItemType = (string)$assetQuote['itemtype'];
+        $purchaseItemsId = (int)$assetQuote['items_id'];
+        break;
+    }
+}
+if (in_array($purchaseItemType, ['Computer', 'Phone'], true) && $purchaseItemsId > 0) {
+    foreach (hhQRows('glpi_infocoms', ['items_id' => $purchaseItemsId, 'itemtype' => $purchaseItemType], ['value'], []) as $info) {
+        if (is_numeric($info['value'] ?? null) && (float)$info['value'] > 0) $purchaseValue = (float)$info['value'];
+        break;
+    }
+}
 
 if (!Session::haveRight('config', UPDATE)) {
     Html::displayRightError();
@@ -139,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $linePoints = $_POST['line_points'] ?? [];
         $lineSourceTypes = $_POST['line_source_type'] ?? [];
         $lineSourceIds = $_POST['line_source_id'] ?? [];
+        $lineWarranty = $_POST['line_is_warranty'] ?? [];
 
         if ($error === '' && (!array_key_exists($itemtype, $allowedTypes) || $itemsId === false || $itemsId < 1 || hhQAssetLabel($itemtype, (int)$itemsId) === '')) {
             $error = 'Seleccione un tipo de activo y un ID válido de un equipo existente.';
@@ -156,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $lines = [];
         if ($error === '') {
-            if (!is_array($lineIds) || !is_array($quantities) || !is_array($linePoints) || !is_array($lineSourceTypes) || !is_array($lineSourceIds)) {
+            if (!is_array($lineIds) || !is_array($quantities) || !is_array($linePoints) || !is_array($lineSourceTypes) || !is_array($lineSourceIds) || !is_array($lineWarranty)) {
                 $error = 'Las líneas de la cotización no son válidas.';
             } else {
                 foreach ($lineIds as $idx => $rawId) {
@@ -203,6 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'description' => (string)$catalogItem['name'],
                         'quantity' => (float)$qty,
                         'points_each' => (float)$pts,
+                        'is_warranty' => (int)($lineWarranty[$idx] ?? 0) === 1 ? 1 : 0,
                     ];
                 }
                 if ($error === '' && $lines === []) $error = 'Agregue al menos un artículo del catálogo a la cotización.';
@@ -268,6 +286,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'amount_snapshot' => number_format($lineTotalPoints * (float)$point['value'], 2, '.', ''),
                         'source_itemtype' => $line['source_itemtype'],
                         'source_items_id' => $line['source_items_id'],
+                        'is_warranty' => $line['is_warranty'],
                     ]);
                 }
                 if (!$existing) hhQWriteHistory($savedId, null, 'draft', 'Cotización creada como borrador.');
@@ -340,6 +359,7 @@ foreach ($editLines as $line) $initialLines[] = [
     'item_id' => (int)($line['plugin_hh_items_id'] ?? 0),
     'quantity' => (float)$line['quantity'],
     'points_each' => (float)$line['points_each'],
+    'is_warranty' => (int)($line['is_warranty'] ?? 0),
     'source_itemtype' => (string)($line['source_itemtype'] ?? ''),
     'source_items_id' => (int)($line['source_items_id'] ?? 0),
 ];
@@ -484,7 +504,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
      <div class="col-md-6"><label class="form-label">Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe((string)($editQuote['observations'] ?? ''))?></textarea></div>
     </div>
     <hr><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Detalle de repuestos y servicios</h4><button type="button" class="btn btn-outline-primary btn-sm" id="hh-add-line">Agregar línea</button></div>
-    <div class="table-responsive"><table class="table table-sm table-striped align-middle hh-lines-table"><thead><tr><th style="min-width:200px">Artículo</th><th style="min-width:100px">Reuso de pieza</th><th style="width:70px">Cantidad</th><th style="width:70px">Puntos</th><th style="width:80px">Total puntos</th><th style="width:80px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="4" class="text-end">Totales</th><th id="hh-total-points" class="hh-total">0.00</th><th id="hh-total-amount" class="hh-total">$0.00</th><th></th></tr></tfoot></table></div>
+    <div class="table-responsive"><table class="table table-sm table-striped align-middle hh-lines-table"><thead><tr><th style="min-width:200px">Artículo</th><th style="min-width:100px">Reuso de pieza</th><th style="min-width:95px">Garantía</th><th style="width:70px">Cantidad</th><th style="width:70px">Puntos</th><th style="width:80px">Total puntos</th><th style="width:80px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="5" class="text-end">Totales</th><th id="hh-total-points" class="hh-total">0.00</th><th id="hh-total-amount" class="hh-total">$0.00</th><th></th></tr></tfoot></table></div>
     <p class="text-muted small">Al seleccionar un artículo se cargan sus puntos actuales. Puedes ajustarlos en esta cotización; el valor queda guardado como histórico en sus líneas. La cotización queda como borrador hasta que se apruebe o rechace.</p>
     <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId : '/plugins/hh/front/quotes.php' ?>">Nueva / cancelar</a>
    </form>
@@ -527,6 +547,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
  const initial = <?=json_encode($initialLines, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
  const assets = <?=json_encode($assetOptions, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
  const pointValue = <?=json_encode((float)$point['value'])?>;
+  const purchaseValue = <?=json_encode($purchaseValue)?>;
  const typeEl = document.getElementById('hh-asset-type');
  const tbody = document.getElementById('hh-lines');
  const addBtn = document.getElementById('hh-add-line');
@@ -538,7 +559,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
  }
  function row(data={item_id:0,quantity:1,points_each:null}) {
    const tr=document.createElement('tr');
-   const tdItem=document.createElement('td'), tdSource=document.createElement('td'), tdQty=document.createElement('td'), tdPoints=document.createElement('td'), tdPts=document.createElement('td'), tdMoney=document.createElement('td'), tdAction=document.createElement('td');
+   const tdItem=document.createElement('td'), tdSource=document.createElement('td'), tdWarranty=document.createElement('td'), tdQty=document.createElement('td'), tdPoints=document.createElement('td'), tdPts=document.createElement('td'), tdMoney=document.createElement('td'), tdAction=document.createElement('td');
    const select=document.createElement('select'); select.className='form-select form-select-sm'; select.name='line_item_id[]'; select.required=true;
    const empty=document.createElement('option'); empty.value=''; empty.textContent='Seleccione artículo'; select.appendChild(empty);
    catalog.filter(allowed).forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.name;o.dataset.points=String(item.points);select.appendChild(o);});
@@ -556,16 +577,31 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const sourceHelp=document.createElement('div');sourceHelp.className='hh-help mt-1';sourceHelp.textContent='';
    tdSource.append(sourceSelect,sourceId,sourceType,sourceHelp);
    sourceSelect.addEventListener('change',()=>{const parts=sourceSelect.value.split(':');sourceType.value=parts.length===2?parts[0]:'';sourceId.value=parts.length===2?parts[1]:'';if(sourceSelect.value!=='')pts.value='0';totals();});
-   const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
+   const warrantyHidden=document.createElement('input');warrantyHidden.type='hidden';warrantyHidden.name='line_is_warranty[]';warrantyHidden.value=data.is_warranty?'1':'0';
+    const warrantyCheck=document.createElement('input');warrantyCheck.type='checkbox';warrantyCheck.className='form-check-input';warrantyCheck.checked=!!Number(data.is_warranty||0);warrantyCheck.title='Marcar si el artículo está cubierto por garantía de una reparación anterior';
+    const warrantyLabel=document.createElement('label');warrantyLabel.className='form-check-label small ms-1';warrantyLabel.textContent='Cubierto';
+    const warrantyWrap=document.createElement('div');warrantyWrap.className='form-check';warrantyWrap.append(warrantyCheck,warrantyLabel,warrantyHidden);tdWarranty.appendChild(warrantyWrap);
+    const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
    const pts=document.createElement('input');pts.type='number';pts.min='0';pts.step='0.01';pts.value=data.points_each!==null&&data.points_each!==undefined?String(data.points_each):'0';pts.name='line_points[]';pts.className='form-control form-control-sm';pts.required=true;
    const pointsTotal=document.createElement('span');const amount=document.createElement('span');
    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
    select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];if(opt&&opt.dataset.points!==undefined)pts.value=opt.dataset.points;totals();});
+    warrantyCheck.addEventListener('change',()=>{warrantyHidden.value=warrantyCheck.checked?'1':'0';if(warrantyCheck.checked)pts.value='0';totals();});
    qty.addEventListener('input',totals);pts.addEventListener('input',totals);
    tdItem.appendChild(select);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
-   [tdItem,tdSource,tdQty,tdPoints,tdPts,tdMoney,tdAction].forEach(td=>tr.appendChild(td));tbody.appendChild(tr);tr._data={qty,pts,pointsTotal,amount};totals();
+   [tdItem,tdSource,tdWarranty,tdQty,tdPoints,tdPts,tdMoney,tdAction].forEach(td=>tr.appendChild(td));tbody.appendChild(tr);tr._data={qty,pts,pointsTotal,amount};totals();
  }
- function totals(){let p=0,a=0;[...tbody.querySelectorAll('tr')].forEach(tr=>{const d=tr._data;if(!d)return;const rowP=(parseFloat(d.qty.value)||0)*(parseFloat(d.pts.value)||0);const rowA=rowP*pointValue;p+=rowP;a+=rowA;d.pointsTotal.textContent=rowP.toFixed(2);d.amount.textContent='$'+rowA.toFixed(2);});document.getElementById('hh-total-points').textContent=p.toFixed(2);document.getElementById('hh-total-amount').textContent='$'+a.toFixed(2);}
+ function totals(){let p=0,a=0;[...tbody.querySelectorAll('tr')].forEach(tr=>{const d=tr._data;if(!d)return;const rowP=(parseFloat(d.qty.value)||0)*(parseFloat(d.pts.value)||0);const rowA=rowP*pointValue;p+=rowP;a+=rowA;d.pointsTotal.textContent=rowP.toFixed(2);d.amount.textContent='$'+rowA.toFixed(2);});document.getElementById('hh-total-points').textContent=p.toFixed(2);document.getElementById('hh-total-amount').textContent='
+ function refreshRows(){const old=[...tbody.querySelectorAll('tr')].map(tr=>({item_id:tr.querySelector('[name="line_item_id[]"]').value,quantity:tr.querySelector('[name="line_quantity[]"]').value,points_each:tr.querySelector('[name="line_points[]"]').value,source_itemtype:tr.querySelector('[name="line_source_type[]"]').value,source_items_id:tr.querySelector('[name="line_source_id[]"]').value,is_warranty:tr.querySelector('[name="line_is_warranty[]"]').value}));tbody.replaceChildren();const valid=old.filter(x=>catalog.some(i=>String(i.id)===String(x.item_id)&&allowed(i)));valid.forEach(x=>row({item_id:Number(x.item_id),quantity:Number(x.quantity),points_each:Number(x.points_each),source_itemtype:x.source_itemtype,source_items_id:Number(x.source_items_id||0),is_warranty:Number(x.is_warranty||0)}));if(!tbody.children.length)row();}
+ addBtn.addEventListener('click',()=>row());typeEl.addEventListener('change',refreshRows);
+ if(initial.length){initial.forEach(x=>row(x));} else {row();}
+})();
+</script>
+<?php if (!$embedded) Html::footer(); ?>
++a.toFixed(2);
+    const ratio=document.getElementById('hh-repair-cost-ratio'), warning=document.getElementById('hh-repair-cost-warning');
+    if(ratio){if(purchaseValue!==null&&Number(purchaseValue)>0){const pct=(a/Number(purchaseValue))*100;ratio.textContent='Costo de reparación: '+pct.toFixed(1)+' % del valor de compra';if(warning)warning.style.display=pct>=40?'block':'none';}else{ratio.textContent='Porcentaje del valor de compra: no disponible';if(warning)warning.style.display='none';}}
+  }
  function refreshRows(){const old=[...tbody.querySelectorAll('tr')].map(tr=>({item_id:tr.querySelector('[name="line_item_id[]"]').value,quantity:tr.querySelector('[name="line_quantity[]"]').value,points_each:tr.querySelector('[name="line_points[]"]').value,source_itemtype:tr.querySelector('[name="line_source_type[]"]').value,source_items_id:tr.querySelector('[name="line_source_id[]"]').value}));tbody.replaceChildren();const valid=old.filter(x=>catalog.some(i=>String(i.id)===String(x.item_id)&&allowed(i)));valid.forEach(x=>row({item_id:Number(x.item_id),quantity:Number(x.quantity),points_each:Number(x.points_each),source_itemtype:x.source_itemtype,source_items_id:Number(x.source_items_id||0)}));if(!tbody.children.length)row();}
  addBtn.addEventListener('click',()=>row());typeEl.addEventListener('change',refreshRows);
  if(initial.length){initial.forEach(x=>row(x));} else {row();}
