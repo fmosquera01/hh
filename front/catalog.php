@@ -112,7 +112,7 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
         <?php endforeach; ?>
         <?php if ($items === []): ?><tr><td colspan="6" class="text-center text-muted">Todavía no hay artículos registrados.</td></tr><?php endif; ?>
         </tbody></table></div>
-      <a class="btn btn-secondary" href="<?= htmlspecialchars(Plugin::getWebDir('hh', false), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/front/index.php">Volver al módulo</a>
+      <a class="btn btn-secondary" href="<?= htmlspecialchars('/' . ltrim(Plugin::getWebDir('hh', false), '/'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/front/index.php">Volver al módulo</a>
     </div>
   </div>
 </div>
