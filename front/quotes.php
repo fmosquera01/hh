@@ -71,6 +71,18 @@ $notice = '';
 $error = '';
 $point = hhQCurrentPointValue();
 $allowedTypes = ['Computer' => 'Computadora', 'Phone' => 'Teléfono'];
+$assetOptions = [];
+foreach ([['type' => 'Computer', 'table' => 'glpi_computers', 'label' => 'Computadora'], ['type' => 'Phone', 'table' => 'glpi_phones', 'label' => 'Teléfono']] as $assetConfig) {
+    foreach (hhQRows($assetConfig['table'], ['is_deleted' => 0], ['id', 'name', 'serial', 'otherserial'], ['name ASC']) as $assetRow) {
+        $assetOptions[] = [
+            'itemtype' => $assetConfig['type'],
+            'id' => (int)$assetRow['id'],
+            'label' => $assetConfig['label'] . ' #' . (int)$assetRow['id'] . ' — ' . (string)$assetRow['name']
+                . ((string)($assetRow['otherserial'] ?? '') !== '' ? ' | Activo: ' . (string)$assetRow['otherserial'] : '')
+                . ((string)($assetRow['serial'] ?? '') !== '' ? ' | Serie: ' . (string)$assetRow['serial'] : ''),
+        ];
+    }
+}
 $categories = ['part' => 'Repuesto', 'labor' => 'Mano de obra', 'service' => 'Servicio', 'other' => 'Otro'];
 $statuses = ['draft' => 'Borrador', 'approved' => 'Aprobada', 'rejected' => 'Rechazada'];
 
@@ -130,6 +142,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($error === '' && (!array_key_exists($itemtype, $allowedTypes) || $itemsId === false || $itemsId < 1 || hhQAssetLabel($itemtype, (int)$itemsId) === '')) {
             $error = 'Seleccione un tipo de activo y un ID válido de un equipo existente.';
+        }
+        if ($error === '' && $quoteId === 0) {
+            foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $itemtype, 'items_id' => (int)$itemsId, 'status' => 'draft'], ['id', 'name'], ['id DESC']) as $pending) {
+                $error = 'Este activo ya tiene una cotización en borrador (' . (string)$pending['name'] . '). Se abrirá la existente para continuar editándola.';
+                $_GET['edit'] = (string)$pending['id'];
+                break;
+            }
         }
         if ($error === '' && !in_array($repairType, ['corrective', 'preventive', 'diagnostic'], true)) $error = 'Tipo de reparación no válido.';
         if ($error === '' && !in_array($priority, ['low', 'normal', 'high', 'urgent'], true)) $error = 'Prioridad no válida.';
@@ -276,6 +295,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+if ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0 && empty($_GET['edit'])) {
+    foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $contextItemType, 'items_id' => $contextItemsId, 'status' => 'draft'], ['id'], ['id DESC']) as $pendingDraft) {
+        $_GET['edit'] = (string)$pendingDraft['id'];
+        break;
+    }
+}
 $editId = filter_var($_GET['edit'] ?? 0, FILTER_VALIDATE_INT);
 $editQuote = null;
 $editLines = [];
