@@ -118,8 +118,9 @@ final class RepairTab extends CommonGLPI
             .hh-repair-tabs .hh-tab-label:first-of-type{border-radius:.35rem 0 0 .35rem}
             .hh-repair-tabs .hh-tab-label:last-of-type{border-radius:0 .35rem .35rem 0;margin-left:-1px}
             .hh-repair-tabs .hh-tab-radio:checked + .hh-tab-label{background:var(--tblr-bg-surface,#fff);color:var(--tblr-primary,#206bc4);border-bottom-color:var(--tblr-bg-surface,#fff);font-weight:600;position:relative;z-index:1}
-            .hh-repair-tabs .hh-tab-panel{padding-top:.6rem}
-            .hh-repair-tabs .hh-tab-panel[hidden]{display:none!important}
+            .hh-repair-tabs .hh-tab-panel{display:none;padding-top:.6rem}
+            .hh-repair-tabs input.hh-tab-radio:nth-of-type(1):checked ~ .hh-tab-panels [data-hh-panel='quotes'],
+            .hh-repair-tabs input.hh-tab-radio:nth-of-type(2):checked ~ .hh-tab-panels [data-hh-panel='history']{display:block}
             .hh-repair-tabs iframe{display:block;width:100%;border:0}
         </style>";
         echo "<div class='hh-repair-tabs'>";
@@ -129,7 +130,7 @@ final class RepairTab extends CommonGLPI
         echo "<label class='hh-tab-label' for='" . self::e($historyTabId) . "'>Historial</label>";
         echo "<div class='hh-tab-panels'>";
         echo "<div class='hh-tab-panel' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='height:850px' loading='lazy'></iframe></div>";
-        echo "<div class='hh-tab-panel' data-hh-panel='history' hidden><iframe title='Historial de reparaciones de este activo' src='" . self::e($historyUrl) . "' style='height:650px' loading='lazy'></iframe></div>";
+        echo "<div class='hh-tab-panel' data-hh-panel='history'><iframe title='Historial de reparaciones de este activo' src='" . self::e($historyUrl) . "' style='height:650px' loading='lazy'></iframe></div>";
         echo "</div></div>";
         return true;
     }
