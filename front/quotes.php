@@ -358,6 +358,16 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 .hh-quotes .hh-help{font-size:.82rem;color:var(--tblr-secondary-color,#667085)}
 .hh-quotes .hh-total{font-size:1.1rem;font-weight:700}
 .hh-quotes .hh-quote-form-card{border:1px solid var(--tblr-border-color,#dce1e7);border-radius:.75rem;padding:1.1rem;background:var(--tblr-card-bg,#fff)}
+.hh-quotes .card{box-shadow:0 .15rem .6rem rgba(20,35,55,.06);border-radius:.75rem;overflow:hidden}
+.hh-quotes .card-header,.hh-quotes .hh-section-head{padding:1rem 1.25rem}
+.hh-quotes .hh-quote-form-card{box-shadow:0 .15rem .5rem rgba(20,35,55,.04)}
+.hh-quotes .form-label{font-weight:600;color:var(--tblr-body-color,#27364b)}
+.hh-quotes .hh-lines-table tbody td{vertical-align:middle;padding:.7rem .55rem}
+.hh-quotes .hh-lines-table tfoot{background:var(--tblr-bg-surface-secondary,#f5f7fa)}
+.hh-quotes .hh-lines-table tfoot th{padding:.85rem .55rem}
+.hh-quotes .hh-section-head .card-title{font-weight:700}
+.hh-quotes .hh-quote-hero .display-6{letter-spacing:-.04em}
+.hh-quotes .btn{border-radius:.45rem}
 @media(max-width:767px){.hh-quotes .hh-source-fields{grid-template-columns:1fr}.hh-quotes .hh-quote-form-card{padding:.75rem}}
 </style>
  <div class="card hh-quote-hero mb-3"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><div class="text-muted small mb-1">HH · GESTIÓN TÉCNICA</div><h2 class="mb-1">Cotizaciones de reparación</h2><p class="mb-0 text-muted">Costos, repuestos, trazabilidad de piezas recuperadas y decisiones en un solo lugar.</p></div><div class="text-end"><div class="text-muted small">Valor vigente por punto</div><div class="display-6 fw-bold">$<?=number_format((float)$point['value'],4)?></div><div class="text-muted small">USD · valor histórico por cotización</div></div></div></div></div>
