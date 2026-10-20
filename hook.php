@@ -145,6 +145,12 @@ function plugin_hh_install(): bool
     return true;
 }
 
+function plugin_hh_upgrade($previousVersion): bool
+{
+    // Re-run idempotent schema migrations when GLPI upgrades this plugin.
+    return plugin_hh_install();
+}
+
 function plugin_hh_uninstall(): bool
 {
     // Preserve business data on uninstall. Dropping HH tables must be an explicit,
