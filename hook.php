@@ -80,6 +80,7 @@ function plugin_hh_install(): bool
             `category_snapshot` varchar(30) DEFAULT NULL,
             `source_itemtype` varchar(100) DEFAULT NULL,
             `source_items_id` int unsigned DEFAULT NULL,
+            `is_warranty` tinyint NOT NULL DEFAULT 0,
             `description_snapshot` varchar(255) NOT NULL,
             `quantity` decimal(10,2) NOT NULL DEFAULT 1,
             `points_each` decimal(12,2) NOT NULL DEFAULT 0,
@@ -127,7 +128,6 @@ function plugin_hh_install(): bool
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `category_snapshot` varchar(30) DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `source_itemtype` varchar(100) DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `source_items_id` int unsigned DEFAULT NULL",
-            "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `is_warranty` tinyint NOT NULL DEFAULT 0",
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `is_warranty` tinyint NOT NULL DEFAULT 0",
         ],
     ];
