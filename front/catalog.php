@@ -39,7 +39,6 @@ function hhCatalogModels(string $itemtype): array
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    Session::checkCSRF($_POST);
     $action = (string) ($_POST['action'] ?? '');
     if ($action === 'save_item') {
         $name = trim((string) ($_POST['name'] ?? ''));
