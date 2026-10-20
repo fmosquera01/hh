@@ -441,6 +441,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 (() => {
  const catalog = <?=json_encode($catalogItems, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
  const initial = <?=json_encode($initialLines, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
+ const assets = <?=json_encode($assetOptions, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
  const pointValue = <?=json_encode((float)$point['value'])?>;
  const typeEl = document.getElementById('hh-asset-type');
  const tbody = document.getElementById('hh-lines');
