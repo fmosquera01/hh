@@ -110,12 +110,12 @@ final class RepairTab extends CommonGLPI
         
         echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
         echo "<ul class='nav nav-tabs' role='tablist'>";
-        echo "<li class='nav-item'><button class='nav-link active' type='button' data-hh-tab='quotes'>Cotizaciones</button></li>";
-        echo "<li class='nav-item'><button class='nav-link' type='button' data-hh-tab='history'>Historial</button></li>";
+        echo "<li class='nav-item' role='presentation'><button class='nav-link active' type='button' role='tab' aria-selected='true' data-hh-tab='quotes'>Cotizaciones</button></li>";
+        echo "<li class='nav-item' role='presentation'><button class='nav-link' type='button' role='tab' aria-selected='false' data-hh-tab='history'>Historial</button></li>";
         echo "</ul>";
-        echo "<div class='pt-3' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='width:100%;height:850px;border:0' loading='lazy'></iframe></div>";
-        echo "<div class='pt-3' data-hh-panel='history' hidden><iframe title='Historial del activo' src='" . self::e($historyUrl) . "' style='width:100%;height:650px;border:0' loading='lazy'></iframe></div>";
-        echo "<script>(()=>{const root=document.currentScript.parentElement;const buttons=root.querySelectorAll('[data-hh-tab]');const panels=root.querySelectorAll('[data-hh-panel]');buttons.forEach(b=>b.addEventListener('click',()=>{buttons.forEach(x=>x.classList.toggle('active',x===b));panels.forEach(p=>p.hidden=p.dataset.hhPanel!==b.dataset.hhTab)}));})();</script>";
+        echo "<div class='pt-2' role='tabpanel' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='display:block;width:100%;height:850px;border:0' loading='lazy'></iframe></div>";
+        echo "<div class='pt-2' role='tabpanel' data-hh-panel='history' hidden><iframe title='Historial de reparaciones de este activo' src='" . self::e($historyUrl) . "' style='display:block;width:100%;height:650px;border:0' loading='lazy'></iframe></div>";
+        echo "<script>(()=>{const script=document.currentScript;const root=script.closest('.card-body');if(!root)return;const buttons=root.querySelectorAll('[data-hh-tab]');const panels=root.querySelectorAll('[data-hh-panel]');buttons.forEach(button=>button.addEventListener('click',()=>{const target=button.getAttribute('data-hh-tab');buttons.forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-selected',active?'true':'false')});panels.forEach(panel=>{panel.hidden=panel.getAttribute('data-hh-panel')!==target});const frame=root.querySelector('[data-hh-panel=\"'+target+'\"] iframe');if(frame&&!frame.dataset.loaded){frame.dataset.loaded='1';frame.src=frame.src}})});})();</script>";
         echo "</div>";
         return true;
     }
