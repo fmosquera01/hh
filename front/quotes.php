@@ -271,7 +271,7 @@ foreach (hhQRows('glpi_plugin_hh_items', ['is_active' => 1], ['*'], ['name ASC']
     $catalogItems[] = ['id' => (int)$item['id'], 'code' => (string)$item['code'], 'name' => (string)$item['name'], 'category' => (string)$item['category'], 'points' => (float)$item['points_each'], 'types' => $types];
 }
 $suppliers = hhQRows('glpi_suppliers', ['is_deleted' => 0], ['id', 'name'], ['name ASC']);
-$assetLabel = $editQuote ? hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']) : '';
+$assetLabel = $editQuote ? hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']) : '';\n$defaultItemType = $editQuote ? (string)$editQuote['itemtype'] : (string)($_GET['itemtype'] ?? '');\n$defaultItemsId = $editQuote ? (int)$editQuote['items_id'] : (int)($_GET['items_id'] ?? 0);
 $editAllowed = !$editQuote || (string)$editQuote['status'] === 'draft';
 $initialLines = [];
 foreach ($editLines as $line) $initialLines[] = [
@@ -307,8 +307,8 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
     <input type="hidden" name="action" value="save_quote">
     <input type="hidden" name="quote_id" value="<?=$editQuote ? (int)$editQuote['id'] : 0?>">
     <div class="row g-3">
-     <div class="col-md-3"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-asset-type" required><option value="">Seleccione...</option><option value="Computer" <?=$editQuote && $editQuote['itemtype']==='Computer'?'selected':''?>>Computadora</option><option value="Phone" <?=$editQuote && $editQuote['itemtype']==='Phone'?'selected':''?>>Teléfono</option></select></div>
-     <div class="col-md-2"><label class="form-label">ID del activo GLPI</label><input class="form-control" type="number" min="1" name="items_id" value="<?=$editQuote?(int)$editQuote['items_id']:''?>" required><small class="text-muted">ID numérico de la ficha del activo.</small></div>
+     <div class="col-md-3"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-asset-type" required><option value="">Seleccione...</option><option value="Computer" <?=$defaultItemType==='Computer'?'selected':''?>>Computadora</option><option value="Phone" <?=$defaultItemType==='Phone'?'selected':''?>>Teléfono</option></select></div>
+     <div class="col-md-2"><label class="form-label">ID del activo GLPI</label><input class="form-control" type="number" min="1" name="items_id" value="<?=$defaultItemsId > 0 ? $defaultItemsId : ''?>" required><small class="text-muted">ID numérico de la ficha del activo.</small></div>
      <div class="col-md-3"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
      <div class="col-md-4"><label class="form-label">Proveedor</label><select class="form-select" name="suppliers_id"><option value="0">No especificado</option><?php foreach($suppliers as $supplier): ?><option value="<?=(int)$supplier['id']?>" <?=$editQuote && (int)$editQuote['suppliers_id']===(int)$supplier['id']?'selected':''?>><?=hhQe((string)$supplier['name'])?></option><?php endforeach; ?></select></div>
      <div class="col-md-3"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
