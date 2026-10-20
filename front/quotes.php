@@ -7,6 +7,10 @@ include('../../../inc/includes.php');
 
 Session::checkLoginUser();
 global $DB;
+$embedded = (($_GET['embedded'] ?? '') === '1');
+$contextItemType = (string)($_GET['itemtype'] ?? '');
+$contextItemsId = (int)($_GET['items_id'] ?? 0);
+$contextAssetName = ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) ? hhQAssetLabel($contextItemType, $contextItemsId) : '';
 
 if (!Session::haveRight('config', UPDATE)) {
     Html::displayRightError();
@@ -71,6 +75,10 @@ $categories = ['part' => 'Repuesto', 'labor' => 'Mano de obra', 'service' => 'Se
 $statuses = ['draft' => 'Borrador', 'approved' => 'Aprobada', 'rejected' => 'Rechazada'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) {
+        $_POST['itemtype'] = $contextItemType;
+        $_POST['items_id'] = (string)$contextItemsId;
+    }
     $action = (string)($_POST['action'] ?? '');
 
     if ($action === 'save_point_value') {
@@ -262,7 +270,8 @@ if ($editId !== false && $editId > 0) {
     foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$editId], ['*']) as $r) { $editQuote = $r; break; }
     if ($editQuote) $editLines = hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$editId], ['*'], ['id ASC']);
 }
-$allQuotes = hhQRows('glpi_plugin_hh_quotes', [], ['*'], ['date_mod DESC', 'id DESC']);
+$quoteCriteria = ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) ? ['itemtype' => $contextItemType, 'items_id' => $contextItemsId] : [];
+$allQuotes = hhQRows('glpi_plugin_hh_quotes', $quoteCriteria, ['*'], ['date_mod DESC', 'id DESC']);
 $catalogItems = [];
 foreach (hhQRows('glpi_plugin_hh_items', ['is_active' => 1], ['*'], ['name ASC']) as $item) {
     $maps = hhQRows('glpi_plugin_hh_itemtypes', ['plugin_hh_items_id' => (int)$item['id']]);
@@ -290,7 +299,7 @@ foreach ($editLines as $line) $initialLines[] = [
     'points_each' => (float)$line['points_each'],
 ];
 
-Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
+if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 ?>
 <div class="container-fluid">
  <div class="card mb-3">
@@ -298,7 +307,7 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
   <div class="card-body">
    <?php if ($notice !== ''): ?><div class="alert alert-success"><?=hhQe($notice)?></div><?php endif; ?>
    <?php if ($error !== ''): ?><div class="alert alert-danger"><?=hhQe($error)?></div><?php endif; ?>
-   <div class="alert alert-info">Valor vigente: <strong>$<?=number_format((float)$point['value'], 4)?></strong> por punto (USD). Cada cotización guarda una copia del valor aplicado; los cambios futuros no alteran cotizaciones ya guardadas.</div>
+   <?php if (!$embedded): ?><div class="alert alert-info">Valor vigente: <strong>$<?=number_format((float)$point['value'], 4)?></strong> por punto (USD). Cada cotización guarda una copia del valor aplicado; los cambios futuros no alteran cotizaciones ya guardadas.</div>
    <form method="post" class="border rounded p-3 mb-4">
     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
     <input type="hidden" name="action" value="save_point_value">
@@ -308,7 +317,7 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
      <div class="col-md-6"><label class="form-label">Motivo del cambio</label><input class="form-control" name="reason" maxlength="255" placeholder="Ej. actualización de tarifa anual" required></div>
      <div class="col-md-3"><button class="btn btn-outline-primary" type="submit">Guardar valor del punto</button></div>
     </div>
-   </form>
+   </form><?php endif; ?>
 
    <h3><?= $editQuote ? 'Editar cotización ' . hhQe((string)$editQuote['name']) : 'Nueva cotización' ?></h3>
    <?php if (!$editAllowed): ?>
@@ -319,8 +328,12 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
     <input type="hidden" name="action" value="save_quote">
     <input type="hidden" name="quote_id" value="<?=$editQuote ? (int)$editQuote['id'] : 0?>">
     <div class="row g-3">
+     <?php if ($embedded && $contextAssetName !== ''): ?>
+     <div class="col-md-5"><label class="form-label">Activo</label><input class="form-control" value="<?=hhQe($contextAssetName)?>" readonly><input type="hidden" name="itemtype" id="hh-asset-type" value="<?=hhQe($contextItemType)?>"><input type="hidden" name="items_id" value="<?=$contextItemsId?>"></div>
+     <?php else: ?>
      <div class="col-md-3"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-asset-type" required><option value="">Seleccione...</option><option value="Computer" <?=$defaultItemType==='Computer'?'selected':''?>>Computadora</option><option value="Phone" <?=$defaultItemType==='Phone'?'selected':''?>>Teléfono</option></select></div>
      <div class="col-md-2"><label class="form-label">ID del activo GLPI</label><input class="form-control" type="number" min="1" name="items_id" value="<?=$defaultItemsId > 0 ? $defaultItemsId : ''?>" required><small class="text-muted">ID numérico de la ficha del activo.</small></div>
+     <?php endif; ?>
      <div class="col-md-3"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
      <div class="col-md-4"><label class="form-label">Proveedor</label><select class="form-select" name="suppliers_id"><option value="0">No especificado</option><?php foreach($suppliers as $supplier): ?><option value="<?=(int)$supplier['id']?>" <?=$editQuote && (int)$editQuote['suppliers_id']===(int)$supplier['id']?'selected':''?>><?=hhQe((string)$supplier['name'])?></option><?php endforeach; ?></select></div>
      <div class="col-md-3"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
@@ -332,7 +345,7 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
     <hr><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Detalle de repuestos y servicios</h4><button type="button" class="btn btn-outline-primary btn-sm" id="hh-add-line">Agregar línea</button></div>
     <div class="table-responsive"><table class="table table-sm table-striped align-middle"><thead><tr><th style="min-width:260px">Artículo</th><th style="width:130px">Cantidad</th><th style="width:150px">Puntos por unidad</th><th style="width:130px">Total puntos</th><th style="width:130px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="3" class="text-end">Totales</th><th id="hh-total-points">0.00</th><th id="hh-total-amount">$0.00</th><th></th></tr></tfoot></table></div>
     <p class="text-muted small">Al seleccionar un artículo se cargan sus puntos actuales. Puedes ajustarlos en esta cotización; el valor queda guardado como histórico en sus líneas. La cotización queda como borrador hasta que se apruebe o rechace.</p>
-    <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="/plugins/hh/front/quotes.php">Nueva / cancelar</a>
+    <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId : '/plugins/hh/front/quotes.php' ?>">Nueva / cancelar</a>
    </form>
    <?php endif; ?>
    <?php if ($editQuote && (string)$editQuote['status']==='draft'): ?>
@@ -350,7 +363,7 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
   <div class="card-header"><h3 class="card-title">Listado de cotizaciones</h3></div>
   <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>N.º</th><th>Fecha</th><th>Activo</th><th>Proveedor</th><th>Estado</th><th class="text-end">Puntos</th><th class="text-end">Total USD</th><th>Acción</th></tr></thead><tbody>
   <?php foreach($allQuotes as $quote): $label=hhQAssetLabel((string)$quote['itemtype'],(int)$quote['items_id']); ?>
-   <tr><td><?=hhQe((string)$quote['name'])?></td><td><?=hhQe((string)($quote['quote_date'] ?? ''))?></td><td><?=hhQe($allowedTypes[(string)$quote['itemtype']] ?? (string)$quote['itemtype'])?> #<?=(int)$quote['items_id']?><div class="small text-muted"><?=hhQe($label)?></div></td><td><?=hhQe((string)($quote['supplier_name_snapshot'] ?? '—'))?></td><td><span class="badge bg-<?=$quote['status']==='approved'?'success':($quote['status']==='rejected'?'danger':'secondary')?>"><?=hhQe($statuses[(string)$quote['status']] ?? (string)$quote['status'])?></span></td><td class="text-end"><?=number_format((float)$quote['total_points'],2)?></td><td class="text-end">$<?=number_format((float)$quote['total_amount_snapshot'],2)?></td><td><a class="btn btn-sm btn-outline-primary" href="/plugins/hh/front/quotes.php?edit=<?=(int)$quote['id']?>">Ver / <?=((string)$quote['status']==='draft'?'Editar':'detalle')?></a></td></tr>
+   <tr><td><?=hhQe((string)$quote['name'])?></td><td><?=hhQe((string)($quote['quote_date'] ?? ''))?></td><td><?=hhQe($allowedTypes[(string)$quote['itemtype']] ?? (string)$quote['itemtype'])?> #<?=(int)$quote['items_id']?><div class="small text-muted"><?=hhQe($label)?></div></td><td><?=hhQe((string)($quote['supplier_name_snapshot'] ?? '—'))?></td><td><span class="badge bg-<?=$quote['status']==='approved'?'success':($quote['status']==='rejected'?'danger':'secondary')?>"><?=hhQe($statuses[(string)$quote['status']] ?? (string)$quote['status'])?></span></td><td class="text-end"><?=number_format((float)$quote['total_points'],2)?></td><td class="text-end">$<?=number_format((float)$quote['total_amount_snapshot'],2)?></td><td><a class="btn btn-sm btn-outline-primary" href="/plugins/hh/front/quotes.php?<?= $embedded ? 'embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&' : '' ?>edit=<?=(int)$quote['id']?>">Ver / <?=((string)$quote['status']==='draft'?'Editar':'detalle')?></a></td></tr>
   <?php endforeach; ?>
   <?php if($allQuotes===[]): ?><tr><td colspan="8" class="text-center text-muted p-4">Todavía no hay cotizaciones.</td></tr><?php endif; ?>
   </tbody></table></div>
@@ -392,4 +405,4 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
  if(initial.length){initial.forEach(x=>row(x));} else {row();}
 })();
 </script>
-<?php Html::footer(); ?>
+<?php if (!$embedded) Html::footer(); ?>
