@@ -32,7 +32,7 @@ function hhHistoryAsset(string $type, int $id): string {
 function hhHistoryStatus(string $s): string { return ['draft'=>'Borrador','approved'=>'Aprobada','rejected'=>'Rechazada'][$s] ?? $s; }
 function hhHistoryDate($v): string { $s = trim((string)$v); if ($s === '' || str_starts_with($s, '0000-00-00')) return '—'; try { return (new DateTimeImmutable($s))->format('d/m/Y H:i'); } catch (Throwable $e) { return $s; } }
 
-$statuses = ['draft'=>'Borrador','approved'=>'Aprobada','rejected'=>'Rechazada'];
+$statuses = ['approved'=>'Aprobada','rejected'=>'Rechazada'];
 $status = (string)($_GET['status'] ?? '');
 $search = trim((string)($_GET['q'] ?? ''));
 $viewId = filter_var($_GET['view'] ?? 0, FILTER_VALIDATE_INT);
@@ -44,7 +44,8 @@ if ($viewId !== false && $viewId > 0) {
         $events = hhHistoryRows('glpi_plugin_hh_quotehistory', ['plugin_hh_quotes_id'=>(int)$viewId], ['date_creation ASC','id ASC']);
     } else { $view = null; }
 }
-$where = $embedded ? ['itemtype'=>$itemtype, 'items_id'=>$itemsId] : [];\n$where['status'] = ['approved', 'rejected'];\n$where['status'] = ['approved', 'rejected'];
+$where = $embedded ? ['itemtype' => $itemtype, 'items_id' => $itemsId] : []; 
+$where['status'] = ['approved', 'rejected'];
 if ($status !== '' && in_array($status, ['approved', 'rejected'], true)) $where['status'] = $status;
 $quotes = hhHistoryRows('glpi_plugin_hh_quotes', $where, ['date_mod DESC','id DESC']);
 if ($search !== '' && !$embedded) {
