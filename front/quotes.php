@@ -400,6 +400,39 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 .hh-quotes .hh-quote-hero .display-6{letter-spacing:-.04em}
 .hh-quotes .btn{border-radius:.45rem}
 @media(max-width:767px){.hh-quotes .hh-source-fields{grid-template-columns:1fr}.hh-quotes .hh-quote-form-card{padding:.75rem}}
+
+/* Compact visual overrides: CSS only; keep form fields and behavior unchanged. */
+.hh-quotes{font-size:12.5px;line-height:1.32}
+.hh-quotes .card{margin-bottom:9px;border-radius:8px}
+.hh-quotes .card-header,.hh-quotes .hh-section-head{padding:.55rem .8rem}
+.hh-quotes .card-body,.hh-quotes .hh-section-body{padding:.65rem .8rem}
+.hh-quotes h2{font-size:17px;line-height:1.25;margin-bottom:6px}
+.hh-quotes h3{font-size:14px;line-height:1.25;margin:7px 0}
+.hh-quotes h4{font-size:12.5px;margin-bottom:5px}
+.hh-quotes p{margin:5px 0 8px}
+.hh-quotes .row{row-gap:7px}
+.hh-quotes .form-label{font-size:11.5px;margin-bottom:3px;line-height:1.2}
+.hh-quotes .form-control,.hh-quotes .form-select{font-size:12px;min-height:30px;padding:4px 7px;border-radius:5px}
+.hh-quotes textarea.form-control{min-height:43px;padding:5px 7px}
+.hh-quotes .btn{font-size:12px;padding:5px 9px;line-height:1.25}
+.hh-quotes .btn-sm{font-size:11px;padding:3px 6px}
+.hh-quotes .alert{padding:7px 9px;margin:6px 0 9px}
+.hh-quotes .hh-quote-form-card{padding:.7rem;margin-bottom:.7rem!important;border-radius:8px}
+.hh-quotes .hh-section{border-radius:8px}
+.hh-quotes .hh-stat{padding:.65rem;border-radius:7px}
+.hh-quotes .hh-stat-label{font-size:.68rem}
+.hh-quotes .hh-stat-value{font-size:1.05rem;margin-top:.1rem}
+.hh-quotes .hh-lines-table{font-size:11.5px}
+.hh-quotes .hh-lines-table thead th{font-size:10.5px;padding:5px 6px}
+.hh-quotes .hh-lines-table tbody td{padding:5px 6px}
+.hh-quotes .hh-lines-table tfoot th{padding:6px}
+.hh-quotes .hh-help{font-size:10.5px;line-height:1.25}
+.hh-quotes hr{margin:.65rem 0}
+.hh-quotes .mb-4{margin-bottom:.75rem!important}
+.hh-quotes .mb-3{margin-bottom:.6rem!important}
+.hh-quotes .pt-3{padding-top:.5rem!important}
+@media(max-width:767px){.hh-quotes .hh-quote-form-card{padding:.55rem}.hh-quotes .row{row-gap:6px}}
+
 </style>
 <?php if (!$embedded): ?> <div class="card hh-quote-hero mb-3"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><div class="text-muted small mb-1">HH · GESTIÓN TÉCNICA</div><h2 class="mb-1">Cotizaciones de reparación</h2><p class="mb-0 text-muted">Costos, repuestos, trazabilidad de piezas recuperadas y decisiones en un solo lugar.</p></div><div class="text-end"><div class="text-muted small">Valor vigente por punto</div><div class="display-6 fw-bold">$<?=number_format((float)$point['value'],4)?></div><div class="text-muted small">USD · valor histórico por cotización</div></div></div></div></div><?php endif; ?>
  <div class="card mb-3">
