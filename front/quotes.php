@@ -271,9 +271,17 @@ foreach (hhQRows('glpi_plugin_hh_items', ['is_active' => 1], ['*'], ['name ASC']
     $catalogItems[] = ['id' => (int)$item['id'], 'code' => (string)$item['code'], 'name' => (string)$item['name'], 'category' => (string)$item['category'], 'points' => (float)$item['points_each'], 'types' => $types];
 }
 $suppliers = hhQRows('glpi_suppliers', ['is_deleted' => 0], ['id', 'name'], ['name ASC']);
-$assetLabel = $editQuote ? hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']) : '';
-$defaultItemType = $editQuote ? (string)$editQuote['itemtype'] : (string)($_GET['itemtype'] ?? '');
-$defaultItemsId = $editQuote ? (int)$editQuote['items_id'] : (int)($_GET['items_id'] ?? 0);
+
+$assetLabel = '';
+if ($editQuote !== null) {
+    $assetLabel = hhQAssetLabel((string) $editQuote['itemtype'], (int) $editQuote['items_id']);
+}
+$defaultItemType = $editQuote !== null
+    ? (string) $editQuote['itemtype']
+    : (string) ($_GET['itemtype'] ?? '');
+$defaultItemsId = $editQuote !== null
+    ? (int) $editQuote['items_id']
+    : (int) ($_GET['items_id'] ?? 0);
 $editAllowed = !$editQuote || (string)$editQuote['status'] === 'draft';
 $initialLines = [];
 foreach ($editLines as $line) $initialLines[] = [
@@ -292,6 +300,7 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
    <?php if ($error !== ''): ?><div class="alert alert-danger"><?=hhQe($error)?></div><?php endif; ?>
    <div class="alert alert-info">Valor vigente: <strong>$<?=number_format((float)$point['value'], 4)?></strong> por punto (USD). Cada cotización guarda una copia del valor aplicado; los cambios futuros no alteran cotizaciones ya guardadas.</div>
    <form method="post" class="border rounded p-3 mb-4">
+    <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
     <input type="hidden" name="action" value="save_point_value">
     <h3>Configurar valor del punto</h3>
     <div class="row g-2 align-items-end">
@@ -306,6 +315,7 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
     <div class="alert alert-warning">Esta cotización está <?=hhQe($statuses[(string)$editQuote['status']] ?? (string)$editQuote['status'])?> y no se puede modificar.</div>
    <?php else: ?>
    <form method="post" id="hh-quote-form" class="border rounded p-3 mb-4">
+    <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
     <input type="hidden" name="action" value="save_quote">
     <input type="hidden" name="quote_id" value="<?=$editQuote ? (int)$editQuote['id'] : 0?>">
     <div class="row g-3">
@@ -327,6 +337,7 @@ Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboar
    <?php endif; ?>
    <?php if ($editQuote && (string)$editQuote['status']==='draft'): ?>
     <form method="post" class="border rounded p-3 mb-4">
+     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
      <input type="hidden" name="action" value="decide_quote"><input type="hidden" name="quote_id" value="<?=(int)$editQuote['id']?>">
      <div class="row g-2 align-items-end"><div class="col-md-8"><label class="form-label">Comentario de aprobación/rechazo</label><input class="form-control" name="comment" maxlength="2000" placeholder="Motivo o referencia de la decisión"></div><div class="col-md-2"><button class="btn btn-success w-100" name="decision" value="approved" type="submit">Aprobar</button></div><div class="col-md-2"><button class="btn btn-danger w-100" name="decision" value="rejected" type="submit">Rechazar</button></div></div>
      <p class="text-muted small mt-2 mb-0">Solo se permite decidir una cotización ya guardada. La decisión es final y bloquea su edición.</p>
