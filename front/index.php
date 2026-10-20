@@ -35,7 +35,7 @@ $catalogUrl = '/plugins/hh/front/catalog.php';
           <div class="card card-body h-100">
             <h3><i class="ti ti-history me-2"></i>Historial</h3>
             <p class="text-muted">Consulta de cotizaciones, estados y reparaciones asociadas a cada activo.</p>
-            <button class="btn btn-outline-secondary mt-auto" type="button" disabled>Próximamente</button>
+            <a class="btn btn-primary mt-auto" href="/plugins/hh/front/history.php">Consultar historial</a>
           </div>
         </div>
       </div>
