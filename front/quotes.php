@@ -271,7 +271,9 @@ foreach (hhQRows('glpi_plugin_hh_items', ['is_active' => 1], ['*'], ['name ASC']
     $catalogItems[] = ['id' => (int)$item['id'], 'code' => (string)$item['code'], 'name' => (string)$item['name'], 'category' => (string)$item['category'], 'points' => (float)$item['points_each'], 'types' => $types];
 }
 $suppliers = hhQRows('glpi_suppliers', ['is_deleted' => 0], ['id', 'name'], ['name ASC']);
-$assetLabel = $editQuote ? hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']) : '';\n$defaultItemType = $editQuote ? (string)$editQuote['itemtype'] : (string)($_GET['itemtype'] ?? '');\n$defaultItemsId = $editQuote ? (int)$editQuote['items_id'] : (int)($_GET['items_id'] ?? 0);
+$assetLabel = $editQuote ? hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']) : '';
+$defaultItemType = $editQuote ? (string)$editQuote['itemtype'] : (string)($_GET['itemtype'] ?? '');
+$defaultItemsId = $editQuote ? (int)$editQuote['items_id'] : (int)($_GET['items_id'] ?? 0);
 $editAllowed = !$editQuote || (string)$editQuote['status'] === 'draft';
 $initialLines = [];
 foreach ($editLines as $line) $initialLines[] = [
