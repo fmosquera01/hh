@@ -109,14 +109,28 @@ final class RepairTab extends CommonGLPI
         $historyUrl = '/plugins/hh/front/history.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
         
         echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
-        echo "<ul class='nav nav-tabs' role='tablist'>";
-        echo "<li class='nav-item' role='presentation'><button class='nav-link active' type='button' role='tab' aria-selected='true' data-hh-tab='quotes'>Cotizaciones</button></li>";
-        echo "<li class='nav-item' role='presentation'><button class='nav-link' type='button' role='tab' aria-selected='false' data-hh-tab='history'>Historial</button></li>";
-        echo "</ul>";
-        echo "<div class='pt-2' role='tabpanel' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='display:block;width:100%;height:850px;border:0' loading='lazy'></iframe></div>";
-        echo "<div class='pt-2' role='tabpanel' data-hh-panel='history' hidden><iframe title='Historial de reparaciones de este activo' src='" . self::e($historyUrl) . "' style='display:block;width:100%;height:650px;border:0' loading='lazy'></iframe></div>";
-        echo "<script>(()=>{const script=document.currentScript;const root=script.closest('.card-body');if(!root)return;const buttons=root.querySelectorAll('[data-hh-tab]');const panels=root.querySelectorAll('[data-hh-panel]');buttons.forEach(button=>button.addEventListener('click',()=>{const target=button.getAttribute('data-hh-tab');buttons.forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-selected',active?'true':'false')});panels.forEach(panel=>{panel.hidden=panel.getAttribute('data-hh-panel')!==target});const frame=root.querySelector('[data-hh-panel=\"'+target+'\"] iframe');if(frame&&!frame.dataset.loaded){frame.dataset.loaded='1';frame.src=frame.src}})});})();</script>";
-        echo "</div>";
+        $tabPrefix = 'hh-repair-' . strtolower($itemType) . '-' . $itemId;
+        $quotesTabId = $tabPrefix . '-quotes';
+        $historyTabId = $tabPrefix . '-history';
+        echo "<style>
+            .hh-repair-tabs .hh-tab-radio{position:absolute;opacity:0;pointer-events:none}
+            .hh-repair-tabs .hh-tab-label{display:inline-block;margin:0;padding:.4rem .7rem;border:1px solid var(--tblr-border-color,#dce1e7);background:var(--tblr-bg-surface-secondary,#f8fafc);color:var(--tblr-body-color,#334155);cursor:pointer;font-size:.82rem}
+            .hh-repair-tabs .hh-tab-label:first-of-type{border-radius:.35rem 0 0 .35rem}
+            .hh-repair-tabs .hh-tab-label:last-of-type{border-radius:0 .35rem .35rem 0;margin-left:-1px}
+            .hh-repair-tabs .hh-tab-radio:checked + .hh-tab-label{background:var(--tblr-bg-surface,#fff);color:var(--tblr-primary,#206bc4);border-bottom-color:var(--tblr-bg-surface,#fff);font-weight:600;position:relative;z-index:1}
+            .hh-repair-tabs .hh-tab-panel{padding-top:.6rem}
+            .hh-repair-tabs .hh-tab-panel[hidden]{display:none!important}
+            .hh-repair-tabs iframe{display:block;width:100%;border:0}
+        </style>";
+        echo "<div class='hh-repair-tabs'>";
+        echo "<input class='hh-tab-radio' type='radio' name='" . self::e($tabPrefix) . "' id='" . self::e($quotesTabId) . "' checked>";
+        echo "<label class='hh-tab-label' for='" . self::e($quotesTabId) . "'>Cotizaciones</label>";
+        echo "<input class='hh-tab-radio' type='radio' name='" . self::e($tabPrefix) . "' id='" . self::e($historyTabId) . "'>";
+        echo "<label class='hh-tab-label' for='" . self::e($historyTabId) . "'>Historial</label>";
+        echo "<div class='hh-tab-panels'>";
+        echo "<div class='hh-tab-panel' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='height:850px' loading='lazy'></iframe></div>";
+        echo "<div class='hh-tab-panel' data-hh-panel='history' hidden><iframe title='Historial de reparaciones de este activo' src='" . self::e($historyUrl) . "' style='height:650px' loading='lazy'></iframe></div>";
+        echo "</div></div>";
         return true;
     }
 
