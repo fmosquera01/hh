@@ -67,23 +67,18 @@ final class RepairTab extends CommonGLPI
         echo "<style>
             .hh-repairs .hh-hero{border:0;border-radius:.65rem;background:linear-gradient(120deg,#17365d,#245b83);color:#fff}
             .hh-repairs .hh-hero .text-muted{color:#d8e6f2!important}
-            .hh-repairs .hh-hero{margin-bottom:.6rem!important}
-            .hh-repairs .hh-hero .card-body{padding:.85rem 1rem!important}
-            .hh-repairs .hh-hero h2{font-size:1.2rem;margin-bottom:.55rem!important}
-            .hh-repairs .hh-asset-detail{height:100%;border:1px solid rgba(255,255,255,.22);border-radius:.35rem;padding:.35rem .5rem;background:rgba(255,255,255,.06);min-height:0}
-            .hh-repairs .hh-detail-label{font-size:.68rem;line-height:1.15;color:#d8e6f2;margin-bottom:.1rem}
-            .hh-repairs .hh-asset-detail strong{font-size:.82rem;line-height:1.2;display:block;overflow-wrap:anywhere;white-space:normal}
-            .hh-repairs .hh-asset-grid{row-gap:.35rem!important}
-            .hh-repairs .hh-empty{border:1px dashed var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1rem;text-align:center}
-            .hh-repairs .hh-repair-workspace{margin-bottom:.75rem!important}
-            .hh-repairs .hh-repair-workspace>.card-header{padding:.5rem .8rem}
-            .hh-repairs .hh-repair-workspace>.card-body{padding:.65rem .8rem}
-            .hh-repairs .hh-repair-workspace .pt-3{padding-top:.5rem!important}
+            .hh-repairs .hh-asset-detail{height:100%;border:1px solid rgba(255,255,255,.22);border-radius:.45rem;padding:.65rem .75rem;background:rgba(255,255,255,.06)}
+            .hh-repairs .hh-detail-label{font-size:.72rem;color:#d8e6f2;margin-bottom:.15rem}
+            .hh-repairs .hh-asset-detail strong{overflow-wrap:anywhere;white-space:normal}
+            .hh-repairs .hh-empty{border:1px dashed var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1.5rem 1rem;text-align:center}
         </style>";
 
-        echo "<div class='card hh-hero mb-2'><div class='card-body'>";
-        echo "<h2 class='mb-2'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h2>";
-        echo "<div class='row g-1 hh-asset-grid'>
+        echo "<div class='card hh-hero mb-3'><div class='card-body p-4'>";
+        
+        echo "<h2 class='mb-1'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h2>";
+      
+        
+        echo "<br class='border-light opacity-25'><div class='row g-2'>";
 
         self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
         self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
@@ -102,12 +97,12 @@ final class RepairTab extends CommonGLPI
         $quotesUrl = '/plugins/hh/front/quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
         $historyUrl = '/plugins/hh/front/history.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
         
-        echo "<div class='card hh-repair-workspace mb-2'><div class='card-header'><h3 class='card-title mb-0 fs-5'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
+        echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
         echo "<ul class='nav nav-tabs' role='tablist'>";
         echo "<li class='nav-item'><button class='nav-link active' type='button' data-hh-tab='quotes'>Cotizaciones</button></li>";
         echo "<li class='nav-item'><button class='nav-link' type='button' data-hh-tab='history'>Historial</button></li>";
         echo "</ul>";
-        echo "<div class='pt-3' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='width:100%;height:500px;border:0' loading='lazy'></iframe></div>";
+        echo "<div class='pt-3' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='width:100%;height:850px;border:0' loading='lazy'></iframe></div>";
         echo "<div class='pt-3' data-hh-panel='history' hidden><iframe title='Historial del activo' src='" . self::e($historyUrl) . "' style='width:100%;height:650px;border:0' loading='lazy'></iframe></div>";
         echo "<script>(()=>{const root=document.currentScript.parentElement;const buttons=root.querySelectorAll('[data-hh-tab]');const panels=root.querySelectorAll('[data-hh-panel]');buttons.forEach(b=>b.addEventListener('click',()=>{buttons.forEach(x=>x.classList.toggle('active',x===b));panels.forEach(p=>p.hidden=p.dataset.hhPanel!==b.dataset.hhTab)}));})();</script>";
         echo "</div>";
