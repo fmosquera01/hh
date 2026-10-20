@@ -288,6 +288,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $DB->update('glpi_plugin_hh_quotes', ['status' => $decision, 'observations' => trim((string)($quote['observations'] ?? '') . ($comment !== '' ? "\nDecisión: " . $comment : ''))], ['id' => (int)$quoteId]);
             hhQWriteHistory((int)$quoteId, 'draft', $decision, $comment);
             $notice = 'Cotización ' . (string)$quote['name'] . ' ' . ($decision === 'approved' ? 'aprobada' : 'rechazada') . '. Queda bloqueada y disponible en el historial.';
+            unset($_GET['edit']);
         }
     } elseif ($action === 'delete_line' && isset($_POST['quote_id'])) {
         // Line editing is handled by saving the draft with the desired rows.
