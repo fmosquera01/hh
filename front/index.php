@@ -27,8 +27,8 @@ $catalogUrl = '/plugins/hh/front/catalog.php';
         <div class="col-sm-6 col-xl-4">
           <div class="card card-body h-100">
             <h3><i class="ti ti-file-invoice me-2"></i>Cotizaciones</h3>
-            <p class="text-muted">La gestión de cotizaciones será el siguiente módulo que se conectará con el catálogo y los activos.</p>
-            <button class="btn btn-outline-secondary mt-auto" type="button" disabled>Próximamente</button>
+            <p class="text-muted">Cree cotizaciones por activo, agregue repuestos y servicios, calcule puntos y montos, y registre la decisión final.</p>
+            <div class="mt-auto"><a class="btn btn-primary" href="/plugins/hh/front/quotes.php">Administrar cotizaciones</a></div>
           </div>
         </div>
         <div class="col-sm-6 col-xl-4">
