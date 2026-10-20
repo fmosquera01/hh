@@ -1,0 +1,382 @@
+<?php
+declare(strict_types=1);
+
+use GlpiPlugin\Hh\Dashboard;
+
+include('../../../inc/includes.php');
+
+Session::checkLoginUser();
+global $DB;
+
+if (!Session::haveRight('config', UPDATE)) {
+    Html::displayRightError();
+}
+
+function hhQe(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function hhQRows(string $table, array $criteria = [], array $select = ['*'], array $order = []): array
+{
+    global $DB;
+    $params = ['SELECT' => $select, 'FROM' => $table];
+    if ($criteria !== []) $params['WHERE'] = $criteria;
+    if ($order !== []) $params['ORDER'] = $order;
+    $rows = [];
+    foreach ($DB->request($params) as $row) $rows[] = $row;
+    return $rows;
+}
+
+function hhQCurrentPointValue(): array
+{
+    $rows = hhQRows('glpi_plugin_hh_pointvalues', [], ['*'], ['valid_from DESC', 'id DESC']);
+    $today = date('Y-m-d H:i:s');
+    foreach ($rows as $row) {
+        if ((string)$row['valid_from'] <= $today && (empty($row['valid_until']) || (string)$row['valid_until'] >= $today)) {
+            return ['value' => (float)$row['value_per_point'], 'currency' => (string)$row['currency'], 'id' => (int)$row['id']];
+        }
+    }
+    return ['value' => 1.0, 'currency' => 'USD', 'id' => 0];
+}
+
+function hhQAssetLabel(string $type, int $id): string
+{
+    global $DB;
+    $tables = ['Computer' => 'glpi_computers', 'Phone' => 'glpi_phones'];
+    if (!isset($tables[$type]) || $id < 1) return '';
+    foreach ($DB->request(['SELECT' => ['name', 'serial', 'otherserial'], 'FROM' => $tables[$type], 'WHERE' => ['id' => $id, 'is_deleted' => 0], 'LIMIT' => 1]) as $r) {
+        return trim((string)$r['name'] . ' | Serie: ' . (string)$r['serial'] . ' | Activo: ' . (string)$r['otherserial']);
+    }
+    return '';
+}
+
+function hhQWriteHistory(int $quoteId, ?string $oldStatus, string $newStatus, string $comment = ''): void
+{
+    global $DB;
+    $DB->insert('glpi_plugin_hh_quotehistory', [
+        'plugin_hh_quotes_id' => $quoteId,
+        'old_status' => $oldStatus,
+        'new_status' => $newStatus,
+        'users_id' => (int)Session::getLoginUserID(),
+        'comment' => $comment !== '' ? $comment : null,
+    ]);
+}
+
+$notice = '';
+$error = '';
+$point = hhQCurrentPointValue();
+$allowedTypes = ['Computer' => 'Computadora', 'Phone' => 'Teléfono'];
+$categories = ['part' => 'Repuesto', 'labor' => 'Mano de obra', 'service' => 'Servicio', 'other' => 'Otro'];
+$statuses = ['draft' => 'Borrador', 'approved' => 'Aprobada', 'rejected' => 'Rechazada'];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = (string)($_POST['action'] ?? '');
+
+    if ($action === 'save_point_value') {
+        $value = filter_var($_POST['value_per_point'] ?? null, FILTER_VALIDATE_FLOAT);
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        if ($value === false || $value < 0 || $reason === '') {
+            $error = 'Ingrese un valor por punto válido y el motivo del cambio.';
+        } else {
+            if ($point['id'] > 0) {
+                $DB->update('glpi_plugin_hh_pointvalues', ['valid_until' => date('Y-m-d H:i:s', time() - 1)], ['id' => $point['id']]);
+            }
+            if ($DB->insert('glpi_plugin_hh_pointvalues', [
+                'value_per_point' => number_format((float)$value, 4, '.', ''),
+                'currency' => 'USD',
+                'valid_from' => date('Y-m-d H:i:s'),
+                'valid_until' => null,
+                'reason' => mb_substr($reason, 0, 255),
+                'users_id' => (int)Session::getLoginUserID(),
+            ])) {
+                $point = hhQCurrentPointValue();
+                $notice = 'Valor del punto actualizado. Las cotizaciones guardadas conservan su valor histórico.';
+            } else {
+                $error = 'No se pudo guardar el valor del punto.';
+            }
+        }
+    } elseif ($action === 'save_quote') {
+        $quoteId = (int)($_POST['quote_id'] ?? 0);
+        $existing = null;
+        if ($quoteId > 0) {
+            foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => $quoteId], ['*'], []) as $row) { $existing = $row; break; }
+            if (!$existing) $error = 'La cotización solicitada no existe.';
+            elseif ((string)$existing['status'] !== 'draft') $error = 'Esta cotización ya tiene una decisión final y está bloqueada.';
+        }
+
+        $itemtype = (string)($_POST['itemtype'] ?? '');
+        $itemsId = filter_var($_POST['items_id'] ?? '0', FILTER_VALIDATE_INT);
+        $quoteDate = trim((string)($_POST['quote_date'] ?? date('Y-m-d')));
+        $supplierId = filter_var($_POST['suppliers_id'] ?? '0', FILTER_VALIDATE_INT);
+        $supplierQuoteNumber = trim((string)($_POST['supplier_quote_number'] ?? ''));
+        $repairType = (string)($_POST['repair_type'] ?? 'corrective');
+        $priority = (string)($_POST['priority'] ?? 'normal');
+        $diagnosis = trim((string)($_POST['diagnosis'] ?? ''));
+        $observations = trim((string)($_POST['observations'] ?? ''));
+        $lineIds = $_POST['line_item_id'] ?? [];
+        $quantities = $_POST['line_quantity'] ?? [];
+        $linePoints = $_POST['line_points'] ?? [];
+
+        if ($error === '' && (!array_key_exists($itemtype, $allowedTypes) || $itemsId === false || $itemsId < 1 || hhQAssetLabel($itemtype, (int)$itemsId) === '')) {
+            $error = 'Seleccione un tipo de activo y un ID válido de un equipo existente.';
+        }
+        if ($error === '' && !in_array($repairType, ['corrective', 'preventive', 'diagnostic'], true)) $error = 'Tipo de reparación no válido.';
+        if ($error === '' && !in_array($priority, ['low', 'normal', 'high', 'urgent'], true)) $error = 'Prioridad no válida.';
+        if ($error === '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $quoteDate)) $error = 'Fecha de cotización no válida.';
+
+        $lines = [];
+        if ($error === '') {
+            if (!is_array($lineIds) || !is_array($quantities) || !is_array($linePoints)) {
+                $error = 'Las líneas de la cotización no son válidas.';
+            } else {
+                foreach ($lineIds as $idx => $rawId) {
+                    $itemId = filter_var($rawId, FILTER_VALIDATE_INT);
+                    $qty = filter_var($quantities[$idx] ?? '1', FILTER_VALIDATE_FLOAT);
+                    $pts = filter_var($linePoints[$idx] ?? null, FILTER_VALIDATE_FLOAT);
+                    if ($itemId === false || $itemId < 1) continue;
+                    if ($qty === false || $qty <= 0 || $pts === false || $pts < 0) {
+                        $error = 'Revise las cantidades y puntos de cada línea.';
+                        break;
+                    }
+                    $catalogItem = null;
+                    foreach (hhQRows('glpi_plugin_hh_items', ['id' => (int)$itemId, 'is_active' => 1], ['*']) as $ci) { $catalogItem = $ci; break; }
+                    if (!$catalogItem) { $error = 'Uno de los artículos seleccionados no existe o está inactivo.'; break; }
+                    $applies = false;
+                    foreach (hhQRows('glpi_plugin_hh_itemtypes', ['plugin_hh_items_id' => (int)$itemId]) as $mapping) {
+                        if ((string)$mapping['itemtype'] === $itemtype && ((int)($mapping['models_id'] ?? 0) === 0 || (int)$mapping['models_id'] === 0)) { $applies = true; break; }
+                        if ((string)$mapping['itemtype'] === $itemtype) {
+                            $modelField = $itemtype === 'Computer' ? 'computermodels_id' : 'phonemodels_id';
+                            $assetTable = $itemtype === 'Computer' ? 'glpi_computers' : 'glpi_phones';
+                            $modelId = 0;
+                            foreach (hhQRows($assetTable, ['id' => (int)$itemsId], [$modelField], []) as $assetRow) { $modelId = (int)($assetRow[$modelField] ?? 0); break; }
+                            if ((int)$mapping['models_id'] === $modelId) $applies = true;
+                        }
+                    }
+                    if (!$applies) { $error = 'El artículo ' . (string)$catalogItem['name'] . ' no aplica al tipo/modelo del activo seleccionado.'; break; }
+                    $lines[] = [
+                        'item_id' => (int)$itemId,
+                        'code' => (string)$catalogItem['code'],
+                        'category' => (string)$catalogItem['category'],
+                        'description' => (string)$catalogItem['name'],
+                        'quantity' => (float)$qty,
+                        'points_each' => (float)$pts,
+                    ];
+                }
+                if ($error === '' && $lines === []) $error = 'Agregue al menos un artículo del catálogo a la cotización.';
+            }
+        }
+
+        if ($error === '') {
+            $totalPoints = 0.0;
+            foreach ($lines as $line) $totalPoints += $line['quantity'] * $line['points_each'];
+            $name = $existing ? (string)$existing['name'] : '';
+            if (!$existing) {
+                $nextId = 1;
+                foreach (hhQRows('glpi_plugin_hh_quotes', [], ['id'], ['id DESC']) as $last) { $nextId = (int)$last['id'] + 1; break; }
+                $name = 'COT-' . date('Y') . '-' . str_pad((string)$nextId, 6, '0', STR_PAD_LEFT);
+            }
+            $supplierName = '';
+            if ($supplierId !== false && $supplierId > 0) {
+                foreach (hhQRows('glpi_suppliers', ['id' => (int)$supplierId], ['name']) as $s) { $supplierName = (string)$s['name']; break; }
+            }
+            $quoteData = [
+                'name' => $name,
+                'itemtype' => $itemtype,
+                'items_id' => (int)$itemsId,
+                'quote_date' => $quoteDate,
+                'suppliers_id' => ($supplierId !== false && $supplierId > 0) ? (int)$supplierId : null,
+                'supplier_name_snapshot' => $supplierName !== '' ? $supplierName : null,
+                'supplier_quote_number' => $supplierQuoteNumber !== '' ? mb_substr($supplierQuoteNumber, 0, 100) : null,
+                'repair_type' => $repairType,
+                'priority' => $priority,
+                'diagnosis' => $diagnosis !== '' ? $diagnosis : null,
+                'observations' => $observations !== '' ? $observations : null,
+                'status' => 'draft',
+                'total_points' => number_format($totalPoints, 2, '.', ''),
+                'point_value_snapshot' => number_format((float)$point['value'], 4, '.', ''),
+                'currency' => 'USD',
+                'total_amount_snapshot' => number_format($totalPoints * (float)$point['value'], 2, '.', ''),
+                'users_id' => (int)Session::getLoginUserID(),
+            ];
+            if ($existing) {
+                unset($quoteData['name'], $quoteData['status'], $quoteData['users_id']);
+                $ok = $DB->update('glpi_plugin_hh_quotes', $quoteData, ['id' => $quoteId]);
+                $savedId = $quoteId;
+            } else {
+                $ok = $DB->insert('glpi_plugin_hh_quotes', $quoteData);
+                $savedId = $ok ? (int)$DB->insertId() : 0;
+            }
+            if ($ok && $savedId > 0) {
+                foreach (hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => $savedId], ['id']) as $oldLine) {
+                    $DB->delete('glpi_plugin_hh_quotedetails', ['id' => (int)$oldLine['id']]);
+                }
+                foreach ($lines as $line) {
+                    $lineTotalPoints = $line['quantity'] * $line['points_each'];
+                    $DB->insert('glpi_plugin_hh_quotedetails', [
+                        'plugin_hh_quotes_id' => $savedId,
+                        'plugin_hh_items_id' => $line['item_id'],
+                        'code_snapshot' => $line['code'],
+                        'category_snapshot' => $line['category'],
+                        'description_snapshot' => mb_substr($line['description'], 0, 255),
+                        'quantity' => number_format($line['quantity'], 2, '.', ''),
+                        'points_each' => number_format($line['points_each'], 2, '.', ''),
+                        'points_total' => number_format($lineTotalPoints, 2, '.', ''),
+                        'point_value_snapshot' => number_format((float)$point['value'], 4, '.', ''),
+                        'amount_snapshot' => number_format($lineTotalPoints * (float)$point['value'], 2, '.', ''),
+                    ]);
+                }
+                if (!$existing) hhQWriteHistory($savedId, null, 'draft', 'Cotización creada como borrador.');
+                $notice = 'Cotización ' . $name . ' guardada como borrador.';
+                $_GET['edit'] = (string)$savedId;
+            } else {
+                $error = 'No se pudo guardar la cotización.';
+            }
+        }
+    } elseif ($action === 'decide_quote') {
+        $quoteId = filter_var($_POST['quote_id'] ?? 0, FILTER_VALIDATE_INT);
+        $decision = (string)($_POST['decision'] ?? '');
+        $comment = trim((string)($_POST['comment'] ?? ''));
+        $quote = null;
+        if ($quoteId !== false && $quoteId > 0) {
+            foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$quoteId], ['*']) as $r) { $quote = $r; break; }
+        }
+        if (!$quote) $error = 'No se encontró la cotización.';
+        elseif ((string)$quote['status'] !== 'draft') $error = 'La cotización ya tiene una decisión final y está bloqueada.';
+        elseif (!in_array($decision, ['approved', 'rejected'], true)) $error = 'Decisión no válida.';
+        else {
+            $DB->update('glpi_plugin_hh_quotes', ['status' => $decision, 'observations' => trim((string)($quote['observations'] ?? '') . ($comment !== '' ? "\nDecisión: " . $comment : ''))], ['id' => (int)$quoteId]);
+            hhQWriteHistory((int)$quoteId, 'draft', $decision, $comment);
+            $notice = 'Cotización ' . (string)$quote['name'] . ' ' . ($decision === 'approved' ? 'aprobada' : 'rechazada') . '. Queda bloqueada y disponible en el historial.';
+        }
+    } elseif ($action === 'delete_line' && isset($_POST['quote_id'])) {
+        // Line editing is handled by saving the draft with the desired rows.
+        $error = 'Quite la línea del formulario y vuelva a guardar el borrador.';
+    }
+}
+
+$editId = filter_var($_GET['edit'] ?? 0, FILTER_VALIDATE_INT);
+$editQuote = null;
+$editLines = [];
+if ($editId !== false && $editId > 0) {
+    foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$editId], ['*']) as $r) { $editQuote = $r; break; }
+    if ($editQuote) $editLines = hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$editId], ['*'], ['id ASC']);
+}
+$allQuotes = hhQRows('glpi_plugin_hh_quotes', [], ['*'], ['date_mod DESC', 'id DESC']);
+$catalogItems = [];
+foreach (hhQRows('glpi_plugin_hh_items', ['is_active' => 1], ['*'], ['name ASC']) as $item) {
+    $maps = hhQRows('glpi_plugin_hh_itemtypes', ['plugin_hh_items_id' => (int)$item['id']]);
+    $types = [];
+    foreach ($maps as $map) $types[] = ['itemtype' => (string)$map['itemtype'], 'models_id' => (int)($map['models_id'] ?? 0)];
+    $catalogItems[] = ['id' => (int)$item['id'], 'code' => (string)$item['code'], 'name' => (string)$item['name'], 'category' => (string)$item['category'], 'points' => (float)$item['points_each'], 'types' => $types];
+}
+$suppliers = hhQRows('glpi_suppliers', ['is_deleted' => 0], ['id', 'name'], ['name ASC']);
+$assetLabel = $editQuote ? hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']) : '';
+$editAllowed = !$editQuote || (string)$editQuote['status'] === 'draft';
+$initialLines = [];
+foreach ($editLines as $line) $initialLines[] = [
+    'item_id' => (int)($line['plugin_hh_items_id'] ?? 0),
+    'quantity' => (float)$line['quantity'],
+    'points_each' => (float)$line['points_each'],
+];
+
+Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
+?>
+<div class="container-fluid">
+ <div class="card mb-3">
+  <div class="card-header"><h2 class="card-title">Cotizaciones de reparación</h2></div>
+  <div class="card-body">
+   <?php if ($notice !== ''): ?><div class="alert alert-success"><?=hhQe($notice)?></div><?php endif; ?>
+   <?php if ($error !== ''): ?><div class="alert alert-danger"><?=hhQe($error)?></div><?php endif; ?>
+   <div class="alert alert-info">Valor vigente: <strong>$<?=number_format((float)$point['value'], 4)?></strong> por punto (USD). Cada cotización guarda una copia del valor aplicado; los cambios futuros no alteran cotizaciones ya guardadas.</div>
+   <form method="post" class="border rounded p-3 mb-4">
+    <input type="hidden" name="action" value="save_point_value">
+    <h3>Configurar valor del punto</h3>
+    <div class="row g-2 align-items-end">
+     <div class="col-md-3"><label class="form-label">Valor en USD por punto</label><input class="form-control" type="number" name="value_per_point" min="0" step="0.0001" value="<?=hhQe(number_format((float)$point['value'],4,'.',''))?>" required></div>
+     <div class="col-md-6"><label class="form-label">Motivo del cambio</label><input class="form-control" name="reason" maxlength="255" placeholder="Ej. actualización de tarifa anual" required></div>
+     <div class="col-md-3"><button class="btn btn-outline-primary" type="submit">Guardar valor del punto</button></div>
+    </div>
+   </form>
+
+   <h3><?= $editQuote ? 'Editar cotización ' . hhQe((string)$editQuote['name']) : 'Nueva cotización' ?></h3>
+   <?php if (!$editAllowed): ?>
+    <div class="alert alert-warning">Esta cotización está <?=hhQe($statuses[(string)$editQuote['status']] ?? (string)$editQuote['status'])?> y no se puede modificar.</div>
+   <?php else: ?>
+   <form method="post" id="hh-quote-form" class="border rounded p-3 mb-4">
+    <input type="hidden" name="action" value="save_quote">
+    <input type="hidden" name="quote_id" value="<?=$editQuote ? (int)$editQuote['id'] : 0?>">
+    <div class="row g-3">
+     <div class="col-md-3"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-asset-type" required><option value="">Seleccione...</option><option value="Computer" <?=$editQuote && $editQuote['itemtype']==='Computer'?'selected':''?>>Computadora</option><option value="Phone" <?=$editQuote && $editQuote['itemtype']==='Phone'?'selected':''?>>Teléfono</option></select></div>
+     <div class="col-md-2"><label class="form-label">ID del activo GLPI</label><input class="form-control" type="number" min="1" name="items_id" value="<?=$editQuote?(int)$editQuote['items_id']:''?>" required><small class="text-muted">ID numérico de la ficha del activo.</small></div>
+     <div class="col-md-3"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
+     <div class="col-md-4"><label class="form-label">Proveedor</label><select class="form-select" name="suppliers_id"><option value="0">No especificado</option><?php foreach($suppliers as $supplier): ?><option value="<?=(int)$supplier['id']?>" <?=$editQuote && (int)$editQuote['suppliers_id']===(int)$supplier['id']?'selected':''?>><?=hhQe((string)$supplier['name'])?></option><?php endforeach; ?></select></div>
+     <div class="col-md-3"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
+     <div class="col-md-3"><label class="form-label">Tipo de reparación</label><select class="form-select" name="repair_type"><option value="corrective" <?=$editQuote && $editQuote['repair_type']==='corrective'?'selected':''?>>Correctiva</option><option value="preventive" <?=$editQuote && $editQuote['repair_type']==='preventive'?'selected':''?>>Preventiva</option><option value="diagnostic" <?=$editQuote && $editQuote['repair_type']==='diagnostic'?'selected':''?>>Diagnóstico</option></select></div>
+     <div class="col-md-3"><label class="form-label">Prioridad</label><select class="form-select" name="priority"><option value="low" <?=$editQuote && $editQuote['priority']==='low'?'selected':''?>>Baja</option><option value="normal" <?=(!$editQuote || $editQuote['priority']==='normal')?'selected':''?>>Normal</option><option value="high" <?=$editQuote && $editQuote['priority']==='high'?'selected':''?>>Alta</option><option value="urgent" <?=$editQuote && $editQuote['priority']==='urgent'?'selected':''?>>Urgente</option></select></div>
+     <div class="col-md-12"><label class="form-label">Diagnóstico</label><textarea class="form-control" name="diagnosis" rows="2"><?=hhQe((string)($editQuote['diagnosis'] ?? ''))?></textarea></div>
+     <div class="col-md-12"><label class="form-label">Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe((string)($editQuote['observations'] ?? ''))?></textarea></div>
+    </div>
+    <hr><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Detalle de repuestos y servicios</h4><button type="button" class="btn btn-outline-primary btn-sm" id="hh-add-line">Agregar línea</button></div>
+    <div class="table-responsive"><table class="table table-sm table-striped align-middle"><thead><tr><th style="min-width:260px">Artículo</th><th style="width:130px">Cantidad</th><th style="width:150px">Puntos por unidad</th><th style="width:130px">Total puntos</th><th style="width:130px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="3" class="text-end">Totales</th><th id="hh-total-points">0.00</th><th id="hh-total-amount">$0.00</th><th></th></tr></tfoot></table></div>
+    <p class="text-muted small">Al seleccionar un artículo se cargan sus puntos actuales. Puedes ajustarlos en esta cotización; el valor queda guardado como histórico en sus líneas. La cotización queda como borrador hasta que se apruebe o rechace.</p>
+    <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="/plugins/hh/front/quotes.php">Nueva / cancelar</a>
+   </form>
+   <?php endif; ?>
+   <?php if ($editQuote && (string)$editQuote['status']==='draft'): ?>
+    <form method="post" class="border rounded p-3 mb-4">
+     <input type="hidden" name="action" value="decide_quote"><input type="hidden" name="quote_id" value="<?=(int)$editQuote['id']?>">
+     <div class="row g-2 align-items-end"><div class="col-md-8"><label class="form-label">Comentario de aprobación/rechazo</label><input class="form-control" name="comment" maxlength="2000" placeholder="Motivo o referencia de la decisión"></div><div class="col-md-2"><button class="btn btn-success w-100" name="decision" value="approved" type="submit">Aprobar</button></div><div class="col-md-2"><button class="btn btn-danger w-100" name="decision" value="rejected" type="submit">Rechazar</button></div></div>
+     <p class="text-muted small mt-2 mb-0">Solo se permite decidir una cotización ya guardada. La decisión es final y bloquea su edición.</p>
+    </form>
+   <?php endif; ?>
+  </div>
+ </div>
+
+ <div class="card">
+  <div class="card-header"><h3 class="card-title">Listado de cotizaciones</h3></div>
+  <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>N.º</th><th>Fecha</th><th>Activo</th><th>Proveedor</th><th>Estado</th><th class="text-end">Puntos</th><th class="text-end">Total USD</th><th>Acción</th></tr></thead><tbody>
+  <?php foreach($allQuotes as $quote): $label=hhQAssetLabel((string)$quote['itemtype'],(int)$quote['items_id']); ?>
+   <tr><td><?=hhQe((string)$quote['name'])?></td><td><?=hhQe((string)($quote['quote_date'] ?? ''))?></td><td><?=hhQe($allowedTypes[(string)$quote['itemtype']] ?? (string)$quote['itemtype'])?> #<?=(int)$quote['items_id']?><div class="small text-muted"><?=hhQe($label)?></div></td><td><?=hhQe((string)($quote['supplier_name_snapshot'] ?? '—'))?></td><td><span class="badge bg-<?=$quote['status']==='approved'?'success':($quote['status']==='rejected'?'danger':'secondary')?>"><?=hhQe($statuses[(string)$quote['status']] ?? (string)$quote['status'])?></span></td><td class="text-end"><?=number_format((float)$quote['total_points'],2)?></td><td class="text-end">$<?=number_format((float)$quote['total_amount_snapshot'],2)?></td><td><a class="btn btn-sm btn-outline-primary" href="/plugins/hh/front/quotes.php?edit=<?=(int)$quote['id']?>">Ver / <?=((string)$quote['status']==='draft'?'Editar':'detalle')?></a></td></tr>
+  <?php endforeach; ?>
+  <?php if($allQuotes===[]): ?><tr><td colspan="8" class="text-center text-muted p-4">Todavía no hay cotizaciones.</td></tr><?php endif; ?>
+  </tbody></table></div>
+ </div>
+</div>
+<script>
+(() => {
+ const catalog = <?=json_encode($catalogItems, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
+ const initial = <?=json_encode($initialLines, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
+ const pointValue = <?=json_encode((float)$point['value'])?>;
+ const typeEl = document.getElementById('hh-asset-type');
+ const tbody = document.getElementById('hh-lines');
+ const addBtn = document.getElementById('hh-add-line');
+ if (!tbody || !addBtn) return;
+ const catLabel = {part:'Repuesto',labor:'Mano de obra',service:'Servicio',other:'Otro'};
+ function allowed(item) {
+   const t = typeEl.value;
+   return item.types.some(x => x.itemtype === t);
+ }
+ function row(data={item_id:0,quantity:1,points_each:null}) {
+   const tr=document.createElement('tr');
+   const tdItem=document.createElement('td'), tdQty=document.createElement('td'), tdPoints=document.createElement('td'), tdPts=document.createElement('td'), tdMoney=document.createElement('td'), tdAction=document.createElement('td');
+   const select=document.createElement('select'); select.className='form-select form-select-sm'; select.name='line_item_id[]'; select.required=true;
+   const empty=document.createElement('option'); empty.value=''; empty.textContent='Seleccione artículo'; select.appendChild(empty);
+   catalog.filter(allowed).forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.code+' — '+item.name+' ('+(catLabel[item.category]||item.category)+')';o.dataset.points=String(item.points);select.appendChild(o);});
+   select.value=String(data.item_id||'');
+   const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
+   const pts=document.createElement('input');pts.type='number';pts.min='0';pts.step='0.01';pts.value=data.points_each!==null&&data.points_each!==undefined?String(data.points_each):'0';pts.name='line_points[]';pts.className='form-control form-control-sm';pts.required=true;
+   const pointsTotal=document.createElement('span');const amount=document.createElement('span');
+   const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
+   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];if(opt&&opt.dataset.points!==undefined)pts.value=opt.dataset.points;totals();});
+   qty.addEventListener('input',totals);pts.addEventListener('input',totals);
+   tdItem.appendChild(select);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
+   [tdItem,tdQty,tdPoints,tdPts,tdMoney,tdAction].forEach(td=>tr.appendChild(td));tbody.appendChild(tr);tr._data={qty,pts,pointsTotal,amount};totals();
+ }
+ function totals(){let p=0,a=0;[...tbody.querySelectorAll('tr')].forEach(tr=>{const d=tr._data;if(!d)return;const rowP=(parseFloat(d.qty.value)||0)*(parseFloat(d.pts.value)||0);const rowA=rowP*pointValue;p+=rowP;a+=rowA;d.pointsTotal.textContent=rowP.toFixed(2);d.amount.textContent='$'+rowA.toFixed(2);});document.getElementById('hh-total-points').textContent=p.toFixed(2);document.getElementById('hh-total-amount').textContent='$'+a.toFixed(2);}
+ function refreshRows(){const old=[...tbody.querySelectorAll('tr')].map(tr=>({item_id:tr.querySelector('[name="line_item_id[]"]').value,quantity:tr.querySelector('[name="line_quantity[]"]').value,points_each:tr.querySelector('[name="line_points[]"]').value}));tbody.replaceChildren();const valid=old.filter(x=>catalog.some(i=>String(i.id)===String(x.item_id)&&allowed(i)));valid.forEach(x=>row({item_id:Number(x.item_id),quantity:Number(x.quantity),points_each:Number(x.points_each)}));if(!tbody.children.length)row();}
+ addBtn.addEventListener('click',()=>row());typeEl.addEventListener('change',refreshRows);
+ if(initial.length){initial.forEach(x=>row(x));} else {row();}
+})();
+</script>
+<?php Html::footer(); ?>
