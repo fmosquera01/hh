@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-use GlpiPlugin\\Hh\\Dashboard;
+use GlpiPlugin\Hh\Dashboard;
 
 include('../../../inc/includes.php');
 
