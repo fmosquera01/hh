@@ -125,6 +125,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lineIds = $_POST['line_item_id'] ?? [];
         $quantities = $_POST['line_quantity'] ?? [];
         $linePoints = $_POST['line_points'] ?? [];
+        $lineSourceTypes = $_POST['line_source_type'] ?? [];
+        $lineSourceIds = $_POST['line_source_id'] ?? [];
 
         if ($error === '' && (!array_key_exists($itemtype, $allowedTypes) || $itemsId === false || $itemsId < 1 || hhQAssetLabel($itemtype, (int)$itemsId) === '')) {
             $error = 'Seleccione un tipo de activo y un ID válido de un equipo existente.';
@@ -135,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $lines = [];
         if ($error === '') {
-            if (!is_array($lineIds) || !is_array($quantities) || !is_array($linePoints)) {
+            if (!is_array($lineIds) || !is_array($quantities) || !is_array($linePoints) || !is_array($lineSourceTypes) || !is_array($lineSourceIds)) {
                 $error = 'Las líneas de la cotización no son válidas.';
             } else {
                 foreach ($lineIds as $idx => $rawId) {
@@ -162,8 +164,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     if (!$applies) { $error = 'El artículo ' . (string)$catalogItem['name'] . ' no aplica al tipo/modelo del activo seleccionado.'; break; }
+                    $sourceType = (string)($lineSourceTypes[$idx] ?? '');
+                    $sourceIdRaw = trim((string)($lineSourceIds[$idx] ?? ''));
+                    $sourceId = $sourceIdRaw !== '' ? filter_var($sourceIdRaw, FILTER_VALIDATE_INT) : null;
+                    if ($sourceIdRaw !== '' && ($sourceId === false || $sourceId < 1 || !in_array($sourceType, ['Computer', 'Phone'], true) || hhQAssetLabel($sourceType, (int)$sourceId) === '')) {
+                        $error = 'El activo de origen de una pieza reutilizada no es válido.';
+                        break;
+                    }
                     $lines[] = [
                         'item_id' => (int)$itemId,
+                        'source_itemtype' => $sourceIdRaw !== '' ? $sourceType : null,
+                        'source_items_id' => $sourceIdRaw !== '' ? (int)$sourceId : null,
                         'code' => (string)$catalogItem['code'],
                         'category' => (string)$catalogItem['category'],
                         'description' => (string)$catalogItem['name'],
@@ -232,6 +243,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'points_total' => number_format($lineTotalPoints, 2, '.', ''),
                         'point_value_snapshot' => number_format((float)$point['value'], 4, '.', ''),
                         'amount_snapshot' => number_format($lineTotalPoints * (float)$point['value'], 2, '.', ''),
+                        'source_itemtype' => $line['source_itemtype'],
+                        'source_items_id' => $line['source_items_id'],
                     ]);
                 }
                 if (!$existing) hhQWriteHistory($savedId, null, 'draft', 'Cotización creada como borrador.');
@@ -297,18 +310,38 @@ foreach ($editLines as $line) $initialLines[] = [
     'item_id' => (int)($line['plugin_hh_items_id'] ?? 0),
     'quantity' => (float)$line['quantity'],
     'points_each' => (float)$line['points_each'],
+    'source_itemtype' => (string)($line['source_itemtype'] ?? ''),
+    'source_items_id' => (int)($line['source_items_id'] ?? 0),
 ];
 
 if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 ?>
-<div class="container-fluid">
+<div class="container-fluid hh-quotes">
+<style>
+.hh-quotes{--hh-navy:#17365d;--hh-blue:#245b83}
+.hh-quotes .hh-quote-hero{border:0;border-radius:.8rem;background:linear-gradient(120deg,var(--hh-navy),var(--hh-blue));color:#fff;overflow:hidden}
+.hh-quotes .hh-quote-hero .text-muted{color:#dce8f2!important}
+.hh-quotes .hh-stat{border:1px solid var(--tblr-border-color,#dce1e7);border-radius:.65rem;padding:1rem;height:100%;background:var(--tblr-card-bg,#fff)}
+.hh-quotes .hh-stat-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--tblr-secondary-color,#667085)}
+.hh-quotes .hh-stat-value{font-size:1.35rem;font-weight:700;margin-top:.25rem}
+.hh-quotes .hh-section{border:1px solid var(--tblr-border-color,#dce1e7);border-radius:.7rem;overflow:hidden}
+.hh-quotes .hh-section-head{background:var(--tblr-bg-surface-secondary,#f5f7fa);padding:.9rem 1rem;border-bottom:1px solid var(--tblr-border-color,#dce1e7)}
+.hh-quotes .hh-section-body{padding:1rem}
+.hh-quotes .hh-lines-table thead th{font-size:.78rem;text-transform:uppercase;letter-spacing:.025em;color:var(--tblr-secondary-color,#667085);white-space:nowrap}
+.hh-quotes .hh-source-fields{display:grid;grid-template-columns:minmax(130px,1fr) minmax(90px,.6fr);gap:.4rem;margin-top:.45rem}
+.hh-quotes .hh-help{font-size:.82rem;color:var(--tblr-secondary-color,#667085)}
+.hh-quotes .hh-total{font-size:1.1rem;font-weight:700}
+.hh-quotes .hh-quote-form-card{border:1px solid var(--tblr-border-color,#dce1e7);border-radius:.75rem;padding:1.1rem;background:var(--tblr-card-bg,#fff)}
+@media(max-width:767px){.hh-quotes .hh-source-fields{grid-template-columns:1fr}.hh-quotes .hh-quote-form-card{padding:.75rem}}
+</style>
+ <div class="card hh-quote-hero mb-3"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><div class="text-muted small mb-1">HH · GESTIÓN TÉCNICA</div><h2 class="mb-1">Cotizaciones de reparación</h2><p class="mb-0 text-muted">Costos, repuestos, trazabilidad de piezas recuperadas y decisiones en un solo lugar.</p></div><div class="text-end"><div class="text-muted small">Valor vigente por punto</div><div class="display-6 fw-bold">$<?=number_format((float)$point['value'],4)?></div><div class="text-muted small">USD · valor histórico por cotización</div></div></div></div></div>
  <div class="card mb-3">
   <div class="card-header"><h2 class="card-title">Cotizaciones de reparación</h2></div>
   <div class="card-body">
    <?php if ($notice !== ''): ?><div class="alert alert-success"><?=hhQe($notice)?></div><?php endif; ?>
    <?php if ($error !== ''): ?><div class="alert alert-danger"><?=hhQe($error)?></div><?php endif; ?>
    <?php if (!$embedded): ?><div class="alert alert-info">Valor vigente: <strong>$<?=number_format((float)$point['value'], 4)?></strong> por punto (USD). Cada cotización guarda una copia del valor aplicado; los cambios futuros no alteran cotizaciones ya guardadas.</div>
-   <form method="post" class="border rounded p-3 mb-4">
+   <form method="post" class="hh-quote-form-card mb-4">
     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
     <input type="hidden" name="action" value="save_point_value">
     <h3>Configurar valor del punto</h3>
@@ -323,7 +356,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    <?php if (!$editAllowed): ?>
     <div class="alert alert-warning">Esta cotización está <?=hhQe($statuses[(string)$editQuote['status']] ?? (string)$editQuote['status'])?> y no se puede modificar.</div>
    <?php else: ?>
-   <form method="post" id="hh-quote-form" class="border rounded p-3 mb-4">
+   <form method="post" id="hh-quote-form" class="hh-quote-form-card mb-4">
     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
     <input type="hidden" name="action" value="save_quote">
     <input type="hidden" name="quote_id" value="<?=$editQuote ? (int)$editQuote['id'] : 0?>">
@@ -343,7 +376,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
      <div class="col-md-12"><label class="form-label">Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe((string)($editQuote['observations'] ?? ''))?></textarea></div>
     </div>
     <hr><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Detalle de repuestos y servicios</h4><button type="button" class="btn btn-outline-primary btn-sm" id="hh-add-line">Agregar línea</button></div>
-    <div class="table-responsive"><table class="table table-sm table-striped align-middle"><thead><tr><th style="min-width:260px">Artículo</th><th style="width:130px">Cantidad</th><th style="width:150px">Puntos por unidad</th><th style="width:130px">Total puntos</th><th style="width:130px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="3" class="text-end">Totales</th><th id="hh-total-points">0.00</th><th id="hh-total-amount">$0.00</th><th></th></tr></tfoot></table></div>
+    <div class="table-responsive"><table class="table table-sm table-striped align-middle hh-lines-table"><thead><tr><th style="min-width:260px">Artículo y origen</th><th style="width:110px">Cantidad</th><th style="width:140px">Puntos / unidad</th><th style="width:120px">Total puntos</th><th style="width:120px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="3" class="text-end">Totales</th><th id="hh-total-points" class="hh-total">0.00</th><th id="hh-total-amount" class="hh-total">$0.00</th><th></th></tr></tfoot></table></div>
     <p class="text-muted small">Al seleccionar un artículo se cargan sus puntos actuales. Puedes ajustarlos en esta cotización; el valor queda guardado como histórico en sus líneas. La cotización queda como borrador hasta que se apruebe o rechace.</p>
     <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId : '/plugins/hh/front/quotes.php' ?>">Nueva / cancelar</a>
    </form>
@@ -390,17 +423,26 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const empty=document.createElement('option'); empty.value=''; empty.textContent='Seleccione artículo'; select.appendChild(empty);
    catalog.filter(allowed).forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.code+' — '+item.name+' ('+(catLabel[item.category]||item.category)+')';o.dataset.points=String(item.points);select.appendChild(o);});
    select.value=String(data.item_id||'');
+   const sourceWrap=document.createElement('div');sourceWrap.className='hh-source-fields';
+   const sourceType=document.createElement('select');sourceType.name='line_source_type[]';sourceType.className='form-select form-select-sm';
+   sourceType.innerHTML='<option value="">Origen: no aplica</option><option value="Computer">Computadora origen</option><option value="Phone">Teléfono origen</option>';
+   sourceType.value=data.source_itemtype||'';
+   const sourceId=document.createElement('input');sourceId.type='number';sourceId.min='1';sourceId.step='1';sourceId.name='line_source_id[]';sourceId.className='form-control form-control-sm';sourceId.placeholder='ID del activo origen';sourceId.value=data.source_items_id?String(data.source_items_id):'';
+   sourceId.title='ID GLPI del equipo del que se recuperó la pieza';
+   sourceWrap.append(sourceType,sourceId);
+   const sourceHelp=document.createElement('div');sourceHelp.className='hh-help mt-1';sourceHelp.textContent='Si es una pieza recuperada, indica el activo donante.';
+   tdItem.appendChild(sourceWrap);tdItem.appendChild(sourceHelp);
    const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
    const pts=document.createElement('input');pts.type='number';pts.min='0';pts.step='0.01';pts.value=data.points_each!==null&&data.points_each!==undefined?String(data.points_each):'0';pts.name='line_points[]';pts.className='form-control form-control-sm';pts.required=true;
    const pointsTotal=document.createElement('span');const amount=document.createElement('span');
    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
    select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];if(opt&&opt.dataset.points!==undefined)pts.value=opt.dataset.points;totals();});
    qty.addEventListener('input',totals);pts.addEventListener('input',totals);
-   tdItem.appendChild(select);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
+   tdItem.insertBefore(select,sourceWrap);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
    [tdItem,tdQty,tdPoints,tdPts,tdMoney,tdAction].forEach(td=>tr.appendChild(td));tbody.appendChild(tr);tr._data={qty,pts,pointsTotal,amount};totals();
  }
  function totals(){let p=0,a=0;[...tbody.querySelectorAll('tr')].forEach(tr=>{const d=tr._data;if(!d)return;const rowP=(parseFloat(d.qty.value)||0)*(parseFloat(d.pts.value)||0);const rowA=rowP*pointValue;p+=rowP;a+=rowA;d.pointsTotal.textContent=rowP.toFixed(2);d.amount.textContent='$'+rowA.toFixed(2);});document.getElementById('hh-total-points').textContent=p.toFixed(2);document.getElementById('hh-total-amount').textContent='$'+a.toFixed(2);}
- function refreshRows(){const old=[...tbody.querySelectorAll('tr')].map(tr=>({item_id:tr.querySelector('[name="line_item_id[]"]').value,quantity:tr.querySelector('[name="line_quantity[]"]').value,points_each:tr.querySelector('[name="line_points[]"]').value}));tbody.replaceChildren();const valid=old.filter(x=>catalog.some(i=>String(i.id)===String(x.item_id)&&allowed(i)));valid.forEach(x=>row({item_id:Number(x.item_id),quantity:Number(x.quantity),points_each:Number(x.points_each)}));if(!tbody.children.length)row();}
+ function refreshRows(){const old=[...tbody.querySelectorAll('tr')].map(tr=>({item_id:tr.querySelector('[name="line_item_id[]"]').value,quantity:tr.querySelector('[name="line_quantity[]"]').value,points_each:tr.querySelector('[name="line_points[]"]').value,source_itemtype:tr.querySelector('[name="line_source_type[]"]').value,source_items_id:tr.querySelector('[name="line_source_id[]"]').value}));tbody.replaceChildren();const valid=old.filter(x=>catalog.some(i=>String(i.id)===String(x.item_id)&&allowed(i)));valid.forEach(x=>row({item_id:Number(x.item_id),quantity:Number(x.quantity),points_each:Number(x.points_each)}));if(!tbody.children.length)row();}
  addBtn.addEventListener('click',()=>row());typeEl.addEventListener('change',refreshRows);
  if(initial.length){initial.forEach(x=>row(x));} else {row();}
 })();
