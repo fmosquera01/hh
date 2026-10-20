@@ -33,6 +33,7 @@ final class RepairTab extends CommonGLPI
         $itemId = (int) $item->getID();
         $fields = $item->fields ?? [];
         $native = self::loadNativeAssetInfo($itemType, $itemId);
+        $approvedPoints = self::loadApprovedRepairPoints($itemType, $itemId);
         $contracts = $native['contracts'];
         // La garantía propia del equipo se calcula aparte del contrato extendido.
         // La fecha de compra es el inicio preferente de la garantía nativa.
@@ -94,7 +95,7 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
         self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
         self::assetDetail(__('Modelo', 'hh'), (string) ($native['model'] ?? ''));
-		self::assetDetail(__('Fabricante', 'hh'), (string) ($native['manufacturer'] ?? ''));
+		self::assetDetail(__('Puntos usados en reparaciones aprobadas', 'hh'), number_format($approvedPoints, 2, '.', ','));
         self::assetDetail(__('Estado', 'hh'), (string) ($native['status'] ?? ''));
         self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
         self::assetDetail(__('Valor de compra', 'hh'), self::displayMoney($native['purchase_value'] ?? null));
@@ -133,6 +134,17 @@ final class RepairTab extends CommonGLPI
         echo "<div class='hh-tab-panel' data-hh-panel='history'><iframe title='Historial de reparaciones de este activo' src='" . self::e($historyUrl) . "' style='height:650px' loading='lazy'></iframe></div>";
         echo "</div></div>";
         return true;
+    }
+
+    /** Sum points from approved repair quotes for this asset only. */
+    private static function loadApprovedRepairPoints(string $itemType, int $itemId): float
+    {
+        global $DB;
+        $total = 0.0;
+        foreach ($DB->request(['SELECT' => ['total_points'], 'FROM' => 'glpi_plugin_hh_quotes', 'WHERE' => ['itemtype' => $itemType, 'items_id' => $itemId, 'status' => 'approved']]) as $row) {
+            $total += (float)($row['total_points'] ?? 0);
+        }
+        return $total;
     }
 
     /** Read native GLPI fields through GLPI's DB request API (no direct SQL queries). */
