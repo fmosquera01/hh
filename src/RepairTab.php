@@ -94,7 +94,7 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Proveedor del contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_supplier'] ?? '') : '—');
         echo "</div></div></div>";
 
-        $catalogUrl = \\Plugin::getWebDir('hh', false) . '/front/catalog.php';
+        $catalogUrl = \Plugin::getWebDir('hh', false) . '/front/catalog.php';
         echo "<div class='card mb-4'><div class='card-header d-flex justify-content-between align-items-center flex-wrap gap-2'><h3 class='card-title mb-0'>"
             . self::e(__('Cotizaciones e historial de reparaciones', 'hh')) . "</h3>";
         echo "<a class='btn btn-outline-primary' href='" . self::e($catalogUrl) . "'><i class='ti ti-package me-1'></i>"
