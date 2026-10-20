@@ -506,6 +506,11 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     <hr><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Detalle de repuestos y servicios</h4><button type="button" class="btn btn-outline-primary btn-sm" id="hh-add-line">Agregar línea</button></div>
     <div class="table-responsive"><table class="table table-sm table-striped align-middle hh-lines-table"><thead><tr><th style="min-width:200px">Artículo</th><th style="min-width:100px">Reuso de pieza</th><th style="min-width:95px">Garantía</th><th style="width:70px">Cantidad</th><th style="width:70px">Puntos</th><th style="width:80px">Total puntos</th><th style="width:80px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="5" class="text-end">Totales</th><th id="hh-total-points" class="hh-total">0.00</th><th id="hh-total-amount" class="hh-total">$0.00</th><th></th></tr></tfoot></table></div>
     <p class="text-muted small">Al seleccionar un artículo se cargan sus puntos actuales. Puedes ajustarlos en esta cotización; el valor queda guardado como histórico en sus líneas. La cotización queda como borrador hasta que se apruebe o rechace.</p>
+    <div class="mt-2 mb-3 small">
+      <div id="hh-repair-cost-ratio" class="fw-semibold">Costo de reparación: calculando porcentaje...</div>
+      <div id="hh-repair-cost-warning" class="alert alert-warning py-2 mt-2 mb-0" style="display:none">No se recomienda reparar: el costo es igual o superior al 40 % del valor de compra del equipo.</div>
+      <?php if ($purchaseValue !== null): ?><div class="text-muted">Valor de compra registrado en GLPI: $<?=number_format($purchaseValue, 2)?></div><?php else: ?><div class="text-muted">No se puede calcular el porcentaje porque el equipo no tiene un valor de compra válido registrado en GLPI.</div><?php endif; ?>
+    </div>
     <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId : '/plugins/hh/front/quotes.php' ?>">Nueva / cancelar</a>
    </form>
    <?php endif; ?>
@@ -585,7 +590,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const pts=document.createElement('input');pts.type='number';pts.min='0';pts.step='0.01';pts.value=data.points_each!==null&&data.points_each!==undefined?String(data.points_each):'0';pts.name='line_points[]';pts.className='form-control form-control-sm';pts.required=true;
    const pointsTotal=document.createElement('span');const amount=document.createElement('span');
    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
-   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];if(opt&&opt.dataset.points!==undefined)pts.value=opt.dataset.points;totals();});
+   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];if(opt&&opt.dataset.points!==undefined)pts.value=warrantyCheck.checked?'0':opt.dataset.points;totals();});
     warrantyCheck.addEventListener('change',()=>{warrantyHidden.value=warrantyCheck.checked?'1':'0';if(warrantyCheck.checked)pts.value='0';totals();});
    qty.addEventListener('input',totals);pts.addEventListener('input',totals);
    tdItem.appendChild(select);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
