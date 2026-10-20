@@ -370,7 +370,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 .hh-quotes .btn{border-radius:.45rem}
 @media(max-width:767px){.hh-quotes .hh-source-fields{grid-template-columns:1fr}.hh-quotes .hh-quote-form-card{padding:.75rem}}
 </style>
- <div class="card hh-quote-hero mb-3"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><div class="text-muted small mb-1">HH · GESTIÓN TÉCNICA</div><h2 class="mb-1">Cotizaciones de reparación</h2><p class="mb-0 text-muted">Costos, repuestos, trazabilidad de piezas recuperadas y decisiones en un solo lugar.</p></div><div class="text-end"><div class="text-muted small">Valor vigente por punto</div><div class="display-6 fw-bold">$<?=number_format((float)$point['value'],4)?></div><div class="text-muted small">USD · valor histórico por cotización</div></div></div></div></div>
+<?php if (!$embedded): ?> <div class="card hh-quote-hero mb-3"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><div class="text-muted small mb-1">HH · GESTIÓN TÉCNICA</div><h2 class="mb-1">Cotizaciones de reparación</h2><p class="mb-0 text-muted">Costos, repuestos, trazabilidad de piezas recuperadas y decisiones en un solo lugar.</p></div><div class="text-end"><div class="text-muted small">Valor vigente por punto</div><div class="display-6 fw-bold">$<?=number_format((float)$point['value'],4)?></div><div class="text-muted small">USD · valor histórico por cotización</div></div></div></div></div><?php endif; ?>
  <div class="card mb-3">
   <div class="card-header"><h2 class="card-title">Cotizaciones de reparación</h2></div>
   <div class="card-body">
@@ -428,6 +428,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
   </div>
  </div>
 
+ <?php if (!$embedded): ?>
  <div class="card hh-section mb-4">
   <div class="hh-section-head"><h3 class="card-title mb-0">Cotización actual</h3><small class="text-muted">Solo borradores pendientes de decisión. Cada activo puede tener un único borrador.</small></div>
   <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>N.º</th><th>Fecha</th><th>Activo</th><th>Proveedor</th><th class="text-end">Puntos</th><th class="text-end">Total USD</th><th>Acción</th></tr></thead><tbody>
@@ -446,6 +447,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
   <?php if ($historyCount === 0): ?><tr><td colspan="8" class="text-center text-muted p-4">Todavía no hay decisiones registradas.</td></tr><?php endif; ?>
   </tbody></table></div>
  </div>
+ <?php endif; ?>
 </div>
 <script>
 (() => {
