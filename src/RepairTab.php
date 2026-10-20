@@ -100,8 +100,10 @@ final class RepairTab extends CommonGLPI
         echo "<a class='btn btn-outline-primary' href='" . self::e($catalogUrl) . "'><i class='ti ti-package me-1'></i>"
             . self::e(__('Administrar catálogo de repuestos y servicios', 'hh')) . "</a></div><div class='card-body'>";
         echo "<div class='row g-3'>";
-        echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Cotizaciones', 'hh')) . "</h4><p class='text-muted mb-0'>"
-            . self::e(__('En el siguiente paso conectaremos la creación de cotizaciones con este activo y sus artículos.', 'hh')) . "</p></div></div>";
+        $quotesUrl = '/plugins/hh/front/quotes.php?itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
+        echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Cotizaciones', 'hh')) . "</h4><p class='text-muted mb-2'>"
+            . self::e(__('Crear y consultar cotizaciones asociadas a este activo.', 'hh')) . "</p><a class='btn btn-outline-primary mt-auto' href='" . self::e($quotesUrl) . "'>"
+            . self::e(__('Administrar cotizaciones', 'hh')) . "</a></div></div>";
         echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Catálogo', 'hh')) . "</h4><p class='text-muted mb-0'>"
             . self::e(__('Registre repuestos, mano de obra y servicios con su código y valor en puntos.', 'hh')) . "</p></div></div>";
         echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Historial', 'hh')) . "</h4><p class='text-muted mb-0'>"
