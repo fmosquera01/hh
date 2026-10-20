@@ -167,8 +167,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $sourceType = (string)($lineSourceTypes[$idx] ?? '');
                     $sourceIdRaw = trim((string)($lineSourceIds[$idx] ?? ''));
                     $sourceId = $sourceIdRaw !== '' ? filter_var($sourceIdRaw, FILTER_VALIDATE_INT) : null;
-                    if ($sourceIdRaw !== '' && ($sourceId === false || $sourceId < 1 || !in_array($sourceType, ['Computer', 'Phone'], true) || hhQAssetLabel($sourceType, (int)$sourceId) === '')) {
-                        $error = 'El activo de origen de una pieza reutilizada no es válido.';
+                    if (($sourceIdRaw === '' && $sourceType !== '') || ($sourceIdRaw !== '' && ($sourceId === false || $sourceId < 1 || !in_array($sourceType, ['Computer', 'Phone'], true) || hhQAssetLabel($sourceType, (int)$sourceId) === ''))) {
+                        $error = 'Para una pieza reutilizada, seleccione un tipo de activo e ingrese un ID de origen válido; si no es reutilizada, deje ambos campos vacíos.';
                         break;
                     }
                     $lines[] = [
