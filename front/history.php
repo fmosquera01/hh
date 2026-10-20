@@ -44,7 +44,7 @@ if ($viewId !== false && $viewId > 0) {
         $events = hhHistoryRows('glpi_plugin_hh_quotehistory', ['plugin_hh_quotes_id'=>(int)$viewId], ['date_creation ASC','id ASC']);
     } else { $view = null; }
 }
-$where = $embedded ? ['itemtype'=>$itemtype, 'items_id'=>$itemsId] : [];\n$where['status'] = ['approved', 'rejected'];
+$where = $embedded ? ['itemtype'=>$itemtype, 'items_id'=>$itemsId] : [];\n$where['status'] = ['approved', 'rejected'];\n$where['status'] = ['approved', 'rejected'];
 if ($status !== '' && in_array($status, ['approved', 'rejected'], true)) $where['status'] = $status;
 $quotes = hhHistoryRows('glpi_plugin_hh_quotes', $where, ['date_mod DESC','id DESC']);
 if ($search !== '' && !$embedded) {
