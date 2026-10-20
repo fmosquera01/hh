@@ -485,7 +485,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
    select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];if(opt&&opt.dataset.points!==undefined)pts.value=opt.dataset.points;totals();});
    qty.addEventListener('input',totals);pts.addEventListener('input',totals);
-   tdItem.insertBefore(select,sourceWrap);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
+   tdItem.appendChild(select);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
    [tdItem,tdSource,tdQty,tdPoints,tdPts,tdMoney,tdAction].forEach(td=>tr.appendChild(td));tbody.appendChild(tr);tr._data={qty,pts,pointsTotal,amount};totals();
  }
  function totals(){let p=0,a=0;[...tbody.querySelectorAll('tr')].forEach(tr=>{const d=tr._data;if(!d)return;const rowP=(parseFloat(d.qty.value)||0)*(parseFloat(d.pts.value)||0);const rowA=rowP*pointValue;p+=rowP;a+=rowA;d.pointsTotal.textContent=rowP.toFixed(2);d.amount.textContent='$'+rowA.toFixed(2);});document.getElementById('hh-total-points').textContent=p.toFixed(2);document.getElementById('hh-total-amount').textContent='$'+a.toFixed(2);}
