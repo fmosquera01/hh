@@ -462,8 +462,10 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const sourceType=document.createElement('select');sourceType.name='line_source_type[]';sourceType.className='form-select form-select-sm';
    sourceType.innerHTML='<option value="">Origen: no aplica</option><option value="Computer">Computadora origen</option><option value="Phone">Teléfono origen</option>';
    sourceType.value=data.source_itemtype||'';
-   const sourceId=document.createElement('input');sourceId.type='number';sourceId.min='1';sourceId.step='1';sourceId.name='line_source_id[]';sourceId.className='form-control form-control-sm';sourceId.placeholder='ID del activo origen';sourceId.value=data.source_items_id?String(data.source_items_id):'';
-   sourceId.title='ID GLPI del equipo del que se recuperó la pieza';
+   const sourceId=document.createElement('select');sourceId.name='line_source_id[]';sourceId.className='form-select form-select-sm';sourceId.title='Activo GLPI del que se recuperó la pieza';
+   function refreshSourceOptions(selected=''){sourceId.replaceChildren();const emptySource=document.createElement('option');emptySource.value='';emptySource.textContent='Seleccione activo de origen';sourceId.appendChild(emptySource);assets.filter(a=>a.itemtype===sourceType.value).forEach(a=>{const o=document.createElement('option');o.value=String(a.id);o.textContent=a.label;sourceId.appendChild(o);});sourceId.value=String(selected||'');sourceId.disabled=!sourceType.value;}
+   refreshSourceOptions(data.source_items_id||'');
+   sourceType.addEventListener('change',()=>refreshSourceOptions(''));
    sourceWrap.append(sourceType,sourceId);
    const sourceHelp=document.createElement('div');sourceHelp.className='hh-help mt-1';sourceHelp.textContent='Si es una pieza recuperada, indica el activo donante.';
    tdItem.appendChild(sourceWrap);tdItem.appendChild(sourceHelp);
