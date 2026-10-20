@@ -500,7 +500,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const tdItem=document.createElement('td'), tdSource=document.createElement('td'), tdQty=document.createElement('td'), tdPoints=document.createElement('td'), tdPts=document.createElement('td'), tdMoney=document.createElement('td'), tdAction=document.createElement('td');
    const select=document.createElement('select'); select.className='form-select form-select-sm'; select.name='line_item_id[]'; select.required=true;
    const empty=document.createElement('option'); empty.value=''; empty.textContent='Seleccione artículo'; select.appendChild(empty);
-   catalog.filter(allowed).forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.code+' — '+item.name+' ('+(catLabel[item.category]||item.category)+')';o.dataset.points=String(item.points);select.appendChild(o);});
+   catalog.filter(allowed).forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.name;o.dataset.points=String(item.points);select.appendChild(o);});
    select.value=String(data.item_id||'');
    const sourceType=document.createElement('input');sourceType.type='hidden';sourceType.name='line_source_type[]';sourceType.value=data.source_itemtype||'';
    const sourceId=document.createElement('input');sourceId.type='hidden';sourceId.name='line_source_id[]';sourceId.value=String(data.source_items_id||'');
@@ -512,7 +512,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    sourceSelect.value=savedSource ? savedSource.itemtype+':'+String(savedSource.id) : '';
    sourceId.value=savedSource ? String(savedSource.id) : '';
    sourceType.value=savedSource ? savedSource.itemtype : '';
-   const sourceHelp=document.createElement('div');sourceHelp.className='hh-help mt-1';sourceHelp.textContent='Opcional: elija otro equipo donante. Al seleccionar una pieza reutilizada, los puntos empiezan en 0 y puede editarlos.';
+   const sourceHelp=document.createElement('div');sourceHelp.className='hh-help mt-1';sourceHelp.textContent='';
    tdSource.append(sourceSelect,sourceId,sourceType,sourceHelp);
    sourceSelect.addEventListener('change',()=>{const parts=sourceSelect.value.split(':');sourceType.value=parts.length===2?parts[0]:'';sourceId.value=parts.length===2?parts[1]:'';if(sourceSelect.value!=='')pts.value='0';totals();});
    const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
