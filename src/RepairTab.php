@@ -93,8 +93,8 @@ final class RepairTab extends CommonGLPI
 
         self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
         self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
-        self::assetDetail(__('Fabricante', 'hh'), (string) ($native['manufacturer'] ?? ''));
         self::assetDetail(__('Modelo', 'hh'), (string) ($native['model'] ?? ''));
+		self::assetDetail(__('Fabricante', 'hh'), (string) ($native['manufacturer'] ?? ''));
         self::assetDetail(__('Estado', 'hh'), (string) ($native['status'] ?? ''));
         self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
         self::assetDetail(__('Valor de compra', 'hh'), self::displayMoney($native['purchase_value'] ?? null));
