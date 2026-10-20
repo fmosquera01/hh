@@ -94,17 +94,16 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Proveedor del contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_supplier'] ?? '') : '—');
         echo "</div></div></div>";
 
-        $catalogUrl = '/' . ltrim(\Plugin::getWebDir('hh', false), '/') . '/front/catalog.php';
         $quotesUrl = '/plugins/hh/front/quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
+        $historyUrl = '/plugins/hh/front/history.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
         
         echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
         echo "<ul class='nav nav-tabs' role='tablist'>";
         echo "<li class='nav-item'><button class='nav-link active' type='button' data-hh-tab='quotes'>Cotizaciones</button></li>";
         echo "<li class='nav-item'><button class='nav-link' type='button' data-hh-tab='history'>Historial</button></li>";
-        echo "<li class='nav-item'><a class='nav-link' href='" . self::e($catalogUrl) . "'>Catálogo</a></li>";
         echo "</ul>";
-        echo "<div class='pt-3' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='width:100%;height:1100px;border:0' loading='lazy'></iframe></div>";
-        echo "<div class='pt-3' data-hh-panel='history' hidden><div class='alert alert-info'>El historial por activo se habilitará aquí. Por ahora, las decisiones de cotización quedan registradas en el historial interno de cada cotización.</div></div>";
+        echo "<div class='pt-3' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='width:100%;height:850px;border:0' loading='lazy'></iframe></div>";
+        echo "<div class='pt-3' data-hh-panel='history' hidden><iframe title='Historial del activo' src='" . self::e($historyUrl) . "' style='width:100%;height:650px;border:0' loading='lazy'></iframe></div>";
         echo "<script>(()=>{const root=document.currentScript.parentElement;const buttons=root.querySelectorAll('[data-hh-tab]');const panels=root.querySelectorAll('[data-hh-panel]');buttons.forEach(b=>b.addEventListener('click',()=>{buttons.forEach(x=>x.classList.toggle('active',x===b));panels.forEach(p=>p.hidden=p.dataset.hhPanel!==b.dataset.hhTab)}));})();</script>";
         echo "</div>";
         return true;
