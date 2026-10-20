@@ -591,20 +591,46 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    tdItem.appendChild(select);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
    [tdItem,tdSource,tdWarranty,tdQty,tdPoints,tdPts,tdMoney,tdAction].forEach(td=>tr.appendChild(td));tbody.appendChild(tr);tr._data={qty,pts,pointsTotal,amount};totals();
  }
- function totals(){let p=0,a=0;[...tbody.querySelectorAll('tr')].forEach(tr=>{const d=tr._data;if(!d)return;const rowP=(parseFloat(d.qty.value)||0)*(parseFloat(d.pts.value)||0);const rowA=rowP*pointValue;p+=rowP;a+=rowA;d.pointsTotal.textContent=rowP.toFixed(2);d.amount.textContent='$'+rowA.toFixed(2);});document.getElementById('hh-total-points').textContent=p.toFixed(2);document.getElementById('hh-total-amount').textContent='
- function refreshRows(){const old=[...tbody.querySelectorAll('tr')].map(tr=>({item_id:tr.querySelector('[name="line_item_id[]"]').value,quantity:tr.querySelector('[name="line_quantity[]"]').value,points_each:tr.querySelector('[name="line_points[]"]').value,source_itemtype:tr.querySelector('[name="line_source_type[]"]').value,source_items_id:tr.querySelector('[name="line_source_id[]"]').value,is_warranty:tr.querySelector('[name="line_is_warranty[]"]').value}));tbody.replaceChildren();const valid=old.filter(x=>catalog.some(i=>String(i.id)===String(x.item_id)&&allowed(i)));valid.forEach(x=>row({item_id:Number(x.item_id),quantity:Number(x.quantity),points_each:Number(x.points_each),source_itemtype:x.source_itemtype,source_items_id:Number(x.source_items_id||0),is_warranty:Number(x.is_warranty||0)}));if(!tbody.children.length)row();}
- addBtn.addEventListener('click',()=>row());typeEl.addEventListener('change',refreshRows);
- if(initial.length){initial.forEach(x=>row(x));} else {row();}
-})();
-</script>
-<?php if (!$embedded) Html::footer(); ?>
-+a.toFixed(2);
-    const ratio=document.getElementById('hh-repair-cost-ratio'), warning=document.getElementById('hh-repair-cost-warning');
-    if(ratio){if(purchaseValue!==null&&Number(purchaseValue)>0){const pct=(a/Number(purchaseValue))*100;ratio.textContent='Costo de reparación: '+pct.toFixed(1)+' % del valor de compra';if(warning)warning.style.display=pct>=40?'block':'none';}else{ratio.textContent='Porcentaje del valor de compra: no disponible';if(warning)warning.style.display='none';}}
+ function totals(){
+    let p=0,a=0;
+    [...tbody.querySelectorAll('tr')].forEach(tr=>{
+      const d=tr._data;if(!d)return;
+      const rowP=(parseFloat(d.qty.value)||0)*(parseFloat(d.pts.value)||0);
+      const rowA=rowP*pointValue;p+=rowP;a+=rowA;
+      d.pointsTotal.textContent=rowP.toFixed(2);d.amount.textContent='$'+rowA.toFixed(2);
+    });
+    document.getElementById('hh-total-points').textContent=p.toFixed(2);
+    document.getElementById('hh-total-amount').textContent='$'+a.toFixed(2);
+    const ratio=document.getElementById('hh-repair-cost-ratio');
+    const warning=document.getElementById('hh-repair-cost-warning');
+    if(ratio){
+      if(purchaseValue!==null&&Number(purchaseValue)>0){
+        const pct=(a/Number(purchaseValue))*100;
+        ratio.textContent='Costo de reparación: '+pct.toFixed(1)+' % del valor de compra';
+        if(warning)warning.style.display=pct>=40?'block':'none';
+      }else{
+        ratio.textContent='Porcentaje del valor de compra: no disponible';
+        if(warning)warning.style.display='none';
+      }
+    }
   }
- function refreshRows(){const old=[...tbody.querySelectorAll('tr')].map(tr=>({item_id:tr.querySelector('[name="line_item_id[]"]').value,quantity:tr.querySelector('[name="line_quantity[]"]').value,points_each:tr.querySelector('[name="line_points[]"]').value,source_itemtype:tr.querySelector('[name="line_source_type[]"]').value,source_items_id:tr.querySelector('[name="line_source_id[]"]').value}));tbody.replaceChildren();const valid=old.filter(x=>catalog.some(i=>String(i.id)===String(x.item_id)&&allowed(i)));valid.forEach(x=>row({item_id:Number(x.item_id),quantity:Number(x.quantity),points_each:Number(x.points_each),source_itemtype:x.source_itemtype,source_items_id:Number(x.source_items_id||0)}));if(!tbody.children.length)row();}
- addBtn.addEventListener('click',()=>row());typeEl.addEventListener('change',refreshRows);
- if(initial.length){initial.forEach(x=>row(x));} else {row();}
+  function refreshRows(){
+    const old=[...tbody.querySelectorAll('tr')].map(tr=>({
+      item_id:tr.querySelector('[name="line_item_id[]"]').value,
+      quantity:tr.querySelector('[name="line_quantity[]"]').value,
+      points_each:tr.querySelector('[name="line_points[]"]').value,
+      source_itemtype:tr.querySelector('[name="line_source_type[]"]').value,
+      source_items_id:tr.querySelector('[name="line_source_id[]"]').value,
+      is_warranty:tr.querySelector('[name="line_is_warranty[]"]').value
+    }));
+    tbody.replaceChildren();
+    const valid=old.filter(x=>catalog.some(i=>String(i.id)===String(x.item_id)&&allowed(i)));
+    valid.forEach(x=>row({item_id:Number(x.item_id),quantity:Number(x.quantity),points_each:Number(x.points_each),source_itemtype:x.source_itemtype,source_items_id:Number(x.source_items_id||0),is_warranty:Number(x.is_warranty||0)}));
+    if(!tbody.children.length)row();
+  }
+  addBtn.addEventListener('click',()=>row());
+  typeEl.addEventListener('change',refreshRows);
+  if(initial.length){initial.forEach(x=>row(x));} else {row();}
 })();
 </script>
 <?php if (!$embedded) Html::footer(); ?>
