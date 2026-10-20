@@ -67,18 +67,21 @@ final class RepairTab extends CommonGLPI
         echo "<style>
             .hh-repairs .hh-hero{border:0;border-radius:.65rem;background:linear-gradient(120deg,#17365d,#245b83);color:#fff}
             .hh-repairs .hh-hero .text-muted{color:#d8e6f2!important}
-            .hh-repairs .hh-asset-detail{height:100%;border:1px solid rgba(255,255,255,.22);border-radius:.45rem;padding:.65rem .75rem;background:rgba(255,255,255,.06)}
-            .hh-repairs .hh-detail-label{font-size:.72rem;color:#d8e6f2;margin-bottom:.15rem}
-            .hh-repairs .hh-asset-detail strong{overflow-wrap:anywhere;white-space:normal}
-            .hh-repairs .hh-empty{border:1px dashed var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1.5rem 1rem;text-align:center}
+            .hh-repairs .hh-hero{margin-bottom:.5rem!important}
+            .hh-repairs .hh-hero .card-body{padding:.7rem .85rem!important}
+            .hh-repairs .hh-hero h2{font-size:1.15rem;margin-bottom:.45rem!important}
+            .hh-repairs .hh-asset-detail{height:100%;border:1px solid rgba(255,255,255,.22);border-radius:.35rem;padding:.3rem .45rem;background:rgba(255,255,255,.06);min-height:0}
+            .hh-repairs .hh-detail-label{font-size:.64rem;line-height:1.1;color:#d8e6f2;margin-bottom:.08rem}
+            .hh-repairs .hh-asset-detail strong{display:block;font-size:.78rem;line-height:1.15;overflow-wrap:anywhere;white-space:normal;font-weight:600}
+            .hh-repairs .hh-empty{border:1px dashed var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1rem;text-align:center}
+            .hh-repairs .hh-asset-grid{row-gap:.35rem!important}
+            .hh-repairs .hh-asset-divider{display:block;border-top:1px solid rgba(255,255,255,.25);margin:.45rem 0 .55rem}
+            @media(max-width:767.98px){.hh-repairs .hh-asset-detail{padding:.35rem .4rem}.hh-repairs .hh-detail-label{font-size:.62rem}.hh-repairs .hh-asset-detail strong{font-size:.75rem}}
         </style>";
 
-        echo "<div class='card hh-hero mb-3'><div class='card-body p-4'>";
-        
+        echo "<div class='card hh-hero mb-2'><div class='card-body'>";
         echo "<h2 class='mb-1'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h2>";
-      
-        
-        echo "<br class='border-light opacity-25'><div class='row g-2'>";
+        echo "<span class='hh-asset-divider'></span><div class='row g-1 hh-asset-grid'>
 
         self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
         self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
