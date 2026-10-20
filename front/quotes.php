@@ -187,7 +187,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $sourceIdRaw = trim((string)($lineSourceIds[$idx] ?? ''));
                     $sourceId = $sourceIdRaw !== '' ? filter_var($sourceIdRaw, FILTER_VALIDATE_INT) : null;
                     if (($sourceIdRaw === '' && $sourceType !== '') || ($sourceIdRaw !== '' && ($sourceId === false || $sourceId < 1 || !in_array($sourceType, ['Computer', 'Phone'], true) || hhQAssetLabel($sourceType, (int)$sourceId) === ''))) {
-                        $error = 'Para una pieza reutilizada, seleccione un tipo de activo e ingrese un ID de origen válido; si no es reutilizada, deje ambos campos vacíos.';
+                        $error = 'Para una pieza reutilizada, seleccione un activo donante válido.';
+                        break;
+                    }
+                    if ($sourceIdRaw !== '' && $sourceType === $itemtype && (int)$sourceId === (int)$itemsId) {
+                        $error = 'El activo que se está reparando no puede ser también el donante de la pieza reutilizada.';
                         break;
                     }
                     $lines[] = [
@@ -344,6 +348,33 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 ?>
 <div class="container-fluid hh-quotes">
 <style>
+/* Diseño autónomo cuando se muestra dentro del iframe de la ficha del activo. */
+.hh-quotes{--hh-navy:#17365d;--hh-blue:#245b83;color:#263445;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.45}
+.hh-quotes *{box-sizing:border-box}
+.hh-quotes .card{background:#fff;border:1px solid #d9e0e8;border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 2px 8px rgba(20,35,55,.06)}
+.hh-quotes .card-header{padding:14px 16px;background:#f5f7fa;border-bottom:1px solid #d9e0e8}
+.hh-quotes .card-body{padding:16px}
+.hh-quotes h2{font-size:21px;line-height:1.3;margin:0 0 10px;font-weight:700}
+.hh-quotes h3{font-size:17px;line-height:1.35;margin:12px 0;font-weight:700}
+.hh-quotes h4{font-size:15px;font-weight:700}
+.hh-quotes p{margin:8px 0 14px}
+.hh-quotes .row{display:flex;flex-wrap:wrap;margin-left:-6px;margin-right:-6px;row-gap:12px}
+.hh-quotes .row>[class*="col-"]{padding-left:6px;padding-right:6px;min-width:0}
+.hh-quotes .col-md-2{width:16.6667%}.hh-quotes .col-md-3{width:25%}.hh-quotes .col-md-4{width:33.3333%}.hh-quotes .col-md-5{width:41.6667%}.hh-quotes .col-md-6{width:50%}.hh-quotes .col-md-8{width:66.6667%}.hh-quotes .col-md-12,.hh-quotes .col-12{width:100%}
+.hh-quotes .form-label{display:block;font-weight:600;margin-bottom:5px;color:#27364b}
+.hh-quotes .form-control,.hh-quotes .form-select{display:block;width:100%;min-width:0;min-height:36px;padding:7px 9px;border:1px solid #c8d1dc;border-radius:6px;background:#fff;color:#263445;font:inherit}
+.hh-quotes textarea.form-control{min-height:64px;resize:vertical}
+.hh-quotes .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid transparent;border-radius:6px;padding:7px 11px;font:inherit;font-weight:600;text-decoration:none;cursor:pointer;white-space:normal}
+.hh-quotes .btn-sm{font-size:12px;padding:5px 8px}
+.hh-quotes .btn-primary{background:#245b83;color:#fff}.hh-quotes .btn-outline-primary{border-color:#245b83;color:#245b83;background:#fff}.hh-quotes .btn-secondary,.hh-quotes .btn-outline-secondary{background:#f1f4f8;border-color:#cbd5e1;color:#334155}.hh-quotes .btn-success{background:#16804a;color:#fff}.hh-quotes .btn-danger,.hh-quotes .btn-outline-danger{background:#fff;border-color:#c43b45;color:#b4232c}
+.hh-quotes .alert{padding:10px 12px;border-radius:7px;margin:10px 0 14px;border:1px solid transparent}.hh-quotes .alert-success{background:#e8f7ee;border-color:#a7dfbb;color:#14532d}.hh-quotes .alert-danger{background:#fff0f0;border-color:#f0b4b4;color:#8b1e1e}.hh-quotes .alert-info{background:#edf6ff;border-color:#b6d9f7;color:#19476b}.hh-quotes .alert-warning{background:#fff8e6;border-color:#f3d58a;color:#77520a}
+.hh-quotes .table-responsive{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.hh-quotes table{width:100%;border-collapse:collapse;font-size:13px}
+.hh-quotes th,.hh-quotes td{border-bottom:1px solid #e3e8ef;padding:8px 7px;text-align:left;vertical-align:middle}
+.hh-quotes th{background:#f5f7fa;font-weight:700}.hh-quotes .text-end{text-align:right}.hh-quotes .text-center{text-align:center}.hh-quotes .text-muted{color:#667085!important}.hh-quotes .small{font-size:12px}.hh-quotes .d-flex{display:flex}.hh-quotes .flex-wrap{flex-wrap:wrap}.hh-quotes .justify-content-between{justify-content:space-between}.hh-quotes .align-items-center{align-items:center}.hh-quotes .align-items-end{align-items:flex-end}.hh-quotes .gap-3{gap:12px}.hh-quotes .gap-2{gap:8px}.hh-quotes .mb-0{margin-bottom:0}.hh-quotes .mb-2{margin-bottom:8px}.hh-quotes .mb-3{margin-bottom:12px}.hh-quotes .mb-4{margin-bottom:16px}.hh-quotes .mt-2{margin-top:8px}.hh-quotes .mt-auto{margin-top:auto}.hh-quotes .pt-3{padding-top:12px}.hh-quotes .p-4{padding:16px}.hh-quotes .p-3{padding:12px}.hh-quotes .rounded{border-radius:8px}.hh-quotes .border{border:1px solid #d9e0e8}.hh-quotes .w-100{width:100%}.hh-quotes hr{border:0;border-top:1px solid #e0e6ed;margin:16px 0}.hh-quotes .badge{display:inline-block;padding:4px 7px;border-radius:5px;color:#fff}.hh-quotes .bg-success{background:#16804a}.hh-quotes .bg-danger{background:#bd2934}.hh-quotes .hh-quote-form-card{background:#fff}
+.hh-quotes .hh-quote-hero{color:#fff}
+.hh-quotes .hh-quote-hero .text-muted{color:#dce8f2!important}
+@media(max-width:767px){.hh-quotes .row>[class*="col-md-"]{width:100%}.hh-quotes .hh-source-fields{grid-template-columns:1fr}.hh-quotes .hh-quote-form-card{padding:.75rem}.hh-quotes .card-body{padding:12px}.hh-quotes .hh-lines-table{min-width:850px}.hh-quotes .btn{font-size:13px}}
 .hh-quotes{--hh-navy:#17365d;--hh-blue:#245b83}
 .hh-quotes .hh-quote-hero{border:0;border-radius:.8rem;background:linear-gradient(120deg,var(--hh-navy),var(--hh-blue));color:#fff;overflow:hidden}
 .hh-quotes .hh-quote-hero .text-muted{color:#dce8f2!important}
@@ -471,14 +502,19 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const empty=document.createElement('option'); empty.value=''; empty.textContent='Seleccione artículo'; select.appendChild(empty);
    catalog.filter(allowed).forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.code+' — '+item.name+' ('+(catLabel[item.category]||item.category)+')';o.dataset.points=String(item.points);select.appendChild(o);});
    select.value=String(data.item_id||'');
-   const sourceType=document.createElement('input');sourceType.type='hidden';sourceType.name='line_source_type[]';sourceType.value=typeEl.value;
-   const sourceId=document.createElement('select');sourceId.name='line_source_id[]';sourceId.className='form-select form-select-sm';sourceId.title='Activo del mismo tipo del que se recuperó la pieza';
-   const noReuse=document.createElement('option');noReuse.value='';noReuse.textContent='No reutilizada';sourceId.appendChild(noReuse);
-   assets.filter(a=>a.itemtype===typeEl.value).forEach(a=>{const o=document.createElement('option');o.value=String(a.id);o.textContent=a.label;sourceId.appendChild(o);});
+   const sourceType=document.createElement('input');sourceType.type='hidden';sourceType.name='line_source_type[]';sourceType.value=data.source_itemtype||'';
+   const sourceId=document.createElement('select');sourceId.name='line_source_id[]';sourceId.className='form-select form-select-sm';sourceId.title='Activo del que se recuperó la pieza';
+   const noReuse=document.createElement('option');noReuse.value='';noReuse.textContent='No reutilizada';noReuse.dataset.itemtype='';sourceId.appendChild(noReuse);
+   const currentAssetId = document.querySelector('[name="items_id"]')?.value || '';
+   assets.filter(a=>!(a.itemtype===typeEl.value && String(a.id)===String(currentAssetId))).forEach(a=>{const o=document.createElement('option');o.value=String(a.id);o.dataset.itemtype=a.itemtype;o.textContent=a.label;sourceId.appendChild(o);});
    sourceId.value=String(data.source_items_id||'');
-   if(data.source_items_id && !assets.some(a=>a.itemtype===typeEl.value && String(a.id)===String(data.source_items_id))) sourceId.value='';
-   const sourceHelp=document.createElement('div');sourceHelp.className='hh-help mt-1';sourceHelp.textContent='Opcional: seleccione el equipo donante si reutiliza una pieza.';
+   const savedSource = assets.find(a=>a.itemtype===(data.source_itemtype||'') && String(a.id)===String(data.source_items_id||''));
+   if(data.source_items_id && savedSource) sourceId.value=String(data.source_items_id);
+   else if(data.source_items_id) sourceId.value='';
+   sourceType.value=sourceId.options[sourceId.selectedIndex]?.dataset.itemtype||'';
+   const sourceHelp=document.createElement('div');sourceHelp.className='hh-help mt-1';sourceHelp.textContent='Opcional: elija otro equipo donante. Al seleccionar una pieza reutilizada, los puntos empiezan en 0 y puede editarlos.';
    tdSource.append(sourceId,sourceType,sourceHelp);
+   sourceId.addEventListener('change',()=>{sourceType.value=sourceId.options[sourceId.selectedIndex]?.dataset.itemtype||'';if(sourceId.value!=='')pts.value='0';totals();});
    const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
    const pts=document.createElement('input');pts.type='number';pts.min='0';pts.step='0.01';pts.value=data.points_each!==null&&data.points_each!==undefined?String(data.points_each):'0';pts.name='line_points[]';pts.className='form-control form-control-sm';pts.required=true;
    const pointsTotal=document.createElement('span');const amount=document.createElement('span');
