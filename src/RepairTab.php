@@ -95,20 +95,17 @@ final class RepairTab extends CommonGLPI
         echo "</div></div></div>";
 
         $catalogUrl = '/' . ltrim(\Plugin::getWebDir('hh', false), '/') . '/front/catalog.php';
-        echo "<div class='card mb-4'><div class='card-header d-flex justify-content-between align-items-center flex-wrap gap-2'><h3 class='card-title mb-0'>"
-            . self::e(__('Cotizaciones e historial de reparaciones', 'hh')) . "</h3>";
-        echo "<a class='btn btn-outline-primary' href='" . self::e($catalogUrl) . "'><i class='ti ti-package me-1'></i>"
-            . self::e(__('Administrar catálogo de repuestos y servicios', 'hh')) . "</a></div><div class='card-body'>";
-        echo "<div class='row g-3'>";
-        $quotesUrl = '/plugins/hh/front/quotes.php?itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
-        echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Cotizaciones', 'hh')) . "</h4><p class='text-muted mb-2'>"
-            . self::e(__('Crear y consultar cotizaciones asociadas a este activo.', 'hh')) . "</p><a class='btn btn-outline-primary mt-auto' href='" . self::e($quotesUrl) . "'>"
-            . self::e(__('Administrar cotizaciones', 'hh')) . "</a></div></div>";
-        echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Catálogo', 'hh')) . "</h4><p class='text-muted mb-0'>"
-            . self::e(__('Registre repuestos, mano de obra y servicios con su código y valor en puntos.', 'hh')) . "</p></div></div>";
-        echo "<div class='col-md-4'><div class='card card-body h-100'><h4>" . self::e(__('Historial', 'hh')) . "</h4><p class='text-muted mb-0'>"
-            . self::e(__('El historial se asociará a este activo y conservará el estado de cada cotización.', 'hh')) . "</p></div></div>";
-        echo "</div></div></div>";
+        $quotesUrl = '/plugins/hh/front/quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
+        $historyUrl = '/plugins/hh/front/history.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
+        echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
+        echo "<ul class='nav nav-tabs' role='tablist'>";
+        echo "<li class='nav-item'><button class='nav-link active' type='button' data-hh-tab='quotes'>Cotizaciones</button></li>";
+        echo "<li class='nav-item'><button class='nav-link' type='button' data-hh-tab='history'>Historial</button></li>";
+        echo "<li class='nav-item'><a class='nav-link' href='" . self::e($catalogUrl) . "'>Catálogo</a></li>";
+        echo "</ul>";
+        echo "<div class='pt-3' data-hh-panel='quotes'><iframe title='Cotizaciones del activo' src='" . self::e($quotesUrl) . "' style='width:100%;height:1100px;border:0' loading='lazy'></iframe></div>";
+        echo "<div class='pt-3' data-hh-panel='history' hidden><iframe title='Historial de reparaciones del activo' src='" . self::e($historyUrl) . "' style='width:100%;height:700px;border:0' loading='lazy'></iframe></div>";
+        echo "<script>(()=>{const root=document.currentScript.parentElement;const buttons=root.querySelectorAll('[data-hh-tab]');const panels=root.querySelectorAll('[data-hh-panel]');buttons.forEach(b=>b.addEventListener('click',()=>{buttons.forEach(x=>x.classList.toggle('active',x===b));panels.forEach(p=>p.hidden=p.dataset.hhPanel!==b.dataset.hhTab)}));})();</script>";
         echo "</div>";
         return true;
     }
