@@ -402,6 +402,14 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 @media(max-width:767px){.hh-quotes .hh-source-fields{grid-template-columns:1fr}.hh-quotes .hh-quote-form-card{padding:.75rem}}
 
 /* Compact visual overrides: CSS only; keep form fields and behavior unchanged. */
+.hh-quotes #hh-quote-form{padding:.55rem .65rem;margin-bottom:.65rem!important}
+.hh-quotes #hh-quote-form>.row{row-gap:5px}
+.hh-quotes #hh-quote-form .form-label{font-size:11px;margin-bottom:2px}
+.hh-quotes #hh-quote-form .form-control,.hh-quotes #hh-quote-form .form-select{min-height:28px;padding:3px 6px;font-size:11.5px}
+.hh-quotes #hh-quote-form textarea.form-control{min-height:38px;height:38px;resize:vertical}
+.hh-quotes #hh-quote-form .text-muted{font-size:10px}
+@media(max-width:767px){.hh-quotes #hh-quote-form [class*="col-md-"]{width:100%}}
+
 .hh-quotes{font-size:12.5px;line-height:1.32}
 .hh-quotes .card{margin-bottom:9px;border-radius:8px}
 .hh-quotes .card-header,.hh-quotes .hh-section-head{padding:.55rem .8rem}
@@ -460,20 +468,20 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
     <input type="hidden" name="action" value="save_quote">
     <input type="hidden" name="quote_id" value="<?=$editQuote ? (int)$editQuote['id'] : 0?>">
-    <div class="row g-3">
+    <div class="row g-2">
      <?php if ($embedded && $contextAssetName !== ''): ?>
-     <div class="col-md-5"><label class="form-label">Activo</label><input class="form-control" value="<?=hhQe($contextAssetName)?>" readonly><input type="hidden" name="itemtype" id="hh-asset-type" value="<?=hhQe($contextItemType)?>"><input type="hidden" name="items_id" value="<?=$contextItemsId?>"></div>
+     <div class="col-md-4"><label class="form-label">Activo</label><input class="form-control" value="<?=hhQe($contextAssetName)?>" readonly><input type="hidden" name="itemtype" id="hh-asset-type" value="<?=hhQe($contextItemType)?>"><input type="hidden" name="items_id" value="<?=$contextItemsId?>"></div>
      <?php else: ?>
-     <div class="col-md-3"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-asset-type" required><option value="">Seleccione...</option><option value="Computer" <?=$defaultItemType==='Computer'?'selected':''?>>Computadora</option><option value="Phone" <?=$defaultItemType==='Phone'?'selected':''?>>Teléfono</option></select></div>
-     <div class="col-md-2"><label class="form-label">ID del activo GLPI</label><input class="form-control" type="number" min="1" name="items_id" value="<?=$defaultItemsId > 0 ? $defaultItemsId : ''?>" required><small class="text-muted">ID numérico de la ficha del activo.</small></div>
+     <div class="col-md-4"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-asset-type" required><option value="">Seleccione...</option><option value="Computer" <?=$defaultItemType==='Computer'?'selected':''?>>Computadora</option><option value="Phone" <?=$defaultItemType==='Phone'?'selected':''?>>Teléfono</option></select></div>
+     <div class="col-md-4"><label class="form-label">ID del activo GLPI</label><input class="form-control" type="number" min="1" name="items_id" value="<?=$defaultItemsId > 0 ? $defaultItemsId : ''?>" required><small class="text-muted">ID numérico de la ficha del activo.</small></div>
      <?php endif; ?>
-     <div class="col-md-3"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
+     <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
      <div class="col-md-4"><label class="form-label">Proveedor</label><select class="form-select" name="suppliers_id"><option value="0">No especificado</option><?php foreach($suppliers as $supplier): ?><option value="<?=(int)$supplier['id']?>" <?=$editQuote && (int)$editQuote['suppliers_id']===(int)$supplier['id']?'selected':''?>><?=hhQe((string)$supplier['name'])?></option><?php endforeach; ?></select></div>
-     <div class="col-md-3"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
-     <div class="col-md-3"><label class="form-label">Tipo de reparación</label><select class="form-select" name="repair_type"><option value="corrective" <?=$editQuote && $editQuote['repair_type']==='corrective'?'selected':''?>>Correctiva</option><option value="preventive" <?=$editQuote && $editQuote['repair_type']==='preventive'?'selected':''?>>Preventiva</option><option value="diagnostic" <?=$editQuote && $editQuote['repair_type']==='diagnostic'?'selected':''?>>Diagnóstico</option></select></div>
-     <div class="col-md-3"><label class="form-label">Prioridad</label><select class="form-select" name="priority"><option value="low" <?=$editQuote && $editQuote['priority']==='low'?'selected':''?>>Baja</option><option value="normal" <?=(!$editQuote || $editQuote['priority']==='normal')?'selected':''?>>Normal</option><option value="high" <?=$editQuote && $editQuote['priority']==='high'?'selected':''?>>Alta</option><option value="urgent" <?=$editQuote && $editQuote['priority']==='urgent'?'selected':''?>>Urgente</option></select></div>
-     <div class="col-md-12"><label class="form-label">Diagnóstico</label><textarea class="form-control" name="diagnosis" rows="2"><?=hhQe((string)($editQuote['diagnosis'] ?? ''))?></textarea></div>
-     <div class="col-md-12"><label class="form-label">Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe((string)($editQuote['observations'] ?? ''))?></textarea></div>
+     <div class="col-md-4"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
+     <div class="col-md-4"><label class="form-label">Tipo de reparación</label><select class="form-select" name="repair_type"><option value="corrective" <?=$editQuote && $editQuote['repair_type']==='corrective'?'selected':''?>>Correctiva</option><option value="preventive" <?=$editQuote && $editQuote['repair_type']==='preventive'?'selected':''?>>Preventiva</option><option value="diagnostic" <?=$editQuote && $editQuote['repair_type']==='diagnostic'?'selected':''?>>Diagnóstico</option></select></div>
+     <div class="col-md-4"><label class="form-label">Prioridad</label><select class="form-select" name="priority"><option value="low" <?=$editQuote && $editQuote['priority']==='low'?'selected':''?>>Baja</option><option value="normal" <?=(!$editQuote || $editQuote['priority']==='normal')?'selected':''?>>Normal</option><option value="high" <?=$editQuote && $editQuote['priority']==='high'?'selected':''?>>Alta</option><option value="urgent" <?=$editQuote && $editQuote['priority']==='urgent'?'selected':''?>>Urgente</option></select></div>
+     <div class="col-md-6"><label class="form-label">Diagnóstico</label><textarea class="form-control" name="diagnosis" rows="2"><?=hhQe((string)($editQuote['diagnosis'] ?? ''))?></textarea></div>
+     <div class="col-md-6"><label class="form-label">Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe((string)($editQuote['observations'] ?? ''))?></textarea></div>
     </div>
     <hr><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Detalle de repuestos y servicios</h4><button type="button" class="btn btn-outline-primary btn-sm" id="hh-add-line">Agregar línea</button></div>
     <div class="table-responsive"><table class="table table-sm table-striped align-middle hh-lines-table"><thead><tr><th style="min-width:260px">Artículo</th><th style="min-width:240px">Reuso de pieza (opcional)</th><th style="width:100px">Cantidad</th><th style="width:140px">Puntos / unidad</th><th style="width:120px">Total puntos</th><th style="width:120px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="4" class="text-end">Totales</th><th id="hh-total-points" class="hh-total">0.00</th><th id="hh-total-amount" class="hh-total">$0.00</th><th></th></tr></tfoot></table></div>
