@@ -130,8 +130,6 @@ function plugin_hh_install(): bool
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `repair_type` varchar(30) NOT NULL DEFAULT 'corrective'",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `priority` varchar(20) NOT NULL DEFAULT 'normal'",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `observations` text DEFAULT NULL",
-            "UPDATE `glpi_plugin_hh_quotes` SET `observations` = `diagnosis` WHERE (`observations` IS NULL OR `observations` = '') AND `diagnosis` IS NOT NULL AND `diagnosis` <> ''",
-            "ALTER TABLE `glpi_plugin_hh_quotes` DROP COLUMN IF EXISTS `diagnosis`",
         ],
         'glpi_plugin_hh_quotedetails' => [
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `plugin_hh_items_id` int unsigned DEFAULT NULL",
@@ -149,6 +147,13 @@ function plugin_hh_install(): bool
                 $migration->addPostQuery($query);
             }
         }
+    }
+
+    // Preserve legacy diagnosis text in the single observations field, then remove the duplicate column.
+    // The field check makes the migration safe to rerun on subsequent plugin upgrades.
+    if ($DB->tableExists('glpi_plugin_hh_quotes') && $DB->fieldExists('glpi_plugin_hh_quotes', 'diagnosis')) {
+        $migration->addPostQuery("UPDATE `glpi_plugin_hh_quotes` SET `observations` = `diagnosis` WHERE (`observations` IS NULL OR `observations` = '') AND `diagnosis` IS NOT NULL AND `diagnosis` <> ''");
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_quotes` DROP COLUMN `diagnosis`");
     }
 
     $migration->executeMigration();
