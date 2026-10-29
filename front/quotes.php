@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
             }
         }
-        if ($error === '' && $ticketIdRaw !== '' && ($ticketId === false || $ticketId < 1 || hhQAssetLabel('Ticket', (int)$ticketId) === '')) {
+        if ($error === '' && $ticketIdRaw !== '' && ($ticketId === false || $ticketId < 1 || hhQRows('glpi_tickets', ['id' => (int)$ticketId], ['id']) === [])) {
             $error = 'El ID de ticket GLPI indicado no es válido.';
         }
         if ($error === '' && (($sentAtRaw !== '' && $sentAt === null) || ($supplierReceivedRaw !== '' && $supplierReceivedAt === null) || ($returnedAtRaw !== '' && $returnedAt === null))) {
@@ -354,6 +354,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ], ['id' => (int)$trackingQuoteId]);
             if ($ok) {
                 $notice = 'Seguimiento de reparación actualizado.';
+                $_GET['edit'] = (string)(int)$trackingQuoteId;
                 foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$trackingQuoteId], ['*']) as $r) { $editQuote = $r; break; }
             } else $error = 'No se pudo actualizar el seguimiento de reparación.';
         }
