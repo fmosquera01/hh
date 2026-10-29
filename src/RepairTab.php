@@ -96,18 +96,18 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
         self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
         self::assetDetail(__('Modelo', 'hh'), (string) ($native['model'] ?? ''));
-		self::assetDetail(__('Puntos usados en reparaciones aprobadas', 'hh'), number_format($approvedPoints, 2, '.', ','));
-        self::assetDetail(__('Fecha de última reparación', 'hh'), self::displayDate($repairTracking['returned_at'] ?? null));
-        self::assetDetail(__('Última guía de salida', 'hh'), (string)($repairTracking['guide_number'] ?? '—') ?: '—');
-        self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($repairTracking['sent_at'] ?? null));
-        self::assetDetail(__('Estado', 'hh'), (string) ($native['status'] ?? ''));
-        self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
+		self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
         self::assetDetail(__('Valor de compra', 'hh'), self::displayMoney($native['purchase_value'] ?? null));
         self::assetDetail(__('Fin de garantía del equipo', 'hh'), self::displayDate($warrantyEnd));
+        self::assetDetail(__('Estado', 'hh'), (string) ($native['status'] ?? ''));
+        self::assetDetail(__('Proveedor del contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_supplier'] ?? '') : '—');
         self::assetDetail(__('Tipo de contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_type'] ?? '—') : '—');
         self::assetDetail(__('Inicio de contrato', 'hh'), $currentContracts !== [] ? self::displayDate($currentContracts[0]['begin_date'] ?? null) : '—');
         self::assetDetail(__('Fin de contrato', 'hh'), $currentContracts !== [] ? self::displayDate($currentContracts[0]['contract_end_date'] ?? null) : '—');
-        self::assetDetail(__('Proveedor del contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_supplier'] ?? '') : '—');
+        self::assetDetail(__('Puntos usados en reparaciones aprobadas', 'hh'), number_format($approvedPoints, 2, '.', ','));
+        self::assetDetail(__('Fecha de última reparación', 'hh'), self::displayDate($repairTracking['returned_at'] ?? null));
+        self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($repairTracking['sent_at'] ?? null));
+        self::assetDetail(__('Última guía de salida', 'hh'), (string)($repairTracking['guide_number'] ?? '—') ?: '—');
         echo "</div></div></div>";
 
         $quotesUrl = '/plugins/hh/front/quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
