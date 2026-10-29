@@ -691,6 +691,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     const warrantyWrap=document.createElement('div');warrantyWrap.className='form-check';warrantyWrap.append(warrantyCheck,warrantyLabel,warrantyHidden);tdWarranty.appendChild(warrantyWrap);
     const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
    const pts=document.createElement('input');pts.type='number';pts.min='0';pts.step='0.01';pts.value=data.points_each!==null&&data.points_each!==undefined?String(data.points_each):'0';pts.name='line_points[]';pts.className='form-control form-control-sm';pts.required=true;
+   if(warrantyCheck.checked){warrantyHidden.value='1';pts.value='0';}
    const pointsTotal=document.createElement('span');const amount=document.createElement('span');
    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
    select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];const inWarranty=warrantyItems.includes(Number(select.value||0));if(inWarranty){warrantyCheck.checked=true;warrantyHidden.value='1';tr.classList.add('hh-warranty-active');}else{tr.classList.remove('hh-warranty-active');}if(opt&&opt.dataset.points!==undefined)pts.value=warrantyCheck.checked?'0':opt.dataset.points;totals();});
