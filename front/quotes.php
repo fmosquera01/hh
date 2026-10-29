@@ -550,13 +550,13 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 @media(max-width:767px){.hh-quotes .hh-quote-form-card{padding:.55rem}.hh-quotes .row{row-gap:6px}}
 
 </style>
-<?php if (!$embedded): ?> <div class="card hh-quote-hero mb-3"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><div class="text-muted small mb-1">HH · GESTIÓN TÉCNICA</div><h2 class="mb-1">Cotizaciones de reparación</h2><p class="mb-0 text-muted">Costos, repuestos, trazabilidad de piezas recuperadas y decisiones en un solo lugar.</p></div><div class="text-end"><div class="text-muted small">Valor vigente por punto</div><div class="display-6 fw-bold">$<?=number_format((float)$point['value'],4)?></div><div class="text-muted small">USD · valor histórico por cotización</div></div></div></div></div><?php endif; ?>
+<?php if (!$embedded): ?> <div class="card hh-quote-hero mb-3"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><div class="text-muted small mb-1">HH · GESTIÓN TÉCNICA</div><h2 class="mb-1">Cotizaciones de reparación</h2><p class="mb-0 text-muted">Costos, repuestos, trazabilidad de piezas recuperadas y decisiones en un solo lugar.</p></div><div class="text-end"><div class="text-muted small">Valor vigente por punto</div><div class="display-6 fw-bold">$<?=number_format((float)$point['value'],2)?></div><div class="text-muted small">USD · tarifa vigente</div></div></div></div></div><?php endif; ?>
  <div class="card mb-3">
   <div class="card-header"><h2 class="card-title">Cotizaciones de reparación</h2></div>
   <div class="card-body">
    <?php if ($notice !== ''): ?><div class="alert alert-success"><?=hhQe($notice)?></div><?php endif; ?>
    <?php if ($error !== ''): ?><div class="alert alert-danger"><?=hhQe($error)?></div><?php endif; ?>
-   <?php if (!$embedded): ?><div class="alert alert-info">Valor vigente: <strong>$<?=number_format((float)$point['value'], 4)?></strong> por punto (USD). Cada cotización guarda una copia del valor aplicado; los cambios futuros no alteran cotizaciones ya guardadas.</div>
+   <?php if (!$embedded): ?>
    <form method="post" class="hh-quote-form-card mb-4">
     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
     <input type="hidden" name="action" value="save_point_value">
@@ -568,6 +568,11 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     </div>
    </form><?php endif; ?>
 
+   <?php $showQuoteForm = $embedded || (bool)$editQuote || (($_GET['new'] ?? '') === '1') || $error !== ''; ?>
+   <?php if (!$showQuoteForm && !$embedded): ?>
+    <div class="d-flex justify-content-end mb-3"><a class="btn btn-primary" href="/plugins/hh/front/quotes.php?new=1"><i class="ti ti-plus"></i> Nueva cotización</a></div>
+   <?php endif; ?>
+   <?php if ($showQuoteForm): ?>
    <h3><?= $editQuote ? 'Editar cotización ' . hhQe((string)$editQuote['name']) : 'Nueva cotización' ?></h3>
    <?php if (!$editAllowed): ?>
     <div class="alert alert-warning">Esta cotización está <?=hhQe($statuses[(string)$editQuote['status']] ?? (string)$editQuote['status'])?> y no se puede modificar.</div>
@@ -600,6 +605,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     </div>
     <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&new=1' : '/plugins/hh/front/quotes.php' ?>">Nueva / cancelar</a>
    </form>
+   <?php endif; ?>
    <?php endif; ?>
    <?php if ($editQuote && (string)$editQuote['status']==='draft'): ?>
     <form method="post" class="border rounded p-3 mb-4">
