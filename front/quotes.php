@@ -122,6 +122,7 @@ function hhQWriteHistory(int $quoteId, ?string $oldStatus, string $newStatus, st
 
 $notice = '';
 $error = '';
+$refreshParentAfterDecision = false;
 $point = hhQCurrentPointValue();
 $allowedTypes = ['Computer' => 'Computadora', 'Phone' => 'Teléfono'];
 $assetOptions = [];
@@ -361,6 +362,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $DB->update('glpi_plugin_hh_quotes', ['status' => $decision, 'observations' => trim((string)($quote['observations'] ?? '') . ($comment !== '' ? "\nDecisión: " . $comment : ''))], ['id' => (int)$quoteId]);
             hhQWriteHistory((int)$quoteId, 'draft', $decision, $comment);
             $notice = 'Cotización ' . (string)$quote['name'] . ' ' . ($decision === 'approved' ? 'aprobada' : 'rechazada') . '. Queda bloqueada y disponible en el historial.';
+            $refreshParentAfterDecision = true;
             unset($_GET['edit']);
         }
     } elseif ($action === 'delete_line' && isset($_POST['quote_id'])) {
@@ -715,4 +717,5 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
   if(initial.length){initial.forEach(x=>row(x));} else {row();}
 })();
 </script>
+<?php if ($refreshParentAfterDecision && $embedded): ?><script>try { if (window.parent && window.parent !== window) { window.parent.location.reload(); } } catch (e) { /* Si no se puede recargar el marco padre, el resultado queda guardado y visible al volver a cargar el tab. */ }</script><?php endif; ?>
 <?php if (!$embedded) Html::footer(); ?>
