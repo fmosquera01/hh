@@ -62,6 +62,7 @@ function plugin_hh_install(): bool
             `returned_at` datetime DEFAULT NULL,
             `repair_type` varchar(30) NOT NULL DEFAULT 'corrective',
             `priority` varchar(20) NOT NULL DEFAULT 'normal',
+            `diagnosis` text DEFAULT NULL,
             `observations` text DEFAULT NULL,
             `status` varchar(20) NOT NULL DEFAULT 'draft',
             `total_points` decimal(12,2) NOT NULL DEFAULT 0,
