@@ -208,12 +208,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
             }
         }
-        if ($error === '' && $ticketIdRaw !== '' && ($ticketId === false || $ticketId < 1 || hhQRows('glpi_tickets', ['id' => (int)$ticketId], ['id']) === [])) {
-            $error = 'El ID de ticket GLPI indicado no es válido.';
-        }
-        if ($error === '' && (($sentAtRaw !== '' && $sentAt === null) || ($supplierReceivedRaw !== '' && $supplierReceivedAt === null) || ($returnedAtRaw !== '' && $returnedAt === null))) {
-            $error = 'Revise las fechas de envío, recepción del proveedor y retorno del equipo.';
-        }
         if ($error === '' && !in_array($repairType, ['corrective', 'preventive', 'diagnostic'], true)) $error = 'Tipo de reparación no válido.';
         if ($error === '' && !in_array($priority, ['low', 'normal', 'high', 'urgent'], true)) $error = 'Prioridad no válida.';
         if ($error === '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $quoteDate)) $error = 'Fecha de cotización no válida.';
