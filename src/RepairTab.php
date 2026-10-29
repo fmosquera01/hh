@@ -155,6 +155,14 @@ final class RepairTab extends CommonGLPI
     private static function loadLatestRepairTracking(string $itemType, int $itemId): array
     {
         global $DB;
+
+        // La guía/envío corresponden al ticket más reciente que tenga seguimiento.
+        // La fecha de última reparación, en cambio, debe ser el retorno confirmado
+        // más reciente de cualquier reparación anterior, no el retorno del envío actual.
+        $latestTracking = ['guide_number' => null, 'sent_at' => null, 'returned_at' => null];
+        $latestTrackingTicketId = 0;
+        $latestReturnTimestamp = 0;
+
         foreach ($DB->request([
             'SELECT' => ['tickets_id'],
             'FROM' => 'glpi_items_tickets',
@@ -165,6 +173,7 @@ final class RepairTab extends CommonGLPI
             if ($ticketId < 1) {
                 continue;
             }
+
             foreach ($DB->request([
                 'SELECT' => ['nmerodeguafield', 'fechaenvioaproveedorfield', 'fecharecepcionproveedorfield', 'fecharecepcionguiafield'],
                 'FROM' => 'glpi_plugin_fields_ticketreparacions',
@@ -178,16 +187,27 @@ final class RepairTab extends CommonGLPI
                 $sent = $fields['fechaenvioaproveedorfield'] ?? null;
                 $received = $fields['fecharecepcionproveedorfield'] ?? null;
                 $returned = $fields['fecharecepcionguiafield'] ?? null;
-                if ($guide !== '' || self::validDate($sent) || self::validDate($received) || self::validDate($returned)) {
-                    return [
+
+                if ($latestTrackingTicketId === 0 && ($guide !== '' || self::validDate($sent) || self::validDate($received))) {
+                    $latestTracking = [
                         'guide_number' => $guide !== '' ? $guide : null,
                         'sent_at' => self::validDate($sent) ? $sent : null,
-                        'returned_at' => self::validDate($returned) ? $returned : null,
+                        'returned_at' => null,
                     ];
+                    $latestTrackingTicketId = $ticketId;
+                }
+
+                if (self::validDate($returned)) {
+                    $returnTimestamp = strtotime((string) $returned);
+                    if ($returnTimestamp !== false && $returnTimestamp > $latestReturnTimestamp) {
+                        $latestReturnTimestamp = $returnTimestamp;
+                        $latestTracking['returned_at'] = $returned;
+                    }
                 }
             }
         }
-        return ['returned_at' => null, 'guide_number' => null, 'sent_at' => null];
+
+        return $latestTracking;
     }
 
     /** Read native GLPI fields through GLPI's DB request API (no direct SQL queries). */
