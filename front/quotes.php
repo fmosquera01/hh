@@ -108,6 +108,55 @@ function hhQRepairTicketForAsset(string $type, int $id): ?array
     return null;
 }
 
+function hhQHasActivePlatinumContract(string $type, int $id): bool
+{
+    global $DB;
+    if (!in_array($type, ['Computer', 'Phone'], true) || $id < 1) return false;
+
+    $today = date('Y-m-d');
+    foreach ($DB->request([
+        'SELECT' => ['contracts_id'],
+        'FROM' => 'glpi_contracts_items',
+        'WHERE' => ['itemtype' => $type, 'items_id' => $id],
+    ]) as $link) {
+        $contractId = (int)($link['contracts_id'] ?? 0);
+        if ($contractId < 1) continue;
+
+        foreach ($DB->request([
+            'SELECT' => ['begin_date', 'duration', 'contracttypes_id'],
+            'FROM' => 'glpi_contracts',
+            'WHERE' => ['id' => $contractId, 'is_deleted' => 0, 'is_template' => 0],
+            'LIMIT' => 1,
+        ]) as $contract) {
+            $start = trim((string)($contract['begin_date'] ?? ''));
+            $months = (int)($contract['duration'] ?? 0);
+            if ($start !== '' && $start !== '0000-00-00' && $start > $today) continue;
+
+            if ($months > 0 && $start !== '' && $start !== '0000-00-00') {
+                try {
+                    $end = (new DateTimeImmutable($start))->modify('+' . $months . ' months')->format('Y-m-d');
+                    if ($end < $today) continue;
+                } catch (Throwable $e) {
+                    continue;
+                }
+            }
+
+            $typeId = (int)($contract['contracttypes_id'] ?? 0);
+            if ($typeId > 0) {
+                foreach ($DB->request([
+                    'SELECT' => ['name'],
+                    'FROM' => 'glpi_contracttypes',
+                    'WHERE' => ['id' => $typeId],
+                    'LIMIT' => 1,
+                ]) as $typeRow) {
+                    if (strcasecmp(trim((string)($typeRow['name'] ?? '')), 'Platinum') === 0) return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 function hhQWriteHistory(int $quoteId, ?string $oldStatus, string $newStatus, string $comment = ''): void
 {
     global $DB;
@@ -649,6 +698,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
  const initial = <?=json_encode($initialLines, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
  const assets = <?=json_encode($assetOptions, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
  const warrantyItems = <?=json_encode($warrantyItems)?>;
+ const platinumContract = <?=json_encode($defaultItemType !== '' && $defaultItemsId > 0 ? hhQHasActivePlatinumContract($defaultItemType, $defaultItemsId) : false)?>;
  const pointValue = <?=json_encode((float)$point['value'])?>;
   const purchaseValue = <?=json_encode($purchaseValue)?>;
  const typeEl = document.getElementById('hh-asset-type');
@@ -667,7 +717,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const empty=document.createElement('option'); empty.value=''; empty.textContent='Seleccione artículo'; select.appendChild(empty);
    catalog.filter(allowed).forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.name;o.dataset.points=String(item.points);select.appendChild(o);});
    select.value=String(data.item_id||'');
-   const autoWarranty = warrantyItems.includes(Number(data.item_id||0));
+   const autoWarranty = platinumContract || warrantyItems.includes(Number(data.item_id||0));
    const sourceType=document.createElement('input');sourceType.type='hidden';sourceType.name='line_source_type[]';sourceType.value=data.source_itemtype||'';
    const sourceId=document.createElement('input');sourceId.type='hidden';sourceId.name='line_source_id[]';sourceId.value=String(data.source_items_id||'');
    const sourceSelect=document.createElement('select');sourceSelect.className='form-select form-select-sm';sourceSelect.title='Activo del que se recuperó la pieza';
@@ -682,7 +732,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    tdSource.append(sourceSelect,sourceId,sourceType,sourceHelp);
    sourceSelect.addEventListener('change',()=>{const parts=sourceSelect.value.split(':');sourceType.value=parts.length===2?parts[0]:'';sourceId.value=parts.length===2?parts[1]:'';if(sourceSelect.value!=='')pts.value='0';totals();});
    const warrantyHidden=document.createElement('input');warrantyHidden.type='hidden';warrantyHidden.name='line_is_warranty[]';warrantyHidden.value=data.is_warranty?'1':'0';
-    const warrantyCheck=document.createElement('input');warrantyCheck.type='checkbox';warrantyCheck.className='form-check-input';warrantyCheck.checked=!!Number(data.is_warranty||0)||autoWarranty;warrantyCheck.title=autoWarranty?'Este componente fue cotizado en una reparación retornada hace 60 días o menos. Verifique si aplica garantía.':'Marcar si el artículo está cubierto por garantía de una reparación anterior';
+    const warrantyCheck=document.createElement('input');warrantyCheck.type='checkbox';warrantyCheck.className='form-check-input';warrantyCheck.checked=!!Number(data.is_warranty||0)||autoWarranty;warrantyCheck.title=platinumContract?'Contrato Platinum vigente: la línea se marca cubierta y sin costo por defecto. Puede desmarcarla manualmente.':(autoWarranty?'Este componente fue cotizado en una reparación retornada dentro de su plazo de garantía.':'Marcar si el artículo está cubierto por garantía de una reparación anterior');
     const warrantyLabel=document.createElement('label');warrantyLabel.className='form-check-label small ms-1';warrantyLabel.textContent='Cubierto';
     const warrantyWrap=document.createElement('div');warrantyWrap.className='form-check';warrantyWrap.append(warrantyCheck,warrantyLabel,warrantyHidden);tdWarranty.appendChild(warrantyWrap);
     const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
@@ -690,8 +740,8 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    if(warrantyCheck.checked){warrantyHidden.value='1';pts.value='0';}
    const pointsTotal=document.createElement('span');const amount=document.createElement('span');
    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
-   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];const inWarranty=warrantyItems.includes(Number(select.value||0));warrantyCheck.checked=inWarranty;warrantyHidden.value=inWarranty?'1':'0';tr.classList.toggle('hh-warranty-active',inWarranty);if(opt&&opt.dataset.points!==undefined)pts.value=inWarranty?'0':opt.dataset.points;totals();});
-    warrantyCheck.addEventListener('change',()=>{warrantyHidden.value=warrantyCheck.checked?'1':'0';tr.classList.toggle('hh-warranty-active',warrantyCheck.checked);if(warrantyCheck.checked)pts.value='0';totals();});
+   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];const inWarranty=platinumContract||warrantyItems.includes(Number(select.value||0));warrantyCheck.checked=inWarranty;warrantyHidden.value=inWarranty?'1':'0';tr.classList.toggle('hh-warranty-active',inWarranty);if(opt&&opt.dataset.points!==undefined)pts.value=inWarranty?'0':opt.dataset.points;totals();});
+    warrantyCheck.addEventListener('change',()=>{warrantyHidden.value=warrantyCheck.checked?'1':'0';tr.classList.toggle('hh-warranty-active',warrantyCheck.checked);if(warrantyCheck.checked){pts.value='0';}else{const opt=select.options[select.selectedIndex];if(opt&&opt.dataset.points!==undefined)pts.value=sourceId.value!==''?'0':opt.dataset.points;}totals();});
    qty.addEventListener('input',totals);pts.addEventListener('input',totals);
    if(warrantyCheck.checked)tr.classList.add('hh-warranty-active');
    tdItem.appendChild(select);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
