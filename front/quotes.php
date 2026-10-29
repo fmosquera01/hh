@@ -146,6 +146,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $quoteDate = trim((string)($_POST['quote_date'] ?? date('Y-m-d')));
         $supplierId = filter_var($_POST['suppliers_id'] ?? '0', FILTER_VALIDATE_INT);
         $supplierQuoteNumber = trim((string)($_POST['supplier_quote_number'] ?? ''));
+        $ticketIdRaw = trim((string)($_POST['tickets_id'] ?? ''));
+        $ticketId = $ticketIdRaw !== '' ? filter_var($ticketIdRaw, FILTER_VALIDATE_INT) : null;
+        $guideNumber = trim((string)($_POST['guide_number'] ?? ''));
+        $sentAtRaw = trim((string)($_POST['sent_to_supplier_at'] ?? ''));
+        $supplierReceivedRaw = trim((string)($_POST['supplier_received_at'] ?? ''));
+        $returnedAtRaw = trim((string)($_POST['returned_at'] ?? ''));
+        $normalizeDateTime = static function (string $value): ?string {
+            if ($value === '') return null;
+            $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value);
+            return $date ? $date->format('Y-m-d H:i:s') : null;
+        };
+        $sentAt = $normalizeDateTime($sentAtRaw);
+        $supplierReceivedAt = $normalizeDateTime($supplierReceivedRaw);
+        $returnedAt = $normalizeDateTime($returnedAtRaw);
         $repairType = (string)($_POST['repair_type'] ?? 'corrective');
         $priority = (string)($_POST['priority'] ?? 'normal');
         $diagnosis = trim((string)($_POST['diagnosis'] ?? ''));
@@ -166,6 +180,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_GET['edit'] = (string)$pending['id'];
                 break;
             }
+        }
+        if ($error === '' && $ticketIdRaw !== '' && ($ticketId === false || $ticketId < 1 || hhQAssetLabel('Ticket', (int)$ticketId) === '')) {
+            $error = 'El ID de ticket GLPI indicado no es válido.';
+        }
+        if ($error === '' && (($sentAtRaw !== '' && $sentAt === null) || ($supplierReceivedRaw !== '' && $supplierReceivedAt === null) || ($returnedAtRaw !== '' && $returnedAt === null))) {
+            $error = 'Revise las fechas de envío, recepción del proveedor y retorno del equipo.';
         }
         if ($error === '' && !in_array($repairType, ['corrective', 'preventive', 'diagnostic'], true)) $error = 'Tipo de reparación no válido.';
         if ($error === '' && !in_array($priority, ['low', 'normal', 'high', 'urgent'], true)) $error = 'Prioridad no válida.';
@@ -248,6 +268,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'suppliers_id' => ($supplierId !== false && $supplierId > 0) ? (int)$supplierId : null,
                 'supplier_name_snapshot' => $supplierName !== '' ? $supplierName : null,
                 'supplier_quote_number' => $supplierQuoteNumber !== '' ? mb_substr($supplierQuoteNumber, 0, 100) : null,
+                'tickets_id' => ($ticketId !== null && $ticketId !== false) ? (int)$ticketId : null,
+                'guide_number' => $guideNumber !== '' ? mb_substr($guideNumber, 0, 100) : null,
+                'sent_to_supplier_at' => $sentAt,
+                'supplier_received_at' => $supplierReceivedAt,
+                'returned_at' => $returnedAt,
                 'repair_type' => $repairType,
                 'priority' => $priority,
                 'diagnosis' => $diagnosis !== '' ? $diagnosis : null,
@@ -295,6 +320,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $error = 'No se pudo guardar la cotización.';
             }
+        }
+    } elseif ($action === 'update_repair_tracking') {
+        $trackingQuoteId = filter_var($_POST['quote_id'] ?? 0, FILTER_VALIDATE_INT);
+        $trackingQuote = null;
+        if ($trackingQuoteId !== false && $trackingQuoteId > 0) {
+            foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$trackingQuoteId], ['*']) as $r) { $trackingQuote = $r; break; }
+        }
+        $ticketRaw = trim((string)($_POST['tickets_id'] ?? ''));
+        $ticket = $ticketRaw !== '' ? filter_var($ticketRaw, FILTER_VALIDATE_INT) : null;
+        $guide = trim((string)($_POST['guide_number'] ?? ''));
+        $sentRaw = trim((string)($_POST['sent_to_supplier_at'] ?? ''));
+        $receivedRaw = trim((string)($_POST['supplier_received_at'] ?? ''));
+        $returnedRaw = trim((string)($_POST['returned_at'] ?? ''));
+        $parseDateTime = static function (string $value): ?string {
+            if ($value === '') return null;
+            $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value);
+            return $date ? $date->format('Y-m-d H:i:s') : null;
+        };
+        $sent = $parseDateTime($sentRaw);
+        $received = $parseDateTime($receivedRaw);
+        $returned = $parseDateTime($returnedRaw);
+        if (!$trackingQuote) $error = 'No se encontró la cotización para actualizar su seguimiento.';
+        elseif ($ticketRaw !== '' && ($ticket === false || $ticket < 1 || hhQRows('glpi_tickets', ['id' => (int)$ticket], ['id']) === [])) $error = 'El ID de ticket GLPI indicado no existe.';
+        elseif (($sentRaw !== '' && $sent === null) || ($receivedRaw !== '' && $received === null) || ($returnedRaw !== '' && $returned === null)) $error = 'Una de las fechas de seguimiento no es válida.';
+        else {
+            $ok = $DB->update('glpi_plugin_hh_quotes', [
+                'tickets_id' => ($ticket !== null && $ticket !== false) ? (int)$ticket : null,
+                'guide_number' => $guide !== '' ? mb_substr($guide, 0, 100) : null,
+                'sent_to_supplier_at' => $sent,
+                'supplier_received_at' => $received,
+                'returned_at' => $returned,
+            ], ['id' => (int)$trackingQuoteId]);
+            if ($ok) {
+                $notice = 'Seguimiento de reparación actualizado.';
+                foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$trackingQuoteId], ['*']) as $r) { $editQuote = $r; break; }
+            } else $error = 'No se pudo actualizar el seguimiento de reparación.';
         }
     } elseif ($action === 'decide_quote') {
         $quoteId = filter_var($_POST['quote_id'] ?? 0, FILTER_VALIDATE_INT);
@@ -364,6 +425,24 @@ foreach ($editLines as $line) $initialLines[] = [
     'source_items_id' => (int)($line['source_items_id'] ?? 0),
 ];
 
+$warrantyItems = [];
+if ($defaultItemType !== '' && $defaultItemsId > 0) {
+    $todayDate = new DateTimeImmutable('today');
+    foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $defaultItemType, 'items_id' => $defaultItemsId, 'status' => 'approved'], ['id', 'returned_at'], ['id DESC']) as $priorQuote) {
+        if ((int)($priorQuote['id'] ?? 0) === (int)($editQuote['id'] ?? 0) || empty($priorQuote['returned_at'])) continue;
+        try {
+            $returnedDate = new DateTimeImmutable((string)$priorQuote['returned_at']);
+            $expiresDate = $returnedDate->modify('+60 days');
+            if ($todayDate > $expiresDate) continue;
+        } catch (Throwable $e) { continue; }
+        foreach (hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$priorQuote['id']], ['plugin_hh_items_id']) as $priorLine) {
+            $partId = (int)($priorLine['plugin_hh_items_id'] ?? 0);
+            if ($partId > 0) $warrantyItems[$partId] = true;
+        }
+    }
+}
+$warrantyItems = array_map('intval', array_keys($warrantyItems));
+
 if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 ?>
 <div class="container-fluid hh-quotes">
@@ -396,7 +475,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 .hh-quotes .hh-quote-hero .text-muted{color:#dce8f2!important}
 @media(max-width:767px){.hh-quotes .row>[class*="col-md-"]{width:100%}.hh-quotes .hh-source-fields{grid-template-columns:1fr}.hh-quotes .hh-quote-form-card{padding:.75rem}.hh-quotes .card-body{padding:12px}.hh-quotes .hh-lines-table{min-width:670px}.hh-quotes .btn{font-size:13px}}
 .hh-quotes{--hh-navy:#17365d;--hh-blue:#245b83}
-.hh-quotes .hh-quote-hero{border:0;border-radius:.8rem;background:linear-gradient(120deg,var(--hh-navy),var(--hh-blue));color:#fff;overflow:hidden}
+.hh-quotes .hh-warranty-active{background:#e8f7ee!important;box-shadow:inset 4px 0 #16804a}.hh-quotes .hh-warranty-active td{background:#e8f7ee!important}.hh-quotes .hh-quote-hero{border:0;border-radius:.8rem;background:linear-gradient(120deg,var(--hh-navy),var(--hh-blue));color:#fff;overflow:hidden}
 .hh-quotes .hh-quote-hero .text-muted{color:#dce8f2!important}
 .hh-quotes .hh-stat{border:1px solid var(--tblr-border-color,#dce1e7);border-radius:.65rem;padding:1rem;height:100%;background:var(--tblr-card-bg,#fff)}
 .hh-quotes .hh-stat-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--tblr-secondary-color,#667085)}
@@ -498,6 +577,11 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
      <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
      <div class="col-md-4"><label class="form-label">Proveedor</label><select class="form-select" name="suppliers_id"><option value="0">No especificado</option><?php foreach($suppliers as $supplier): ?><option value="<?=(int)$supplier['id']?>" <?=$editQuote && (int)$editQuote['suppliers_id']===(int)$supplier['id']?'selected':''?>><?=hhQe((string)$supplier['name'])?></option><?php endforeach; ?></select></div>
      <div class="col-md-4"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
+     <div class="col-md-3"><label class="form-label">Ticket GLPI asociado</label><input class="form-control" type="number" min="1" name="tickets_id" value="<?=hhQe((string)($editQuote['tickets_id'] ?? ''))?>" placeholder="ID del caso"></div>
+     <div class="col-md-3"><label class="form-label">Número de guía</label><input class="form-control" name="guide_number" maxlength="100" value="<?=hhQe((string)($editQuote['guide_number'] ?? ''))?>" placeholder="Guía de este dispositivo"></div>
+     <div class="col-md-3"><label class="form-label">Envío a proveedor</label><input class="form-control" type="datetime-local" name="sent_to_supplier_at" value="<?=!empty($editQuote['sent_to_supplier_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['sent_to_supplier_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
+     <div class="col-md-3"><label class="form-label">Recibido por proveedor</label><input class="form-control" type="datetime-local" name="supplier_received_at" value="<?=!empty($editQuote['supplier_received_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['supplier_received_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
+     <div class="col-md-3"><label class="form-label">Retorno a Songa</label><input class="form-control" type="datetime-local" name="returned_at" value="<?=!empty($editQuote['returned_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['returned_at']))->format('Y-m-d\TH:i')) : ''?>"><small class="text-muted">Esta fecha inicia la garantía de reparación.</small></div>
      <div class="col-md-4"><label class="form-label">Tipo de reparación</label><select class="form-select" name="repair_type"><option value="corrective" <?=$editQuote && $editQuote['repair_type']==='corrective'?'selected':''?>>Correctiva</option><option value="preventive" <?=$editQuote && $editQuote['repair_type']==='preventive'?'selected':''?>>Preventiva</option><option value="diagnostic" <?=$editQuote && $editQuote['repair_type']==='diagnostic'?'selected':''?>>Diagnóstico</option></select></div>
      <div class="col-md-4"><label class="form-label">Prioridad</label><select class="form-select" name="priority"><option value="low" <?=$editQuote && $editQuote['priority']==='low'?'selected':''?>>Baja</option><option value="normal" <?=(!$editQuote || $editQuote['priority']==='normal')?'selected':''?>>Normal</option><option value="high" <?=$editQuote && $editQuote['priority']==='high'?'selected':''?>>Alta</option><option value="urgent" <?=$editQuote && $editQuote['priority']==='urgent'?'selected':''?>>Urgente</option></select></div>
      <div class="col-md-6"><label class="form-label">Diagnóstico</label><textarea class="form-control" name="diagnosis" rows="2"><?=hhQe((string)($editQuote['diagnosis'] ?? ''))?></textarea></div>
@@ -513,6 +597,22 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     </div>
     <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&new=1' : '/plugins/hh/front/quotes.php' ?>">Nueva / cancelar</a>
    </form>
+   <?php endif; ?>
+   <?php if ($editQuote): ?>
+    <form method="post" class="border rounded p-3 mb-3">
+     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
+     <input type="hidden" name="action" value="update_repair_tracking"><input type="hidden" name="quote_id" value="<?=(int)$editQuote['id']?>">
+     <h4>Seguimiento del envío y retorno</h4>
+     <p class="text-muted small">Una guía corresponde a un solo dispositivo. Registra aquí el ticket, la guía y las fechas confirmadas. La fecha de retorno inicia el plazo de 60 días para los componentes cotizados en esta reparación.</p>
+     <div class="row g-2 align-items-end">
+      <div class="col-md-2"><label class="form-label">Ticket GLPI</label><input class="form-control" type="number" min="1" name="tickets_id" value="<?=hhQe((string)($editQuote['tickets_id'] ?? ''))?>"></div>
+      <div class="col-md-2"><label class="form-label">Número de guía</label><input class="form-control" name="guide_number" maxlength="100" value="<?=hhQe((string)($editQuote['guide_number'] ?? ''))?>"></div>
+      <div class="col-md-2"><label class="form-label">Fecha envío</label><input class="form-control" type="datetime-local" name="sent_to_supplier_at" value="<?=!empty($editQuote['sent_to_supplier_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['sent_to_supplier_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
+      <div class="col-md-2"><label class="form-label">Recepción proveedor</label><input class="form-control" type="datetime-local" name="supplier_received_at" value="<?=!empty($editQuote['supplier_received_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['supplier_received_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
+      <div class="col-md-2"><label class="form-label">Retorno a Songa</label><input class="form-control" type="datetime-local" name="returned_at" value="<?=!empty($editQuote['returned_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['returned_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
+      <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Guardar seguimiento</button></div>
+     </div>
+    </form>
    <?php endif; ?>
    <?php if ($editQuote && (string)$editQuote['status']==='draft'): ?>
     <form method="post" class="border rounded p-3 mb-4">
@@ -551,6 +651,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
  const catalog = <?=json_encode($catalogItems, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
  const initial = <?=json_encode($initialLines, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
  const assets = <?=json_encode($assetOptions, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)?>;
+ const warrantyItems = <?=json_encode($warrantyItems)?>;
  const pointValue = <?=json_encode((float)$point['value'])?>;
   const purchaseValue = <?=json_encode($purchaseValue)?>;
  const typeEl = document.getElementById('hh-asset-type');
@@ -569,6 +670,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    const empty=document.createElement('option'); empty.value=''; empty.textContent='Seleccione artículo'; select.appendChild(empty);
    catalog.filter(allowed).forEach(item=>{const o=document.createElement('option');o.value=String(item.id);o.textContent=item.name;o.dataset.points=String(item.points);select.appendChild(o);});
    select.value=String(data.item_id||'');
+   const autoWarranty = warrantyItems.includes(Number(data.item_id||0));
    const sourceType=document.createElement('input');sourceType.type='hidden';sourceType.name='line_source_type[]';sourceType.value=data.source_itemtype||'';
    const sourceId=document.createElement('input');sourceId.type='hidden';sourceId.name='line_source_id[]';sourceId.value=String(data.source_items_id||'');
    const sourceSelect=document.createElement('select');sourceSelect.className='form-select form-select-sm';sourceSelect.title='Activo del que se recuperó la pieza';
@@ -583,16 +685,17 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    tdSource.append(sourceSelect,sourceId,sourceType,sourceHelp);
    sourceSelect.addEventListener('change',()=>{const parts=sourceSelect.value.split(':');sourceType.value=parts.length===2?parts[0]:'';sourceId.value=parts.length===2?parts[1]:'';if(sourceSelect.value!=='')pts.value='0';totals();});
    const warrantyHidden=document.createElement('input');warrantyHidden.type='hidden';warrantyHidden.name='line_is_warranty[]';warrantyHidden.value=data.is_warranty?'1':'0';
-    const warrantyCheck=document.createElement('input');warrantyCheck.type='checkbox';warrantyCheck.className='form-check-input';warrantyCheck.checked=!!Number(data.is_warranty||0);warrantyCheck.title='Marcar si el artículo está cubierto por garantía de una reparación anterior';
+    const warrantyCheck=document.createElement('input');warrantyCheck.type='checkbox';warrantyCheck.className='form-check-input';warrantyCheck.checked=!!Number(data.is_warranty||0)||autoWarranty;warrantyCheck.title=autoWarranty?'Este componente fue cotizado en una reparación retornada hace 60 días o menos. Verifique si aplica garantía.':'Marcar si el artículo está cubierto por garantía de una reparación anterior';
     const warrantyLabel=document.createElement('label');warrantyLabel.className='form-check-label small ms-1';warrantyLabel.textContent='Cubierto';
     const warrantyWrap=document.createElement('div');warrantyWrap.className='form-check';warrantyWrap.append(warrantyCheck,warrantyLabel,warrantyHidden);tdWarranty.appendChild(warrantyWrap);
     const qty=document.createElement('input');qty.type='number';qty.min='0.01';qty.step='0.01';qty.value=String(data.quantity||1);qty.name='line_quantity[]';qty.className='form-control form-control-sm';qty.required=true;
    const pts=document.createElement('input');pts.type='number';pts.min='0';pts.step='0.01';pts.value=data.points_each!==null&&data.points_each!==undefined?String(data.points_each):'0';pts.name='line_points[]';pts.className='form-control form-control-sm';pts.required=true;
    const pointsTotal=document.createElement('span');const amount=document.createElement('span');
    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
-   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];if(opt&&opt.dataset.points!==undefined)pts.value=warrantyCheck.checked?'0':opt.dataset.points;totals();});
-    warrantyCheck.addEventListener('change',()=>{warrantyHidden.value=warrantyCheck.checked?'1':'0';if(warrantyCheck.checked)pts.value='0';totals();});
+   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];const inWarranty=warrantyItems.includes(Number(select.value||0));if(inWarranty){warrantyCheck.checked=true;warrantyHidden.value='1';tr.classList.add('hh-warranty-active');}else{tr.classList.remove('hh-warranty-active');}if(opt&&opt.dataset.points!==undefined)pts.value=warrantyCheck.checked?'0':opt.dataset.points;totals();});
+    warrantyCheck.addEventListener('change',()=>{warrantyHidden.value=warrantyCheck.checked?'1':'0';tr.classList.toggle('hh-warranty-active',warrantyCheck.checked);if(warrantyCheck.checked)pts.value='0';totals();});
    qty.addEventListener('input',totals);pts.addEventListener('input',totals);
+   if(warrantyCheck.checked)tr.classList.add('hh-warranty-active');
    tdItem.appendChild(select);tdQty.appendChild(qty);tdPoints.appendChild(pts);tdPts.appendChild(pointsTotal);tdMoney.appendChild(amount);tdAction.appendChild(remove);
    [tdItem,tdSource,tdWarranty,tdQty,tdPoints,tdPts,tdMoney,tdAction].forEach(td=>tr.appendChild(td));tbody.appendChild(tr);tr._data={qty,pts,pointsTotal,amount};totals();
  }
