@@ -70,11 +70,11 @@ final class RepairTab extends CommonGLPI
             .hh-repairs{font-size:12px;line-height:1.22;padding-left:.2rem;padding-right:.2rem}
             .hh-repairs .hh-hero{border:0;border-radius:.55rem;background:linear-gradient(120deg,#17365d,#245b83);color:#fff}
             .hh-repairs .hh-hero .text-muted{color:#d8e6f2!important}
-            .hh-repairs .hh-hero .card-body{padding:.45rem .6rem!important}
-            .hh-repairs .hh-hero h2{font-size:1rem;line-height:1.15;margin-bottom:.25rem!important}
-            .hh-repairs .hh-asset-detail{height:100%;min-height:0;border:1px solid rgba(255,255,255,.22);border-radius:.3rem;padding:.22rem .35rem;background:rgba(255,255,255,.06)}
-            .hh-repairs .hh-detail-label{font-size:.61rem;line-height:1.1;color:#d8e6f2;margin-bottom:.04rem}
-            .hh-repairs .hh-asset-detail strong{font-size:.72rem;line-height:1.12;overflow-wrap:anywhere;white-space:normal}
+            .hh-repairs .hh-hero .card-body{padding:.3rem .45rem!important}
+            .hh-repairs .hh-hero h2{font-size:.9rem;line-height:1.1;margin-bottom:.2rem!important}
+            .hh-repairs .hh-asset-detail{height:100%;min-height:0;border:1px solid rgba(255,255,255,.18);border-radius:.25rem;padding:.16rem .28rem;background:rgba(255,255,255,.05)}
+            .hh-repairs .hh-detail-label{font-size:.58rem;line-height:1.05;color:#d8e6f2;margin-bottom:.02rem}
+            .hh-repairs .hh-asset-detail strong{font-size:.68rem;line-height:1.08;overflow-wrap:anywhere;white-space:normal}
             .hh-repairs .row.g-2{--tblr-gutter-x:.25rem;--tblr-gutter-y:.25rem}
             .hh-repairs .hh-empty{border:1px dashed var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1rem;text-align:center}
             .hh-repairs>.card{margin-bottom:.6rem!important}
@@ -113,13 +113,13 @@ final class RepairTab extends CommonGLPI
         $quotesUrl = '/plugins/hh/front/quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
         $historyUrl = '/plugins/hh/front/history.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
         
-        echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title mb-0'>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h3></div><div class='card-body'>";
+        echo "<div class='card mb-2'><div class='card-body p-2'>";
         $tabPrefix = 'hh-repair-' . strtolower($itemType) . '-' . $itemId;
         $quotesTabId = $tabPrefix . '-quotes';
         $historyTabId = $tabPrefix . '-history';
         echo "<style>
             .hh-repair-tabs .hh-tab-radio{position:absolute;opacity:0;pointer-events:none}
-            .hh-repair-tabs .hh-tab-label{display:inline-block;margin:0;padding:.4rem .7rem;border:1px solid var(--tblr-border-color,#dce1e7);background:var(--tblr-bg-surface-secondary,#f8fafc);color:var(--tblr-body-color,#334155);cursor:pointer;font-size:.82rem}
+            .hh-repair-tabs .hh-tab-label{display:inline-block;margin:0;padding:.28rem .55rem;border:1px solid var(--tblr-border-color,#dce1e7);background:var(--tblr-bg-surface-secondary,#f8fafc);color:var(--tblr-body-color,#334155);cursor:pointer;font-size:.82rem}
             .hh-repair-tabs .hh-tab-label:first-of-type{border-radius:.35rem 0 0 .35rem}
             .hh-repair-tabs .hh-tab-label:last-of-type{border-radius:0 .35rem .35rem 0;margin-left:-1px}
             .hh-repair-tabs .hh-tab-radio:checked + .hh-tab-label{background:var(--tblr-bg-surface,#fff);color:var(--tblr-primary,#206bc4);border-bottom-color:var(--tblr-bg-surface,#fff);font-weight:600;position:relative;z-index:1}
