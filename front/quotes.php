@@ -472,7 +472,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 .hh-quotes .hh-quote-hero .text-muted{color:#dce8f2!important}
 @media(max-width:767px){.hh-quotes .row>[class*="col-md-"]{width:100%}.hh-quotes .hh-source-fields{grid-template-columns:1fr}.hh-quotes .hh-quote-form-card{padding:.75rem}.hh-quotes .card-body{padding:12px}.hh-quotes .hh-lines-table{min-width:670px}.hh-quotes .btn{font-size:13px}}
 .hh-quotes{--hh-navy:#17365d;--hh-blue:#245b83}
-.hh-quotes .hh-warranty-active{background:#e8f7ee!important;box-shadow:inset 4px 0 #16804a}.hh-quotes .hh-warranty-active td{background:#e8f7ee!important}.hh-quotes .hh-quote-hero{border:0;border-radius:.8rem;background:linear-gradient(120deg,var(--hh-navy),var(--hh-blue));color:#fff;overflow:hidden}
+.hh-quotes .hh-warranty-active{background:#bfe8cc!important;box-shadow:inset 4px 0 #11743b}.hh-quotes .hh-warranty-active td{background:#bfe8cc!important}.hh-quotes .hh-warranty-active td,.hh-quotes .hh-warranty-active td label{color:#174d2d!important}.hh-quotes .hh-quote-hero{border:0;border-radius:.8rem;background:linear-gradient(120deg,var(--hh-navy),var(--hh-blue));color:#fff;overflow:hidden}
 .hh-quotes .hh-quote-hero .text-muted{color:#dce8f2!important}
 .hh-quotes .hh-stat{border:1px solid var(--tblr-border-color,#dce1e7);border-radius:.65rem;padding:1rem;height:100%;background:var(--tblr-card-bg,#fff)}
 .hh-quotes .hh-stat-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--tblr-secondary-color,#667085)}
