@@ -348,43 +348,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'No se pudo guardar la cotización.';
             }
         }
-    } elseif ($action === 'update_repair_tracking') {
-        $trackingQuoteId = filter_var($_POST['quote_id'] ?? 0, FILTER_VALIDATE_INT);
-        $trackingQuote = null;
-        if ($trackingQuoteId !== false && $trackingQuoteId > 0) {
-            foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$trackingQuoteId], ['*']) as $r) { $trackingQuote = $r; break; }
-        }
-        $ticketRaw = trim((string)($_POST['tickets_id'] ?? ''));
-        $ticket = $ticketRaw !== '' ? filter_var($ticketRaw, FILTER_VALIDATE_INT) : null;
-        $guide = trim((string)($_POST['guide_number'] ?? ''));
-        $sentRaw = trim((string)($_POST['sent_to_supplier_at'] ?? ''));
-        $receivedRaw = trim((string)($_POST['supplier_received_at'] ?? ''));
-        $returnedRaw = trim((string)($_POST['returned_at'] ?? ''));
-        $parseDateTime = static function (string $value): ?string {
-            if ($value === '') return null;
-            $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value);
-            return $date ? $date->format('Y-m-d H:i:s') : null;
-        };
-        $sent = $parseDateTime($sentRaw);
-        $received = $parseDateTime($receivedRaw);
-        $returned = $parseDateTime($returnedRaw);
-        if (!$trackingQuote) $error = 'No se encontró la cotización para actualizar su seguimiento.';
-        elseif ($ticketRaw !== '' && ($ticket === false || $ticket < 1 || hhQRows('glpi_tickets', ['id' => (int)$ticket], ['id']) === [])) $error = 'El ID de ticket GLPI indicado no existe.';
-        elseif (($sentRaw !== '' && $sent === null) || ($receivedRaw !== '' && $received === null) || ($returnedRaw !== '' && $returned === null)) $error = 'Una de las fechas de seguimiento no es válida.';
-        else {
-            $ok = $DB->update('glpi_plugin_hh_quotes', [
-                'tickets_id' => ($ticket !== null && $ticket !== false) ? (int)$ticket : null,
-                'guide_number' => $guide !== '' ? mb_substr($guide, 0, 100) : null,
-                'sent_to_supplier_at' => $sent,
-                'supplier_received_at' => $received,
-                'returned_at' => $returned,
-            ], ['id' => (int)$trackingQuoteId]);
-            if ($ok) {
-                $notice = 'Seguimiento de reparación actualizado.';
-                $_GET['edit'] = (string)(int)$trackingQuoteId;
-                foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$trackingQuoteId], ['*']) as $r) { $editQuote = $r; break; }
-            } else $error = 'No se pudo actualizar el seguimiento de reparación.';
-        }
     } elseif ($action === 'decide_quote') {
         $quoteId = filter_var($_POST['quote_id'] ?? 0, FILTER_VALIDATE_INT);
         $decision = (string)($_POST['decision'] ?? '');
@@ -611,7 +574,6 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
      <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
      <div class="col-md-4"><label class="form-label">Proveedor</label><select class="form-select" name="suppliers_id"><option value="0">No especificado</option><?php foreach($suppliers as $supplier): ?><option value="<?=(int)$supplier['id']?>" <?=$editQuote && (int)$editQuote['suppliers_id']===(int)$supplier['id']?'selected':''?>><?=hhQe((string)$supplier['name'])?></option><?php endforeach; ?></select></div>
      <div class="col-md-4"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
-     <div class="col-md-12"><div class="alert alert-info py-2 mb-0"><strong>Seguimiento de guía:</strong> Los datos de ticket, guía, envío, recepción del proveedor y retorno se obtienen automáticamente del ticket GLPI asociado al activo.</div></div>
      <div class="col-md-4"><label class="form-label">Tipo de reparación</label><select class="form-select" name="repair_type"><option value="corrective" <?=$editQuote && $editQuote['repair_type']==='corrective'?'selected':''?>>Correctiva</option><option value="preventive" <?=$editQuote && $editQuote['repair_type']==='preventive'?'selected':''?>>Preventiva</option><option value="diagnostic" <?=$editQuote && $editQuote['repair_type']==='diagnostic'?'selected':''?>>Diagnóstico</option></select></div>
      <div class="col-md-4"><label class="form-label">Prioridad</label><select class="form-select" name="priority"><option value="low" <?=$editQuote && $editQuote['priority']==='low'?'selected':''?>>Baja</option><option value="normal" <?=(!$editQuote || $editQuote['priority']==='normal')?'selected':''?>>Normal</option><option value="high" <?=$editQuote && $editQuote['priority']==='high'?'selected':''?>>Alta</option><option value="urgent" <?=$editQuote && $editQuote['priority']==='urgent'?'selected':''?>>Urgente</option></select></div>
      <div class="col-md-12"><label class="form-label">Diagnóstico / Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe(trim((string)($editQuote['diagnosis'] ?? '') . ((string)($editQuote['diagnosis'] ?? '') !== '' && (string)($editQuote['observations'] ?? '') !== '' ? "\n" : '') . (string)($editQuote['observations'] ?? '')))?></textarea></div>
@@ -626,22 +588,6 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     </div>
     <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&new=1' : '/plugins/hh/front/quotes.php' ?>">Nueva / cancelar</a>
    </form>
-   <?php endif; ?>
-   <?php if ($editQuote): ?>
-    <form method="post" class="border rounded p-3 mb-3">
-     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
-     <input type="hidden" name="action" value="update_repair_tracking"><input type="hidden" name="quote_id" value="<?=(int)$editQuote['id']?>">
-     <h4>Seguimiento del envío y retorno</h4>
-     <p class="text-muted small">Una guía corresponde a un solo dispositivo. Registra aquí el ticket, la guía y las fechas confirmadas. La fecha de retorno inicia el plazo de 60 días para los componentes cotizados en esta reparación.</p>
-     <div class="row g-2 align-items-end">
-      <div class="col-md-2"><label class="form-label">Ticket GLPI</label><input class="form-control" type="number" min="1" name="tickets_id" value="<?=hhQe((string)($editQuote['tickets_id'] ?? ''))?>"></div>
-      <div class="col-md-2"><label class="form-label">Número de guía</label><input class="form-control" name="guide_number" maxlength="100" value="<?=hhQe((string)($editQuote['guide_number'] ?? ''))?>"></div>
-      <div class="col-md-2"><label class="form-label">Fecha envío</label><input class="form-control" type="datetime-local" name="sent_to_supplier_at" value="<?=!empty($editQuote['sent_to_supplier_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['sent_to_supplier_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
-      <div class="col-md-2"><label class="form-label">Recepción proveedor</label><input class="form-control" type="datetime-local" name="supplier_received_at" value="<?=!empty($editQuote['supplier_received_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['supplier_received_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
-      <div class="col-md-2"><label class="form-label">Retorno a Songa</label><input class="form-control" type="datetime-local" name="returned_at" value="<?=!empty($editQuote['returned_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['returned_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
-      <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Guardar seguimiento</button></div>
-     </div>
-    </form>
    <?php endif; ?>
    <?php if ($editQuote && (string)$editQuote['status']==='draft'): ?>
     <form method="post" class="border rounded p-3 mb-4">
