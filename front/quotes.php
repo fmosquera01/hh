@@ -268,6 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'quantity' => (float)$qty,
                         'points_each' => (float)$pts,
                         'is_warranty' => (int)($lineWarranty[$idx] ?? 0) === 1 ? 1 : 0,
+                        'warranty_days' => (int)($catalogItem['warranty_days'] ?? 60),
                     ];
                 }
                 if ($error === '' && $lines === []) $error = 'Agregue al menos un artículo del catálogo a la cotización.';
@@ -338,6 +339,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'source_itemtype' => $line['source_itemtype'],
                         'source_items_id' => $line['source_items_id'],
                         'is_warranty' => $line['is_warranty'],
+                        'warranty_days_snapshot' => $line['warranty_days'],
                     ]);
                 }
                 if (!$existing) hhQWriteHistory($savedId, null, 'draft', 'Cotización creada como borrador.');
@@ -391,7 +393,7 @@ foreach (hhQRows('glpi_plugin_hh_items', ['is_active' => 1], ['*'], ['name ASC']
     $maps = hhQRows('glpi_plugin_hh_itemtypes', ['plugin_hh_items_id' => (int)$item['id']]);
     $types = [];
     foreach ($maps as $map) $types[] = ['itemtype' => (string)$map['itemtype'], 'models_id' => (int)($map['models_id'] ?? 0)];
-    $catalogItems[] = ['id' => (int)$item['id'], 'code' => (string)$item['code'], 'name' => (string)$item['name'], 'category' => (string)$item['category'], 'points' => (float)$item['points_each'], 'types' => $types];
+    $catalogItems[] = ['id' => (int)$item['id'], 'code' => (string)$item['code'], 'name' => (string)$item['name'], 'category' => (string)$item['category'], 'points' => (float)$item['points_each'], 'warranty_days' => (int)($item['warranty_days'] ?? 60), 'types' => $types];
 }
 $suppliers = hhQRows('glpi_suppliers', ['is_deleted' => 0], ['id', 'name'], ['name ASC']);
 
@@ -417,26 +419,35 @@ foreach ($editLines as $line) $initialLines[] = [
 ];
 
 $warrantyItems = [];
-if ($defaultItemType !== '' && $defaultItemsId > 0) {
-    $todayDate = new DateTimeImmutable('today');
-    foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $defaultItemType, 'items_id' => $defaultItemsId, 'status' => 'approved'], ['id', 'tickets_id', 'returned_at'], ['id DESC']) as $priorQuote) {
-        if ((int)($priorQuote['id'] ?? 0) === (int)($editQuote['id'] ?? 0)) continue;
-        $returnValue = trim((string)($priorQuote['returned_at'] ?? ''));
-        if ($returnValue === '' && (int)($priorQuote['tickets_id'] ?? 0) > 0) {
-            $tracking = hhQRepairTrackingForTicket((int)$priorQuote['tickets_id']);
-            $returnValue = trim((string)($tracking['returned_at'] ?? ''));
+$currentRepairTracking = ($defaultItemType !== '' && $defaultItemsId > 0)
+    ? hhQRepairTicketForAsset($defaultItemType, $defaultItemsId)
+    : null;
+$currentSendValue = trim((string)($currentRepairTracking['sent_to_supplier_at'] ?? ''));
+
+if ($defaultItemType !== '' && $defaultItemsId > 0 && $currentSendValue !== '') {
+    try {
+        // Se compara la fecha de envío de esta reparación con el plazo desde el retorno anterior.
+        $currentSendDate = new DateTimeImmutable($currentSendValue);
+        foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $defaultItemType, 'items_id' => $defaultItemsId, 'status' => 'approved'], ['id', 'tickets_id', 'returned_at'], ['id DESC']) as $priorQuote) {
+            if ((int)($priorQuote['id'] ?? 0) === (int)($editQuote['id'] ?? 0)) continue;
+            $returnValue = trim((string)($priorQuote['returned_at'] ?? ''));
+            if ($returnValue === '' && (int)($priorQuote['tickets_id'] ?? 0) > 0) {
+                $tracking = hhQRepairTrackingForTicket((int)$priorQuote['tickets_id']);
+                $returnValue = trim((string)($tracking['returned_at'] ?? ''));
+            }
+            if ($returnValue === '') continue;
+            try { $returnedDate = new DateTimeImmutable($returnValue); } catch (Throwable $e) { continue; }
+            if ($returnedDate > $currentSendDate) continue;
+            foreach (hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$priorQuote['id']], ['plugin_hh_items_id', 'category_snapshot', 'warranty_days_snapshot']) as $priorLine) {
+                $partId = (int)($priorLine['plugin_hh_items_id'] ?? 0);
+                if ($partId < 1 || (string)($priorLine['category_snapshot'] ?? '') !== 'part') continue;
+                $days = (int)($priorLine['warranty_days_snapshot'] ?? 60);
+                if ($days <= 0) continue;
+                $expiresDate = $returnedDate->modify('+' . $days . ' days');
+                if ($currentSendDate <= $expiresDate) $warrantyItems[$partId] = true;
+            }
         }
-        if ($returnValue === '') continue;
-        try {
-            $returnedDate = new DateTimeImmutable($returnValue);
-            $expiresDate = $returnedDate->modify('+60 days');
-            if ($returnedDate > $todayDate || $todayDate > $expiresDate) continue;
-        } catch (Throwable $e) { continue; }
-        foreach (hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$priorQuote['id']], ['plugin_hh_items_id', 'category_snapshot']) as $priorLine) {
-            $partId = (int)($priorLine['plugin_hh_items_id'] ?? 0);
-            if ($partId > 0 && (string)($priorLine['category_snapshot'] ?? '') === 'part') $warrantyItems[$partId] = true;
-        }
-    }
+    } catch (Throwable $e) { $warrantyItems = []; }
 }
 $warrantyItems = array_map('intval', array_keys($warrantyItems));
 
@@ -668,7 +679,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    if(warrantyCheck.checked){warrantyHidden.value='1';pts.value='0';}
    const pointsTotal=document.createElement('span');const amount=document.createElement('span');
    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-sm btn-outline-danger';remove.textContent='Quitar';remove.addEventListener('click',()=>{tr.remove();totals();});
-   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];const inWarranty=warrantyItems.includes(Number(select.value||0));if(inWarranty){warrantyCheck.checked=true;warrantyHidden.value='1';tr.classList.add('hh-warranty-active');}else{tr.classList.remove('hh-warranty-active');}if(opt&&opt.dataset.points!==undefined)pts.value=warrantyCheck.checked?'0':opt.dataset.points;totals();});
+   select.addEventListener('change',()=>{const opt=select.options[select.selectedIndex];const inWarranty=warrantyItems.includes(Number(select.value||0));warrantyCheck.checked=inWarranty;warrantyHidden.value=inWarranty?'1':'0';tr.classList.toggle('hh-warranty-active',inWarranty);if(opt&&opt.dataset.points!==undefined)pts.value=inWarranty?'0':opt.dataset.points;totals();});
     warrantyCheck.addEventListener('change',()=>{warrantyHidden.value=warrantyCheck.checked?'1':'0';tr.classList.toggle('hh-warranty-active',warrantyCheck.checked);if(warrantyCheck.checked)pts.value='0';totals();});
    qty.addEventListener('input',totals);pts.addEventListener('input',totals);
    if(warrantyCheck.checked)tr.classList.add('hh-warranty-active');
