@@ -29,6 +29,7 @@ function plugin_hh_install(): bool
             `description` text DEFAULT NULL,
             `category` varchar(30) NOT NULL DEFAULT 'part',
             `points_each` decimal(12,2) NOT NULL DEFAULT 0,
+            `warranty_days` int unsigned NOT NULL DEFAULT 60,
             `is_active` tinyint NOT NULL DEFAULT 1,
             `users_id` int unsigned NOT NULL,
             `date_creation` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -86,6 +87,7 @@ function plugin_hh_install(): bool
             `source_itemtype` varchar(100) DEFAULT NULL,
             `source_items_id` int unsigned DEFAULT NULL,
             `is_warranty` tinyint NOT NULL DEFAULT 0,
+            `warranty_days_snapshot` int unsigned NOT NULL DEFAULT 60,
             `description_snapshot` varchar(255) NOT NULL,
             `quantity` decimal(10,2) NOT NULL DEFAULT 1,
             `points_each` decimal(12,2) NOT NULL DEFAULT 0,
@@ -131,7 +133,11 @@ function plugin_hh_install(): bool
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `priority` varchar(20) NOT NULL DEFAULT 'normal'",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `observations` text DEFAULT NULL",
         ],
+        'glpi_plugin_hh_items' => [
+            "ALTER TABLE `glpi_plugin_hh_items` ADD COLUMN IF NOT EXISTS `warranty_days` int unsigned NOT NULL DEFAULT 60",
+        ],
         'glpi_plugin_hh_quotedetails' => [
+            "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `warranty_days_snapshot` int unsigned NOT NULL DEFAULT 60",
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `plugin_hh_items_id` int unsigned DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `code_snapshot` varchar(40) DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `category_snapshot` varchar(30) DEFAULT NULL",
