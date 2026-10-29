@@ -62,7 +62,6 @@ function plugin_hh_install(): bool
             `returned_at` datetime DEFAULT NULL,
             `repair_type` varchar(30) NOT NULL DEFAULT 'corrective',
             `priority` varchar(20) NOT NULL DEFAULT 'normal',
-            `diagnosis` text DEFAULT NULL,
             `observations` text DEFAULT NULL,
             `status` varchar(20) NOT NULL DEFAULT 'draft',
             `total_points` decimal(12,2) NOT NULL DEFAULT 0,
@@ -129,8 +128,9 @@ function plugin_hh_install(): bool
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `returned_at` datetime DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `repair_type` varchar(30) NOT NULL DEFAULT 'corrective'",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `priority` varchar(20) NOT NULL DEFAULT 'normal'",
-            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `diagnosis` text DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `observations` text DEFAULT NULL",
+            "UPDATE `glpi_plugin_hh_quotes` SET `observations` = `diagnosis` WHERE (`observations` IS NULL OR `observations` = '') AND `diagnosis` IS NOT NULL AND `diagnosis` <> ''",
+            "ALTER TABLE `glpi_plugin_hh_quotes` DROP COLUMN IF EXISTS `diagnosis`",
         ],
         'glpi_plugin_hh_quotedetails' => [
             "ALTER TABLE `glpi_plugin_hh_quotedetails` ADD COLUMN IF NOT EXISTS `plugin_hh_items_id` int unsigned DEFAULT NULL",
