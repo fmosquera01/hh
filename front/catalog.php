@@ -102,6 +102,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif ($action === 'update_warranty_days') {
+        $id = filter_var($_POST['id'] ?? 0, FILTER_VALIDATE_INT);
+        $days = filter_var($_POST['warranty_days'] ?? null, FILTER_VALIDATE_INT);
+        if ($id === false || $id < 1 || $days === false || $days < 0 || $days > 3650) {
+            $error = 'Ingrese un número de días válido entre 0 y 3650.';
+        } else {
+            $updated = $DB->update('glpi_plugin_hh_items', ['warranty_days' => (int)$days], ['id' => (int)$id]);
+            if ($updated) $message = 'Días de garantía actualizados.';
+            else $error = 'No se pudo actualizar la garantía del artículo.';
+        }
     } elseif ($action === 'toggle_item') {
         $id = filter_var($_POST['id'] ?? 0, FILTER_VALIDATE_INT);
         if ($id !== false && $id > 0) {
@@ -171,7 +181,7 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
             <td><?= hhCatalogEscape((string) $row['category']) ?></td>
             <td><?= hhCatalogEscape((string) $row['applicability']) ?></td>
             <td class="text-end"><?= number_format((float) $row['points_each'], 2) ?></td>
-            <td><?= (int) ($row['warranty_days'] ?? 60) ?> días</td>
+            <td><form method="post" class="d-flex align-items-center gap-1"><input type="hidden" name="_glpi_csrf_token" value="<?= hhCatalogEscape(Session::getNewCSRFToken()) ?>"><input type="hidden" name="action" value="update_warranty_days"><input type="hidden" name="id" value="<?= (int) $row['id'] ?>"><input class="form-control form-control-sm" style="width:76px" type="number" name="warranty_days" min="0" max="3650" value="<?= (int) ($row['warranty_days'] ?? 60) ?>" required><span class="small">días</span><button class="btn btn-sm btn-outline-primary" type="submit">Guardar</button></form></td>
             <td><?= (int) $row['is_active'] === 1 ? 'Activo' : 'Inactivo' ?></td>
             <td><form method="post"><input type="hidden" name="_glpi_csrf_token" value="<?= hhCatalogEscape(Session::getNewCSRFToken()) ?>"><input type="hidden" name="action" value="toggle_item"><input type="hidden" name="id" value="<?= (int) $row['id'] ?>"><input type="hidden" name="active" value="<?= (int) $row['is_active'] ?>"><button class="btn btn-sm btn-outline-secondary" type="submit"><?= (int) $row['is_active'] === 1 ? 'Desactivar' : 'Activar' ?></button></form></td>
           </tr>
