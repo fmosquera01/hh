@@ -82,16 +82,16 @@ function hhQRepairTrackingForTicket(int $ticketId): ?array
 {
     if ($ticketId < 1) return null;
     foreach (hhQRows('glpi_plugin_fields_ticketreparacions', [
-        'items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 1,
-    ], ['nmerodeguafield', 'fechaenvioaproveedorfield', 'fecharecepcionproveedorfield', 'fecharecepcionguiafield']) as $fields) {
+        'items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 15,
+    ], ['nmerodeguafield', 'fechaenvioaproveedorfieldtwo', 'fecharecepcionproveedorfieldtwo', 'fecharecepcionguiafieldtwo']) as $fields) {
         $guide = trim((string)($fields['nmerodeguafield'] ?? ''));
-        $sent = trim((string)($fields['fechaenvioaproveedorfield'] ?? ''));
-        $received = trim((string)($fields['fecharecepcionproveedorfield'] ?? ''));
+        $sent = trim((string)($fields['fechaenvioaproveedorfieldtwo'] ?? ''));
+        $received = trim((string)($fields['fecharecepcionproveedorfieldtwo'] ?? ''));
         if ($guide !== '' && hhQNormalizeFieldDate($sent) !== null && hhQNormalizeFieldDate($received) !== null) {
             return [
                 'tickets_id' => $ticketId, 'guide_number' => $guide,
                 'sent_to_supplier_at' => $sent, 'supplier_received_at' => $received,
-                'returned_at' => trim((string)($fields['fecharecepcionguiafield'] ?? '')),
+                'returned_at' => trim((string)($fields['fecharecepcionguiafieldtwo'] ?? '')),
             ];
         }
     }
