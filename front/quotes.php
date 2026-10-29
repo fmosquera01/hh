@@ -533,7 +533,14 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 .hh-quotes .btn{font-size:12px;padding:5px 9px;line-height:1.25}
 .hh-quotes .btn-sm{font-size:11px;padding:3px 6px}
 .hh-quotes .alert{padding:7px 9px;margin:6px 0 9px}
-.hh-quotes .hh-quote-form-card{padding:.7rem;margin-bottom:.7rem!important;border-radius:8px}
+.hh-quotes .hh-quote-form-card{padding:.55rem;margin-bottom:.45rem!important;border-radius:7px}
+.hh-quotes .card-body.p-2 .hh-quote-form-card{padding:.4rem;margin-bottom:.35rem!important}
+.hh-quotes .card-body.p-2 h3{font-size:1rem;margin-bottom:.4rem}
+.hh-quotes .card-body.p-2 h4{font-size:.9rem}
+.hh-quotes .card-body.p-2 .row{--tblr-gutter-x:.4rem;--tblr-gutter-y:.35rem}
+.hh-quotes .card-body.p-2 .form-label{margin-bottom:.15rem}
+.hh-quotes .card-body.p-2 hr{margin:.4rem 0}
+.hh-quotes .card-body.p-2 .table-responsive{margin-bottom:.35rem}
 .hh-quotes .hh-section{border-radius:8px}
 .hh-quotes .hh-stat{padding:.65rem;border-radius:7px}
 .hh-quotes .hh-stat-label{font-size:.68rem}
@@ -551,9 +558,9 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 
 </style>
 <?php if (!$embedded): ?> <div class="card hh-quote-hero mb-3"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><div class="text-muted small mb-1">HH · GESTIÓN TÉCNICA</div><h2 class="mb-1">Cotizaciones de reparación</h2><p class="mb-0 text-muted">Costos, repuestos, trazabilidad de piezas recuperadas y decisiones en un solo lugar.</p></div><div class="text-end"><div class="text-muted small">Valor vigente por punto</div><div class="display-6 fw-bold">$<?=number_format((float)$point['value'],2)?></div><div class="text-muted small">USD · tarifa vigente</div></div></div></div></div><?php endif; ?>
- <div class="card mb-3">
-  <div class="card-header"><h2 class="card-title">Cotizaciones de reparación</h2></div>
-  <div class="card-body">
+ <div class="card mb-2">
+  <?php if (!$embedded): ?><div class="card-header"><h2 class="card-title">Cotizaciones de reparación</h2></div><?php endif; ?>
+  <div class="card-body <?= $embedded ? 'p-2' : '' ?>">
    <?php if ($notice !== ''): ?><div class="alert alert-success"><?=hhQe($notice)?></div><?php endif; ?>
    <?php if ($error !== ''): ?><div class="alert alert-danger"><?=hhQe($error)?></div><?php endif; ?>
    <?php if (!$embedded): ?>
@@ -568,10 +575,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     </div>
    </form><?php endif; ?>
 
-   <?php $showQuoteForm = $embedded || (bool)$editQuote || (($_GET['new'] ?? '') === '1') || $error !== ''; ?>
-   <?php if (!$showQuoteForm && !$embedded): ?>
-    <div class="d-flex justify-content-end mb-3"><a class="btn btn-primary" href="/plugins/hh/front/quotes.php?new=1"><i class="ti ti-plus"></i> Nueva cotización</a></div>
-   <?php endif; ?>
+   <?php $showQuoteForm = $embedded || (bool)$editQuote || $error !== ''; ?>
    <?php if ($showQuoteForm): ?>
    <h3><?= $editQuote ? 'Editar cotización ' . hhQe((string)$editQuote['name']) : 'Nueva cotización' ?></h3>
    <?php if (!$editAllowed): ?>
