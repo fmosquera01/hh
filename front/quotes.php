@@ -434,11 +434,11 @@ if ($defaultItemType !== '' && $defaultItemsId > 0) {
         try {
             $returnedDate = new DateTimeImmutable((string)$priorQuote['returned_at']);
             $expiresDate = $returnedDate->modify('+60 days');
-            if ($todayDate > $expiresDate) continue;
+            if ($returnedDate > $todayDate || $todayDate > $expiresDate) continue;
         } catch (Throwable $e) { continue; }
-        foreach (hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$priorQuote['id']], ['plugin_hh_items_id']) as $priorLine) {
+        foreach (hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$priorQuote['id']], ['plugin_hh_items_id', 'category_snapshot']) as $priorLine) {
             $partId = (int)($priorLine['plugin_hh_items_id'] ?? 0);
-            if ($partId > 0) $warrantyItems[$partId] = true;
+            if ($partId > 0 && (string)($priorLine['category_snapshot'] ?? '') === 'part') $warrantyItems[$partId] = true;
         }
     }
 }
