@@ -67,15 +67,15 @@ final class RepairTab extends CommonGLPI
 
         echo "<div class='container-fluid hh-repairs'>";
         echo "<style>
-            .hh-repairs{font-size:13px;line-height:1.3;padding-left:.35rem;padding-right:.35rem}
+            .hh-repairs{font-size:12px;line-height:1.22;padding-left:.2rem;padding-right:.2rem}
             .hh-repairs .hh-hero{border:0;border-radius:.55rem;background:linear-gradient(120deg,#17365d,#245b83);color:#fff}
             .hh-repairs .hh-hero .text-muted{color:#d8e6f2!important}
-            .hh-repairs .hh-hero .card-body{padding:.7rem 1rem!important}
-            .hh-repairs .hh-hero h2{font-size:1.15rem;line-height:1.25;margin-bottom:.35rem!important}
-            .hh-repairs .hh-asset-detail{height:100%;min-height:0;border:1px solid rgba(255,255,255,.22);border-radius:.35rem;padding:.38rem .5rem;background:rgba(255,255,255,.06)}
-            .hh-repairs .hh-detail-label{font-size:.65rem;line-height:1.2;color:#d8e6f2;margin-bottom:.08rem}
-            .hh-repairs .hh-asset-detail strong{font-size:.78rem;line-height:1.2;overflow-wrap:anywhere;white-space:normal}
-            .hh-repairs .row.g-2{--tblr-gutter-x:.4rem;--tblr-gutter-y:.4rem}
+            .hh-repairs .hh-hero .card-body{padding:.45rem .6rem!important}
+            .hh-repairs .hh-hero h2{font-size:1rem;line-height:1.15;margin-bottom:.25rem!important}
+            .hh-repairs .hh-asset-detail{height:100%;min-height:0;border:1px solid rgba(255,255,255,.22);border-radius:.3rem;padding:.22rem .35rem;background:rgba(255,255,255,.06)}
+            .hh-repairs .hh-detail-label{font-size:.61rem;line-height:1.1;color:#d8e6f2;margin-bottom:.04rem}
+            .hh-repairs .hh-asset-detail strong{font-size:.72rem;line-height:1.12;overflow-wrap:anywhere;white-space:normal}
+            .hh-repairs .row.g-2{--tblr-gutter-x:.25rem;--tblr-gutter-y:.25rem}
             .hh-repairs .hh-empty{border:1px dashed var(--tblr-border-color,#dce1e7);border-radius:.5rem;padding:1rem;text-align:center}
             .hh-repairs>.card{margin-bottom:.6rem!important}
             .hh-repairs>.card>.card-header{padding:.55rem .8rem}
@@ -99,6 +99,7 @@ final class RepairTab extends CommonGLPI
 		self::assetDetail(__('Puntos usados en reparaciones aprobadas', 'hh'), number_format($approvedPoints, 2, '.', ','));
         self::assetDetail(__('Fecha de última reparación', 'hh'), self::displayDate($repairTracking['returned_at'] ?? null));
         self::assetDetail(__('Última guía de salida', 'hh'), (string)($repairTracking['guide_number'] ?? '—') ?: '—');
+        self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($repairTracking['sent_at'] ?? null));
         self::assetDetail(__('Estado', 'hh'), (string) ($native['status'] ?? ''));
         self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
         self::assetDetail(__('Valor de compra', 'hh'), self::displayMoney($native['purchase_value'] ?? null));
@@ -150,24 +151,43 @@ final class RepairTab extends CommonGLPI
         return $total;
     }
 
-    /** Latest confirmed return date and guide for this asset, from approved HH quotes. */
+    /** Latest guide, supplier-send date and confirmed return for this asset from its linked ticket Fields. */
     private static function loadLatestRepairTracking(string $itemType, int $itemId): array
     {
         global $DB;
         foreach ($DB->request([
-            'SELECT' => ['returned_at', 'guide_number'],
-            'FROM' => 'glpi_plugin_hh_quotes',
-            'WHERE' => ['itemtype' => $itemType, 'items_id' => $itemId, 'status' => 'approved'],
-            'ORDER' => ['returned_at DESC', 'id DESC'],
-        ]) as $row) {
-            if (!empty($row['returned_at'])) {
-                return [
-                    'returned_at' => $row['returned_at'],
-                    'guide_number' => $row['guide_number'] ?? null,
-                ];
+            'SELECT' => ['tickets_id'],
+            'FROM' => 'glpi_items_tickets',
+            'WHERE' => ['itemtype' => $itemType, 'items_id' => $itemId],
+            'ORDER' => ['tickets_id DESC'],
+        ]) as $link) {
+            $ticketId = (int) ($link['tickets_id'] ?? 0);
+            if ($ticketId < 1) {
+                continue;
+            }
+            foreach ($DB->request([
+                'SELECT' => ['nmerodeguafield', 'fechaenvioaproveedorfield', 'fecharecepcionproveedorfield', 'fecharecepcionguiafield'],
+                'FROM' => 'glpi_plugin_fields_ticketreparacions',
+                'WHERE' => [
+                    'items_id' => $ticketId,
+                    'itemtype' => 'Ticket',
+                    'plugin_fields_containers_id' => 1,
+                ],
+            ]) as $fields) {
+                $guide = trim((string) ($fields['nmerodeguafield'] ?? ''));
+                $sent = $fields['fechaenvioaproveedorfield'] ?? null;
+                $received = $fields['fecharecepcionproveedorfield'] ?? null;
+                $returned = $fields['fecharecepcionguiafield'] ?? null;
+                if ($guide !== '' || self::validDate($sent) || self::validDate($received) || self::validDate($returned)) {
+                    return [
+                        'guide_number' => $guide !== '' ? $guide : null,
+                        'sent_at' => self::validDate($sent) ? $sent : null,
+                        'returned_at' => self::validDate($returned) ? $returned : null,
+                    ];
+                }
             }
         }
-        return ['returned_at' => null, 'guide_number' => null];
+        return ['returned_at' => null, 'guide_number' => null, 'sent_at' => null];
     }
 
     /** Read native GLPI fields through GLPI's DB request API (no direct SQL queries). */
@@ -443,7 +463,7 @@ final class RepairTab extends CommonGLPI
     private static function assetDetail(string $label, string $value): void
     {
         $display = trim($value) !== '' && $value !== '0' ? $value : '—';
-        echo "<div class='col-6 col-md-4 col-xl-3'><div class='hh-asset-detail'>";
+        echo "<div class='col-6 col-md-4 col-xl-2'><div class='hh-asset-detail'>";
         echo "<div class='hh-detail-label'>" . self::e($label) . "</div>";
         echo "<strong>" . self::e($display) . "</strong></div></div>";
     }
