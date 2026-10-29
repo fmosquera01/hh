@@ -34,6 +34,7 @@ final class RepairTab extends CommonGLPI
         $fields = $item->fields ?? [];
         $native = self::loadNativeAssetInfo($itemType, $itemId);
         $approvedPoints = self::loadApprovedRepairPoints($itemType, $itemId);
+        $repairTracking = self::loadLatestRepairTracking($itemType, $itemId);
         $contracts = $native['contracts'];
         // La garantía propia del equipo se calcula aparte del contrato extendido.
         // La fecha de compra es el inicio preferente de la garantía nativa.
@@ -96,6 +97,8 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
         self::assetDetail(__('Modelo', 'hh'), (string) ($native['model'] ?? ''));
 		self::assetDetail(__('Puntos usados en reparaciones aprobadas', 'hh'), number_format($approvedPoints, 2, '.', ','));
+        self::assetDetail(__('Fecha de última reparación', 'hh'), self::displayDate($repairTracking['returned_at'] ?? null));
+        self::assetDetail(__('Última guía de salida', 'hh'), (string)($repairTracking['guide_number'] ?? '—') ?: '—');
         self::assetDetail(__('Estado', 'hh'), (string) ($native['status'] ?? ''));
         self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
         self::assetDetail(__('Valor de compra', 'hh'), self::displayMoney($native['purchase_value'] ?? null));
@@ -145,6 +148,26 @@ final class RepairTab extends CommonGLPI
             $total += (float)($row['total_points'] ?? 0);
         }
         return $total;
+    }
+
+    /** Latest confirmed return date and guide for this asset, from approved HH quotes. */
+    private static function loadLatestRepairTracking(string $itemType, int $itemId): array
+    {
+        global $DB;
+        foreach ($DB->request([
+            'SELECT' => ['returned_at', 'guide_number'],
+            'FROM' => 'glpi_plugin_hh_quotes',
+            'WHERE' => ['itemtype' => $itemType, 'items_id' => $itemId, 'status' => 'approved'],
+            'ORDER' => ['returned_at DESC', 'id DESC'],
+        ]) as $row) {
+            if (!empty($row['returned_at'])) {
+                return [
+                    'returned_at' => $row['returned_at'],
+                    'guide_number' => $row['guide_number'] ?? null,
+                ];
+            }
+        }
+        return ['returned_at' => null, 'guide_number' => null];
     }
 
     /** Read native GLPI fields through GLPI's DB request API (no direct SQL queries). */
