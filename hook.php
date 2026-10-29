@@ -163,7 +163,27 @@ function plugin_hh_upgrade($previousVersion): bool
 
 function plugin_hh_uninstall(): bool
 {
-    // Preserve business data on uninstall. Dropping HH tables must be an explicit,
-    // separate maintenance action after a verified backup.
+    global $DB;
+
+    // Drop dependent/detail tables first, then their parent tables.
+    // Uninstalling HH intentionally resets all plugin-owned data.
+    // GLPI core tables and asset/ticket records are never dropped.
+    $tables = [
+        'glpi_plugin_hh_quotedetails',
+        'glpi_plugin_hh_quotehistory',
+        'glpi_plugin_hh_quotes',
+        'glpi_plugin_hh_itemtypes',
+        'glpi_plugin_hh_items',
+        'glpi_plugin_hh_pointvalues',
+    ];
+
+    foreach ($tables as $table) {
+        if ($DB->tableExists($table)) {
+            if (!$DB->doQuery("DROP TABLE `{$table}`")) {
+                return false;
+            }
+        }
+    }
+
     return true;
 }
