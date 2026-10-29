@@ -192,8 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $returnedAt = $tracking !== null ? hhQNormalizeFieldDate((string)$tracking['returned_at']) : null;
         $repairType = (string)($_POST['repair_type'] ?? 'corrective');
         $priority = (string)($_POST['priority'] ?? 'normal');
-        $diagnosis = trim((string)($_POST['observations'] ?? ''));
-        $observations = $diagnosis;
+        $observations = trim((string)($_POST['observations'] ?? ''));
         $lineIds = $_POST['line_item_id'] ?? [];
         $quantities = $_POST['line_quantity'] ?? [];
         $linePoints = $_POST['line_points'] ?? [];
@@ -302,7 +301,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'returned_at' => $returnedAt,
                 'repair_type' => $repairType,
                 'priority' => $priority,
-                'diagnosis' => $diagnosis !== '' ? $diagnosis : null,
                 'observations' => $observations !== '' ? $observations : null,
                 'status' => 'draft',
                 'total_points' => number_format($totalPoints, 2, '.', ''),
@@ -576,7 +574,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
      <div class="col-md-4"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
      <div class="col-md-4"><label class="form-label">Tipo de reparación</label><select class="form-select" name="repair_type"><option value="corrective" <?=$editQuote && $editQuote['repair_type']==='corrective'?'selected':''?>>Correctiva</option><option value="preventive" <?=$editQuote && $editQuote['repair_type']==='preventive'?'selected':''?>>Preventiva</option><option value="diagnostic" <?=$editQuote && $editQuote['repair_type']==='diagnostic'?'selected':''?>>Diagnóstico</option></select></div>
      <div class="col-md-4"><label class="form-label">Prioridad</label><select class="form-select" name="priority"><option value="low" <?=$editQuote && $editQuote['priority']==='low'?'selected':''?>>Baja</option><option value="normal" <?=(!$editQuote || $editQuote['priority']==='normal')?'selected':''?>>Normal</option><option value="high" <?=$editQuote && $editQuote['priority']==='high'?'selected':''?>>Alta</option><option value="urgent" <?=$editQuote && $editQuote['priority']==='urgent'?'selected':''?>>Urgente</option></select></div>
-     <div class="col-md-12"><label class="form-label">Diagnóstico / Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe(trim((string)($editQuote['diagnosis'] ?? '') . ((string)($editQuote['diagnosis'] ?? '') !== '' && (string)($editQuote['observations'] ?? '') !== '' ? "\n" : '') . (string)($editQuote['observations'] ?? '')))?></textarea></div>
+     <div class="col-md-12"><label class="form-label">Diagnóstico / Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe((string)($editQuote['observations'] ?? $editQuote['diagnosis'] ?? ''))?></textarea></div>
     </div>
     <hr><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Detalle de repuestos y servicios</h4><button type="button" class="btn btn-outline-primary btn-sm" id="hh-add-line">Agregar línea</button></div>
     <div class="table-responsive"><table class="table table-sm table-striped align-middle hh-lines-table"><thead><tr><th style="min-width:200px">Artículo</th><th style="min-width:100px">Reuso de pieza</th><th style="min-width:95px">Garantía</th><th style="width:70px">Cantidad</th><th style="width:70px">Puntos</th><th style="width:80px">Total puntos</th><th style="width:80px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="5" class="text-end">Totales</th><th id="hh-total-points" class="hh-total">0.00</th><th id="hh-total-amount" class="hh-total">$0.00</th><th></th></tr></tfoot></table></div>
