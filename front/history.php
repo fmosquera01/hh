@@ -29,6 +29,18 @@ function hhHistoryAsset(string $type, int $id): string {
     }
     return 'Activo no disponible';
 }
+function hhHistoryTicketReturnDate(int $ticketId): string {
+    if ($ticketId < 1) return '';
+    foreach (hhHistoryRows('glpi_plugin_fields_ticketreparacions', [
+        'items_id' => $ticketId,
+        'itemtype' => 'Ticket',
+        'plugin_fields_containers_id' => 1,
+    ]) as $fields) {
+        $value = trim((string)($fields['fecharecepcionguiafield'] ?? ''));
+        if ($value !== '' && !str_starts_with($value, '0000-00-00')) return $value;
+    }
+    return '';
+}
 function hhHistoryStatus(string $s): string { return ['draft'=>'Borrador','approved'=>'Aprobada','rejected'=>'Rechazada'][$s] ?? $s; }
 function hhHistoryDate($v): string { $s = trim((string)$v); if ($s === '' || str_starts_with($s, '0000-00-00')) return '—'; try { return (new DateTimeImmutable($s))->format('d/m/Y H:i'); } catch (Throwable $e) { return $s; } }
 
@@ -40,6 +52,8 @@ $view = null; $lines = []; $events = [];
 if ($viewId !== false && $viewId > 0) {
     foreach (hhHistoryRows('glpi_plugin_hh_quotes', ['id'=>(int)$viewId]) as $r) { $view = $r; break; }
     if ($view && (!$embedded || ((string)$view['itemtype'] === $itemtype && (int)$view['items_id'] === $itemsId))) {
+        $ticketReturnDate = hhHistoryTicketReturnDate((int)($view['tickets_id'] ?? 0));
+        if ($ticketReturnDate !== '') $view['returned_at'] = $ticketReturnDate;
         $lines = hhHistoryRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id'=>(int)$viewId], ['id ASC']);
         $events = hhHistoryRows('glpi_plugin_hh_quotehistory', ['plugin_hh_quotes_id'=>(int)$viewId], ['date_creation ASC','id ASC']);
     } else { $view = null; }
@@ -61,7 +75,7 @@ if (!$embedded) Html::header(__('Historial de reparaciones', 'hh'), $_SERVER['PH
 $base = '/plugins/hh/front/history.php' . ($embedded ? '?embedded=1&itemtype=' . rawurlencode($itemtype) . '&items_id=' . $itemsId : '');
 ?>
 <style>
-.hh-history{font-size:12px;line-height:1.35}.hh-history .card{border-radius:8px;margin-bottom:9px}.hh-history .card-header{padding:.55rem .8rem}.hh-history .card-body{padding:.65rem .8rem}.hh-history h2{font-size:16px;margin:0}.hh-history h3{font-size:13px;margin:6px 0 8px}.hh-history .form-label{font-size:11px;margin-bottom:3px}.hh-history .form-control,.hh-history .form-select{font-size:12px;min-height:29px;padding:4px 7px}.hh-history .table{font-size:11.5px;margin-bottom:0}.hh-history .table th,.hh-history .table td{padding:5px 7px;vertical-align:middle}.hh-history .badge{font-size:10px}.hh-history .meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.hh-history .meta>div{border:1px solid var(--tblr-border-color,#dce1e7);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere}.hh-history .meta small{display:block;color:var(--tblr-muted,#667085);font-size:10px}.hh-history .meta strong{font-size:12px}@media(max-width:639px){.hh-history .meta{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:420px){.hh-history .meta{grid-template-columns:1fr}}
+.hh-history{font-size:12px;line-height:1.35}.hh-history .card{border-radius:8px;margin-bottom:9px}.hh-history .card-header{padding:.55rem .8rem}.hh-history .card-body{padding:.65rem .8rem}.hh-history h2{font-size:16px;margin:0}.hh-history h3{font-size:13px;margin:6px 0 8px}.hh-history .form-label{font-size:11px;margin-bottom:3px}.hh-history .form-control,.hh-history .form-select{font-size:12px;min-height:29px;padding:4px 7px}.hh-history .table{font-size:11.5px;margin-bottom:0}.hh-history .table th,.hh-history .table td{padding:5px 7px;vertical-align:middle}.hh-history .badge{font-size:10px}.hh-history .meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 14px;margin-bottom:10px!important}.hh-history .meta>div{display:inline-flex;align-items:baseline;gap:4px;border:0;border-bottom:1px solid var(--tblr-border-color,#e5e7eb);border-radius:0;padding:2px 0;overflow-wrap:anywhere;max-width:100%}.hh-history .meta small{display:inline;color:var(--tblr-muted,#667085);font-size:10px;white-space:nowrap}.hh-history .meta strong{font-size:11.5px;font-weight:600}.hh-history .meta>div:first-child{flex-basis:100%}
 </style>
 <div class="container-fluid hh-history">
  <div class="card">
