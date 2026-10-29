@@ -438,9 +438,10 @@ if ($defaultItemType !== '' && $defaultItemsId > 0 && $currentSendValue !== '') 
             if ($returnValue === '') continue;
             try { $returnedDate = new DateTimeImmutable($returnValue); } catch (Throwable $e) { continue; }
             if ($returnedDate > $currentSendDate) continue;
-            foreach (hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$priorQuote['id']], ['plugin_hh_items_id', 'category_snapshot', 'warranty_days_snapshot']) as $priorLine) {
+            foreach (hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$priorQuote['id']], ['plugin_hh_items_id', 'category_snapshot', 'warranty_days_snapshot', 'is_warranty']) as $priorLine) {
                 $partId = (int)($priorLine['plugin_hh_items_id'] ?? 0);
-                if ($partId < 1 || (string)($priorLine['category_snapshot'] ?? '') !== 'part') continue;
+                // Una reparación ya cubierta por garantía no reinicia el plazo del repuesto.
+                if ($partId < 1 || (string)($priorLine['category_snapshot'] ?? '') !== 'part' || (int)($priorLine['is_warranty'] ?? 0) === 1) continue;
                 $days = (int)($priorLine['warranty_days_snapshot'] ?? 60);
                 if ($days <= 0) continue;
                 $expiresDate = $returnedDate->modify('+' . $days . ' days');
