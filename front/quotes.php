@@ -78,26 +78,32 @@ function hhQNormalizeFieldDate(string $value): ?string
     try { return (new DateTimeImmutable($value))->format('Y-m-d H:i:s'); } catch (Throwable $e) { return null; }
 }
 
+function hhQRepairTrackingForTicket(int $ticketId): ?array
+{
+    if ($ticketId < 1) return null;
+    foreach (hhQRows('glpi_plugin_fields_ticketreparacions', [
+        'items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 1,
+    ], ['nmerodeguafield', 'fechaenvioaproveedorfield', 'fecharecepcionproveedorfield', 'fecharecepcionguiafield']) as $fields) {
+        $guide = trim((string)($fields['nmerodeguafield'] ?? ''));
+        $sent = trim((string)($fields['fechaenvioaproveedorfield'] ?? ''));
+        $received = trim((string)($fields['fecharecepcionproveedorfield'] ?? ''));
+        if ($guide !== '' && hhQNormalizeFieldDate($sent) !== null && hhQNormalizeFieldDate($received) !== null) {
+            return [
+                'tickets_id' => $ticketId, 'guide_number' => $guide,
+                'sent_to_supplier_at' => $sent, 'supplier_received_at' => $received,
+                'returned_at' => trim((string)($fields['fecharecepcionguiafield'] ?? '')),
+            ];
+        }
+    }
+    return null;
+}
+
 function hhQRepairTicketForAsset(string $type, int $id): ?array
 {
     if (!in_array($type, ['Computer', 'Phone'], true) || $id < 1) return null;
     foreach (hhQRows('glpi_items_tickets', ['itemtype' => $type, 'items_id' => $id], ['tickets_id'], ['tickets_id DESC']) as $link) {
-        $ticketId = (int)($link['tickets_id'] ?? 0);
-        if ($ticketId < 1) continue;
-        foreach (hhQRows('glpi_plugin_fields_ticketreparacions', [
-            'items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 1,
-        ], ['nmerodeguafield', 'fechaenvioaproveedorfield', 'fecharecepcionproveedorfield', 'fecharecepcionguiafield']) as $fields) {
-            $guide = trim((string)($fields['nmerodeguafield'] ?? ''));
-            $sent = trim((string)($fields['fechaenvioaproveedorfield'] ?? ''));
-            $received = trim((string)($fields['fecharecepcionproveedorfield'] ?? ''));
-            if ($guide !== '' && hhQNormalizeFieldDate($sent) !== null && hhQNormalizeFieldDate($received) !== null) {
-                return [
-                    'tickets_id' => $ticketId, 'guide_number' => $guide,
-                    'sent_to_supplier_at' => $sent, 'supplier_received_at' => $received,
-                    'returned_at' => trim((string)($fields['fecharecepcionguiafield'] ?? '')),
-                ];
-            }
-        }
+        $tracking = hhQRepairTrackingForTicket((int)($link['tickets_id'] ?? 0));
+        if ($tracking !== null) return $tracking;
     }
     return null;
 }
@@ -450,10 +456,16 @@ foreach ($editLines as $line) $initialLines[] = [
 $warrantyItems = [];
 if ($defaultItemType !== '' && $defaultItemsId > 0) {
     $todayDate = new DateTimeImmutable('today');
-    foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $defaultItemType, 'items_id' => $defaultItemsId, 'status' => 'approved'], ['id', 'returned_at'], ['id DESC']) as $priorQuote) {
-        if ((int)($priorQuote['id'] ?? 0) === (int)($editQuote['id'] ?? 0) || empty($priorQuote['returned_at'])) continue;
+    foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $defaultItemType, 'items_id' => $defaultItemsId, 'status' => 'approved'], ['id', 'tickets_id', 'returned_at'], ['id DESC']) as $priorQuote) {
+        if ((int)($priorQuote['id'] ?? 0) === (int)($editQuote['id'] ?? 0)) continue;
+        $returnValue = trim((string)($priorQuote['returned_at'] ?? ''));
+        if ($returnValue === '' && (int)($priorQuote['tickets_id'] ?? 0) > 0) {
+            $tracking = hhQRepairTrackingForTicket((int)$priorQuote['tickets_id']);
+            $returnValue = trim((string)($tracking['returned_at'] ?? ''));
+        }
+        if ($returnValue === '') continue;
         try {
-            $returnedDate = new DateTimeImmutable((string)$priorQuote['returned_at']);
+            $returnedDate = new DateTimeImmutable($returnValue);
             $expiresDate = $returnedDate->modify('+60 days');
             if ($returnedDate > $todayDate || $todayDate > $expiresDate) continue;
         } catch (Throwable $e) { continue; }
