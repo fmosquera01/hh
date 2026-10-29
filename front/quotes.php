@@ -71,6 +71,37 @@ function hhQAssetLabel(string $type, int $id): string
     return '';
 }
 
+function hhQNormalizeFieldDate(string $value): ?string
+{
+    $value = trim($value);
+    if ($value === '' || $value === '0000-00-00 00:00:00') return null;
+    try { return (new DateTimeImmutable($value))->format('Y-m-d H:i:s'); } catch (Throwable $e) { return null; }
+}
+
+function hhQRepairTicketForAsset(string $type, int $id): ?array
+{
+    if (!in_array($type, ['Computer', 'Phone'], true) || $id < 1) return null;
+    foreach (hhQRows('glpi_items_tickets', ['itemtype' => $type, 'items_id' => $id], ['tickets_id'], ['tickets_id DESC']) as $link) {
+        $ticketId = (int)($link['tickets_id'] ?? 0);
+        if ($ticketId < 1) continue;
+        foreach (hhQRows('glpi_plugin_fields_ticketreparacions', [
+            'items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 1,
+        ], ['nmerodeguafield', 'fechaenvioaproveedorfield', 'fecharecepcionproveedorfield', 'fecharecepcionguiafield']) as $fields) {
+            $guide = trim((string)($fields['nmerodeguafield'] ?? ''));
+            $sent = trim((string)($fields['fechaenvioaproveedorfield'] ?? ''));
+            $received = trim((string)($fields['fecharecepcionproveedorfield'] ?? ''));
+            if ($guide !== '' && hhQNormalizeFieldDate($sent) !== null && hhQNormalizeFieldDate($received) !== null) {
+                return [
+                    'tickets_id' => $ticketId, 'guide_number' => $guide,
+                    'sent_to_supplier_at' => $sent, 'supplier_received_at' => $received,
+                    'returned_at' => trim((string)($fields['fecharecepcionguiafield'] ?? '')),
+                ];
+            }
+        }
+    }
+    return null;
+}
+
 function hhQWriteHistory(int $quoteId, ?string $oldStatus, string $newStatus, string $comment = ''): void
 {
     global $DB;
@@ -90,6 +121,7 @@ $allowedTypes = ['Computer' => 'Computadora', 'Phone' => 'Teléfono'];
 $assetOptions = [];
 foreach ([['type' => 'Computer', 'table' => 'glpi_computers', 'label' => 'Computadora'], ['type' => 'Phone', 'table' => 'glpi_phones', 'label' => 'Teléfono']] as $assetConfig) {
     foreach (hhQRows($assetConfig['table'], ['is_deleted' => 0], ['id', 'name', 'serial', 'otherserial'], ['name ASC']) as $assetRow) {
+        if (hhQRepairTicketForAsset($assetConfig['type'], (int)$assetRow['id']) === null) continue;
         $assetOptions[] = [
             'itemtype' => $assetConfig['type'],
             'id' => (int)$assetRow['id'],
@@ -146,24 +178,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $quoteDate = trim((string)($_POST['quote_date'] ?? date('Y-m-d')));
         $supplierId = filter_var($_POST['suppliers_id'] ?? '0', FILTER_VALIDATE_INT);
         $supplierQuoteNumber = trim((string)($_POST['supplier_quote_number'] ?? ''));
-        $ticketIdRaw = trim((string)($_POST['tickets_id'] ?? ''));
-        $ticketId = $ticketIdRaw !== '' ? filter_var($ticketIdRaw, FILTER_VALIDATE_INT) : null;
-        $guideNumber = trim((string)($_POST['guide_number'] ?? ''));
-        $sentAtRaw = trim((string)($_POST['sent_to_supplier_at'] ?? ''));
-        $supplierReceivedRaw = trim((string)($_POST['supplier_received_at'] ?? ''));
-        $returnedAtRaw = trim((string)($_POST['returned_at'] ?? ''));
-        $normalizeDateTime = static function (string $value): ?string {
-            if ($value === '') return null;
-            $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value);
-            return $date ? $date->format('Y-m-d H:i:s') : null;
-        };
-        $sentAt = $normalizeDateTime($sentAtRaw);
-        $supplierReceivedAt = $normalizeDateTime($supplierReceivedRaw);
-        $returnedAt = $normalizeDateTime($returnedAtRaw);
+        $tracking = ($itemsId !== false && $itemsId > 0) ? hhQRepairTicketForAsset($itemtype, (int)$itemsId) : null;
+        $ticketId = $tracking !== null ? (int)$tracking['tickets_id'] : null;
+        $guideNumber = (string)($tracking['guide_number'] ?? '');
+        $sentAt = $tracking !== null ? hhQNormalizeFieldDate((string)$tracking['sent_to_supplier_at']) : null;
+        $supplierReceivedAt = $tracking !== null ? hhQNormalizeFieldDate((string)$tracking['supplier_received_at']) : null;
+        $returnedAt = $tracking !== null ? hhQNormalizeFieldDate((string)$tracking['returned_at']) : null;
         $repairType = (string)($_POST['repair_type'] ?? 'corrective');
         $priority = (string)($_POST['priority'] ?? 'normal');
-        $diagnosis = trim((string)($_POST['diagnosis'] ?? ''));
-        $observations = trim((string)($_POST['observations'] ?? ''));
+        $diagnosis = trim((string)($_POST['observations'] ?? ''));
+        $observations = $diagnosis;
         $lineIds = $_POST['line_item_id'] ?? [];
         $quantities = $_POST['line_quantity'] ?? [];
         $linePoints = $_POST['line_points'] ?? [];
@@ -173,6 +197,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($error === '' && (!array_key_exists($itemtype, $allowedTypes) || $itemsId === false || $itemsId < 1 || hhQAssetLabel($itemtype, (int)$itemsId) === '')) {
             $error = 'Seleccione un tipo de activo y un ID válido de un equipo existente.';
+        }
+        if ($error === '' && $tracking === null) {
+            $error = 'Este activo no tiene un ticket asociado con número de guía, fecha de envío y fecha de recepción por el proveedor. No se puede guardar la cotización.';
         }
         if ($error === '' && $quoteId === 0) {
             foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $itemtype, 'items_id' => (int)$itemsId, 'status' => 'draft'], ['id', 'name'], ['id DESC']) as $pending) {
@@ -578,15 +605,10 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
      <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
      <div class="col-md-4"><label class="form-label">Proveedor</label><select class="form-select" name="suppliers_id"><option value="0">No especificado</option><?php foreach($suppliers as $supplier): ?><option value="<?=(int)$supplier['id']?>" <?=$editQuote && (int)$editQuote['suppliers_id']===(int)$supplier['id']?'selected':''?>><?=hhQe((string)$supplier['name'])?></option><?php endforeach; ?></select></div>
      <div class="col-md-4"><label class="form-label">N.º cotización del proveedor</label><input class="form-control" name="supplier_quote_number" maxlength="100" value="<?=hhQe((string)($editQuote['supplier_quote_number'] ?? ''))?>"></div>
-     <div class="col-md-3"><label class="form-label">Ticket GLPI asociado</label><input class="form-control" type="number" min="1" name="tickets_id" value="<?=hhQe((string)($editQuote['tickets_id'] ?? ''))?>" placeholder="ID del caso"></div>
-     <div class="col-md-3"><label class="form-label">Número de guía</label><input class="form-control" name="guide_number" maxlength="100" value="<?=hhQe((string)($editQuote['guide_number'] ?? ''))?>" placeholder="Guía de este dispositivo"></div>
-     <div class="col-md-3"><label class="form-label">Envío a proveedor</label><input class="form-control" type="datetime-local" name="sent_to_supplier_at" value="<?=!empty($editQuote['sent_to_supplier_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['sent_to_supplier_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
-     <div class="col-md-3"><label class="form-label">Recibido por proveedor</label><input class="form-control" type="datetime-local" name="supplier_received_at" value="<?=!empty($editQuote['supplier_received_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['supplier_received_at']))->format('Y-m-d\TH:i')) : ''?>"></div>
-     <div class="col-md-3"><label class="form-label">Retorno a Songa</label><input class="form-control" type="datetime-local" name="returned_at" value="<?=!empty($editQuote['returned_at']) ? hhQe((new DateTimeImmutable((string)$editQuote['returned_at']))->format('Y-m-d\TH:i')) : ''?>"><small class="text-muted">Esta fecha inicia la garantía de reparación.</small></div>
+     <div class="col-md-12"><div class="alert alert-info py-2 mb-0"><strong>Seguimiento de guía:</strong> Los datos de ticket, guía, envío, recepción del proveedor y retorno se obtienen automáticamente del ticket GLPI asociado al activo.</div></div>
      <div class="col-md-4"><label class="form-label">Tipo de reparación</label><select class="form-select" name="repair_type"><option value="corrective" <?=$editQuote && $editQuote['repair_type']==='corrective'?'selected':''?>>Correctiva</option><option value="preventive" <?=$editQuote && $editQuote['repair_type']==='preventive'?'selected':''?>>Preventiva</option><option value="diagnostic" <?=$editQuote && $editQuote['repair_type']==='diagnostic'?'selected':''?>>Diagnóstico</option></select></div>
      <div class="col-md-4"><label class="form-label">Prioridad</label><select class="form-select" name="priority"><option value="low" <?=$editQuote && $editQuote['priority']==='low'?'selected':''?>>Baja</option><option value="normal" <?=(!$editQuote || $editQuote['priority']==='normal')?'selected':''?>>Normal</option><option value="high" <?=$editQuote && $editQuote['priority']==='high'?'selected':''?>>Alta</option><option value="urgent" <?=$editQuote && $editQuote['priority']==='urgent'?'selected':''?>>Urgente</option></select></div>
-     <div class="col-md-6"><label class="form-label">Diagnóstico</label><textarea class="form-control" name="diagnosis" rows="2"><?=hhQe((string)($editQuote['diagnosis'] ?? ''))?></textarea></div>
-     <div class="col-md-6"><label class="form-label">Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe((string)($editQuote['observations'] ?? ''))?></textarea></div>
+     <div class="col-md-12"><label class="form-label">Diagnóstico / Observaciones</label><textarea class="form-control" name="observations" rows="2"><?=hhQe(trim((string)($editQuote['diagnosis'] ?? '') . ((string)($editQuote['diagnosis'] ?? '') !== '' && (string)($editQuote['observations'] ?? '') !== '' ? "\n" : '') . (string)($editQuote['observations'] ?? '')))?></textarea></div>
     </div>
     <hr><div class="d-flex justify-content-between align-items-center mb-2"><h4 class="mb-0">Detalle de repuestos y servicios</h4><button type="button" class="btn btn-outline-primary btn-sm" id="hh-add-line">Agregar línea</button></div>
     <div class="table-responsive"><table class="table table-sm table-striped align-middle hh-lines-table"><thead><tr><th style="min-width:200px">Artículo</th><th style="min-width:100px">Reuso de pieza</th><th style="min-width:95px">Garantía</th><th style="width:70px">Cantidad</th><th style="width:70px">Puntos</th><th style="width:80px">Total puntos</th><th style="width:80px">Total USD</th><th></th></tr></thead><tbody id="hh-lines"></tbody><tfoot><tr><th colspan="5" class="text-end">Totales</th><th id="hh-total-points" class="hh-total">0.00</th><th id="hh-total-amount" class="hh-total">$0.00</th><th></th></tr></tfoot></table></div>
