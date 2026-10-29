@@ -48,13 +48,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $modelsIdRaw = (string) ($_POST['models_id'] ?? '');
         $modelsId = $modelsIdRaw !== '' ? filter_var($modelsIdRaw, FILTER_VALIDATE_INT) : null;
         $points = filter_var($_POST['points_each'] ?? '0', FILTER_VALIDATE_FLOAT);
+        $warrantyDays = filter_var($_POST['warranty_days'] ?? '60', FILTER_VALIDATE_INT);
         $active = isset($_POST['is_active']) ? 1 : 0;
 
         if ($name === '' || mb_strlen($name) > 180
             || !in_array($category, ['part', 'labor', 'service', 'other'], true)
             || !array_key_exists($itemtype, $allowedTypes)
             || ($modelsIdRaw !== '' && ($modelsId === false || $modelsId < 1))
-            || $points === false || $points < 0) {
+            || $points === false || $points < 0
+            || $warrantyDays === false || $warrantyDays < 0 || $warrantyDays > 3650) {
             $error = 'Revise el nombre, categoría, tipo/modelo de activo y puntos ingresados.';
         } else {
             $modelTable = $itemtype === 'Computer' ? 'glpi_computermodels' : 'glpi_phonemodels';
@@ -79,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'description' => $description !== '' ? $description : null,
                     'category' => $category,
                     'points_each' => number_format((float) $points, 2, '.', ''),
+                    'warranty_days' => (int) $warrantyDays,
                     'is_active' => $active,
                     'users_id' => (int) Session::getLoginUserID(),
                 ];
@@ -152,6 +155,7 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
           <div class="col-md-3"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-itemtype" required><option value="">Seleccione...</option><option value="Computer">Computadoras</option><option value="Phone">Teléfonos</option></select></div>
           <div class="col-md-3"><label class="form-label">Modelo (opcional)</label><select class="form-select" name="models_id" id="hh-model"><option value="">Todos los modelos del tipo seleccionado</option></select></div>
           <div class="col-md-3"><label class="form-label">Puntos por unidad</label><input class="form-control" type="number" name="points_each" min="0" step="0.01" value="0" required></div>
+          <div class="col-md-3"><label class="form-label">Garantía del repuesto (días)</label><input class="form-control" type="number" name="warranty_days" min="0" max="3650" step="1" value="60" required><small class="text-muted">0 = sin garantía</small></div>
           <div class="col-md-3 d-flex align-items-end"><label class="form-check"><input class="form-check-input" type="checkbox" name="is_active" checked> Activo</label></div>
           <div class="col-12"><label class="form-label">Descripción</label><textarea class="form-control" name="description" rows="2"></textarea></div>
           <div class="col-12"><button class="btn btn-primary" type="submit">Guardar artículo</button> <a class="btn btn-secondary" href="/plugins/hh/front/index.php">Volver a Gestión de reparaciones</a></div>
@@ -159,7 +163,7 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
       </form>
       <h3>Artículos registrados (<?= count($items) ?>)</h3>
       <div class="table-responsive"><table class="table table-striped table-hover">
-        <thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Tipo/modelo de activo</th><th class="text-end">Puntos</th><th>Estado</th><th>Acción</th></tr></thead><tbody>
+        <thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Tipo/modelo de activo</th><th class="text-end">Puntos</th><th>Garantía</th><th>Estado</th><th>Acción</th></tr></thead><tbody>
         <?php foreach ($items as $row): ?>
           <tr>
             <td><?= hhCatalogEscape((string) $row['code']) ?></td>
@@ -167,11 +171,12 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
             <td><?= hhCatalogEscape((string) $row['category']) ?></td>
             <td><?= hhCatalogEscape((string) $row['applicability']) ?></td>
             <td class="text-end"><?= number_format((float) $row['points_each'], 2) ?></td>
+            <td><?= (int) ($row['warranty_days'] ?? 60) ?> días</td>
             <td><?= (int) $row['is_active'] === 1 ? 'Activo' : 'Inactivo' ?></td>
             <td><form method="post"><input type="hidden" name="_glpi_csrf_token" value="<?= hhCatalogEscape(Session::getNewCSRFToken()) ?>"><input type="hidden" name="action" value="toggle_item"><input type="hidden" name="id" value="<?= (int) $row['id'] ?>"><input type="hidden" name="active" value="<?= (int) $row['is_active'] ?>"><button class="btn btn-sm btn-outline-secondary" type="submit"><?= (int) $row['is_active'] === 1 ? 'Desactivar' : 'Activar' ?></button></form></td>
           </tr>
         <?php endforeach; ?>
-        <?php if ($items === []): ?><tr><td colspan="7" class="text-center text-muted">Todavía no hay artículos registrados.</td></tr><?php endif; ?>
+        <?php if ($items === []): ?><tr><td colspan="8" class="text-center text-muted">Todavía no hay artículos registrados.</td></tr><?php endif; ?>
         </tbody></table></div>
     </div>
   </div>
