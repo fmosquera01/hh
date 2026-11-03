@@ -20,6 +20,18 @@ function hhCatalogEscape(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function hhCatalogCurrentPointValue(): array
+{
+    global $DB;
+    $now = date('Y-m-d H:i:s');
+    foreach ($DB->request(['SELECT' => ['*'], 'FROM' => 'glpi_plugin_hh_pointvalues', 'ORDER' => ['valid_from DESC', 'id DESC']]) as $row) {
+        if ((string)($row['valid_from'] ?? '') <= $now && (empty($row['valid_until']) || (string)$row['valid_until'] >= $now)) {
+            return ['id' => (int)$row['id'], 'value' => (float)$row['value_per_point'], 'currency' => (string)$row['currency']];
+        }
+    }
+    return ['id' => 0, 'value' => 1.0, 'currency' => 'USD'];
+}
+
 function hhCatalogModels(string $itemtype): array
 {
     global $DB;
@@ -38,9 +50,34 @@ function hhCatalogModels(string $itemtype): array
     return $models;
 }
 
+$point = hhCatalogCurrentPointValue();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string) ($_POST['action'] ?? '');
-    if ($action === 'save_item') {
+    if ($action === 'save_point_value') {
+        $value = filter_var($_POST['value_per_point'] ?? null, FILTER_VALIDATE_FLOAT);
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        if ($value === false || $value < 0 || $reason === '') {
+            $error = 'Ingrese un valor por punto válido y el motivo del cambio.';
+        } else {
+            if ($point['id'] > 0) {
+                $DB->update('glpi_plugin_hh_pointvalues', ['valid_until' => date('Y-m-d H:i:s', time() - 1)], ['id' => $point['id']]);
+            }
+            if ($DB->insert('glpi_plugin_hh_pointvalues', [
+                'value_per_point' => number_format((float)$value, 4, '.', ''),
+                'currency' => 'USD',
+                'valid_from' => date('Y-m-d H:i:s'),
+                'valid_until' => null,
+                'reason' => mb_substr($reason, 0, 255),
+                'users_id' => (int)Session::getLoginUserID(),
+            ])) {
+                $point = hhCatalogCurrentPointValue();
+                $message = 'Valor del punto actualizado. Las cotizaciones guardadas conservan su valor histórico.';
+            } else {
+                $error = 'No se pudo guardar el valor del punto.';
+            }
+        }
+    } elseif ($action === 'save_item') {
         $name = trim((string) ($_POST['name'] ?? ''));
         $description = trim((string) ($_POST['description'] ?? ''));
         $category = (string) ($_POST['category'] ?? 'part');
@@ -155,6 +192,21 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
     <div class="card-body">
       <?php if ($message !== ''): ?><div class="alert alert-success"><?= hhCatalogEscape($message) ?></div><?php endif; ?>
       <?php if ($error !== ''): ?><div class="alert alert-danger"><?= hhCatalogEscape($error) ?></div><?php endif; ?>
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title mb-0">Valor vigente del punto</h3><strong class="fs-3">$<?=number_format((float)$point['value'], 4)?> USD</strong></div>
+        <div class="card-body">
+          <p class="text-muted">Este valor se utiliza para calcular el importe de las cotizaciones nuevas. Las cotizaciones existentes mantienen el valor histórico con el que fueron guardadas.</p>
+          <form method="post">
+            <input type="hidden" name="_glpi_csrf_token" value="<?=hhCatalogEscape(Session::getNewCSRFToken())?>">
+            <input type="hidden" name="action" value="save_point_value">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-3"><label class="form-label">Valor en USD por punto</label><input class="form-control" type="number" name="value_per_point" min="0" step="0.0001" value="<?=hhCatalogEscape(number_format((float)$point['value'],4,'.',''))?>" required></div>
+              <div class="col-md-6"><label class="form-label">Motivo del cambio</label><input class="form-control" name="reason" maxlength="255" placeholder="Ej. actualización de tarifa anual" required></div>
+              <div class="col-md-3"><button class="btn btn-outline-primary" type="submit">Actualizar valor del punto</button></div>
+            </div>
+          </form>
+        </div>
+      </div>
       <p class="text-muted">El código se genera automáticamente al guardar. Elija el tipo de activo y, opcionalmente, un modelo específico. Si deja el modelo vacío, el artículo aplica a todos los modelos de ese tipo.</p>
       <form method="post" class="mb-4">
         <input type="hidden" name="_glpi_csrf_token" value="<?= hhCatalogEscape(Session::getNewCSRFToken()) ?>">
