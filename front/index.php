@@ -33,6 +33,13 @@ $catalogUrl = '/plugins/hh/front/catalog.php';
         </div>
         <div class="col-sm-6 col-xl-4">
           <div class="card card-body h-100">
+            <h3><i class="ti ti-coins me-2"></i>Puntos</h3>
+            <p class="text-muted">Registre compras de puntos, consumos históricos y consulte el saldo disponible y todos sus movimientos.</p>
+            <a class="btn btn-primary mt-auto" href="/plugins/hh/front/points.php">Administrar puntos</a>
+          </div>
+        </div>
+        <div class="col-sm-6 col-xl-4">
+          <div class="card card-body h-100">
             <h3><i class="ti ti-history me-2"></i>Historial</h3>
             <p class="text-muted">Consulta de cotizaciones, estados y reparaciones asociadas a cada activo.</p>
             <a class="btn btn-primary mt-auto" href="/plugins/hh/front/history.php">Consultar historial</a>
