@@ -256,6 +256,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($error === '' && $tracking === null) {
             $error = 'Este activo no tiene un ticket asociado con número de guía, fecha de envío y fecha de recepción por el proveedor. No se puede guardar la cotización.';
         }
+        if ($error === '' && $guideNumber !== '') {
+            foreach (hhQRows('glpi_plugin_hh_quotes', ['guide_number' => $guideNumber], ['id', 'name', 'status', 'itemtype', 'items_id'], ['id DESC']) as $sameGuideQuote) {
+                if ((int)$sameGuideQuote['id'] === $quoteId) continue;
+                $existingStatusLabel = $statuses[(string)$sameGuideQuote['status']] ?? (string)$sameGuideQuote['status'];
+                $error = 'La guía de salida ' . $guideNumber . ' ya está asociada a la cotización ' . (string)$sameGuideQuote['name'] . ' (' . $existingStatusLabel . '). No se puede crear otra cotización con la misma guía.';
+                break;
+            }
+        }
         if ($error === '' && $quoteId === 0) {
             foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $itemtype, 'items_id' => (int)$itemsId, 'status' => 'draft'], ['id', 'name'], ['id DESC']) as $pending) {
                 $error = 'Este activo ya tiene una cotización en borrador (' . (string)$pending['name'] . '). Se abrirá la existente para continuar editándola.';
@@ -650,7 +658,54 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    <?php if ($showQuoteForm): ?>
    <h3><?= $editQuote ? 'Editar cotización ' . hhQe((string)$editQuote['name']) : 'Nueva cotización' ?></h3>
    <?php if (!$editAllowed): ?>
-    <div class="alert alert-warning">Esta cotización está <?=hhQe($statuses[(string)$editQuote['status']] ?? (string)$editQuote['status'])?> y no se puede modificar.</div>
+    <div class="alert alert-info">Esta cotización está <?=hhQe($statuses[(string)$editQuote['status']] ?? (string)$editQuote['status'])?>. Se muestra en modo consulta y no se puede modificar.</div>
+    <?php
+      $detailSupplier = trim((string)($editQuote['supplier_name_snapshot'] ?? ''));
+      $detailAsset = hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']);
+      $detailDate = static function ($value): string {
+          $value = trim((string)($value ?? ''));
+          if ($value === '' || $value === '0000-00-00 00:00:00') return '—';
+          try { return (new DateTimeImmutable($value))->format('d/m/Y H:i'); } catch (Throwable $e) { return $value; }
+      };
+    ?>
+    <div class="card hh-section mb-3">
+     <div class="card-header"><strong>Detalle de <?=hhQe((string)$editQuote['name'])?></strong></div>
+     <div class="card-body">
+      <div class="row g-3">
+       <div class="col-md-4"><div class="small text-muted">Activo</div><strong><?=hhQe($allowedTypes[(string)$editQuote['itemtype']] ?? (string)$editQuote['itemtype'])?> #<?=(int)$editQuote['items_id']?></strong><div><?=hhQe($detailAsset)?></div></div>
+       <div class="col-md-4"><div class="small text-muted">Fecha de cotización</div><strong><?=hhQe((string)($editQuote['quote_date'] ?? '—'))?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">Estado</div><strong><?=hhQe($statuses[(string)$editQuote['status']] ?? (string)$editQuote['status'])?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">Proveedor</div><strong><?=hhQe($detailSupplier !== '' ? $detailSupplier : '—')?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">N.º cotización del proveedor</div><strong><?=hhQe((string)($editQuote['supplier_quote_number'] ?? '—'))?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">Guía de salida</div><strong><?=hhQe((string)($editQuote['guide_number'] ?? '—'))?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">Envío al proveedor</div><strong><?=hhQe($detailDate($editQuote['sent_to_supplier_at'] ?? null))?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">Recepción por proveedor</div><strong><?=hhQe($detailDate($editQuote['supplier_received_at'] ?? null))?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">Retorno del equipo</div><strong><?=hhQe($detailDate($editQuote['returned_at'] ?? null))?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">Total puntos</div><strong><?=number_format((float)$editQuote['total_points'], 2)?> pts</strong></div>
+       <div class="col-md-4"><div class="small text-muted">Total USD</div><strong>$<?=number_format((float)$editQuote['total_amount_snapshot'], 2)?></strong></div>
+      </div>
+      <?php if (trim((string)($editQuote['observations'] ?? '')) !== ''): ?><hr><div class="small text-muted">Diagnóstico / observaciones</div><div><?=nl2br(hhQe((string)$editQuote['observations']))?></div><?php endif; ?>
+     </div>
+    </div>
+    <div class="card hh-section mb-3">
+     <div class="card-header"><strong>Repuestos y servicios cotizados</strong></div>
+     <div class="table-responsive"><table class="table table-striped mb-0">
+      <thead><tr><th>Artículo</th><th>Cantidad</th><th class="text-end">Puntos unitarios</th><th class="text-end">Total puntos</th><th class="text-end">Total USD</th><th>Garantía</th></tr></thead>
+      <tbody>
+      <?php foreach ($editLines as $detailLine): ?>
+       <tr><td><?=hhQe((string)$detailLine['description_snapshot'])?><?php if (!empty($detailLine['source_itemtype']) && !empty($detailLine['source_items_id'])): ?><div class="small text-muted">Pieza reutilizada de <?=hhQe((string)$detailLine['source_itemtype'])?> #<?=(int)$detailLine['source_items_id']?></div><?php endif; ?></td>
+        <td><?=number_format((float)$detailLine['quantity'], 2)?></td>
+        <td class="text-end"><?=number_format((float)$detailLine['points_each'], 2)?></td>
+        <td class="text-end"><?=number_format((float)$detailLine['points_total'], 2)?></td>
+        <td class="text-end">$<?=number_format((float)$detailLine['amount_snapshot'], 2)?></td>
+        <td><?=!empty($detailLine['is_warranty']) ? 'Cubierto' : 'No cubierto'?></td></tr>
+      <?php endforeach; ?>
+      <?php if ($editLines === []): ?><tr><td colspan="6" class="text-center text-muted p-3">Esta cotización no tiene líneas de detalle.</td></tr><?php endif; ?>
+      </tbody>
+      <tfoot><tr><th colspan="3" class="text-end">Total</th><th class="text-end"><?=number_format((float)$editQuote['total_points'], 2)?> pts</th><th class="text-end">$<?=number_format((float)$editQuote['total_amount_snapshot'], 2)?></th><th></th></tr></tfoot>
+     </table></div>
+    </div>
+    <a class="btn btn-outline-secondary" href="/plugins/hh/front/quotes.php">Volver a cotizaciones</a>
    <?php else: ?>
    <form method="post" id="hh-quote-form" class="hh-quote-form-card mb-4">
     <input type="hidden" name="_glpi_csrf_token" value="<?=hhQe(Session::getNewCSRFToken())?>">
