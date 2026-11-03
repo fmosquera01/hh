@@ -22,6 +22,24 @@ function plugin_hh_install(): bool
             PRIMARY KEY (`id`),
             KEY `idx_hh_pointvalues_validity` (`valid_from`, `valid_until`)
         ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_pointmovements' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_pointmovements` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `movement_type` varchar(20) NOT NULL,
+            `points` decimal(12,2) NOT NULL,
+            `movement_date` date NOT NULL,
+            `supplier_quote_number` varchar(100) DEFAULT NULL,
+            `plugin_hh_quotes_id` int unsigned DEFAULT NULL,
+            `itemtype` varchar(100) DEFAULT NULL,
+            `items_id` int unsigned DEFAULT NULL,
+            `description` varchar(255) DEFAULT NULL,
+            `notes` text DEFAULT NULL,
+            `users_id` int unsigned NOT NULL,
+            `date_creation` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `unicity_quote_movement` (`plugin_hh_quotes_id`, `movement_type`),
+            KEY `idx_hh_pointmovements_date` (`movement_date`),
+            KEY `idx_hh_pointmovements_type` (`movement_type`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
         'glpi_plugin_hh_items' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_items` (
             `id` int unsigned NOT NULL AUTO_INCREMENT,
             `code` varchar(40) NOT NULL,
@@ -181,6 +199,7 @@ function plugin_hh_uninstall(): bool
     // Uninstalling HH intentionally resets all plugin-owned data.
     // GLPI core tables and asset/ticket records are never dropped.
     $tables = [
+        'glpi_plugin_hh_pointmovements',
         'glpi_plugin_hh_quotedetails',
         'glpi_plugin_hh_quotehistory',
         'glpi_plugin_hh_quotes',
