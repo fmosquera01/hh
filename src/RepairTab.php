@@ -175,18 +175,18 @@ final class RepairTab extends CommonGLPI
             }
 
             foreach ($DB->request([
-                'SELECT' => ['nmerodeguafield', 'fechaenvioaproveedorfield', 'fecharecepcionproveedorfield', 'fecharecepcionguiafield'],
+                'SELECT' => ['nmerodeguafield', 'fechaenvioaproveedorfieldtwo', 'fecharecepcionproveedorfieldtwo', 'fecharecepcionguiafieldtwo'],
                 'FROM' => 'glpi_plugin_fields_ticketreparacions',
                 'WHERE' => [
                     'items_id' => $ticketId,
                     'itemtype' => 'Ticket',
-                    'plugin_fields_containers_id' => 1,
+                    'plugin_fields_containers_id' => 15,
                 ],
             ]) as $fields) {
                 $guide = trim((string) ($fields['nmerodeguafield'] ?? ''));
-                $sent = $fields['fechaenvioaproveedorfield'] ?? null;
-                $received = $fields['fecharecepcionproveedorfield'] ?? null;
-                $returned = $fields['fecharecepcionguiafield'] ?? null;
+                $sent = $fields['fechaenvioaproveedorfieldtwo'] ?? null;
+                $received = $fields['fecharecepcionproveedorfieldtwo'] ?? null;
+                $returned = $fields['fecharecepcionguiafieldtwo'] ?? null;
 
                 if ($latestTrackingTicketId === 0 && ($guide !== '' || self::validDate($sent) || self::validDate($received))) {
                     $latestTracking = [
