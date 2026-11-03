@@ -411,6 +411,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         elseif (!in_array($decision, ['approved', 'rejected'], true)) $error = 'Decisión no válida.';
         else {
             $DB->update('glpi_plugin_hh_quotes', ['status' => $decision, 'observations' => trim((string)($quote['observations'] ?? '') . ($comment !== '' ? "\nDecisión: " . $comment : ''))], ['id' => (int)$quoteId]);
+            if ($decision === 'approved') {
+                $alreadyDeducted = false;
+                foreach ($DB->request([
+                    'SELECT' => ['id'], 'FROM' => 'glpi_plugin_hh_pointmovements',
+                    'WHERE' => ['plugin_hh_quotes_id' => (int)$quoteId, 'movement_type' => 'consumption'], 'LIMIT' => 1,
+                ]) as $movement) { $alreadyDeducted = true; break; }
+                if (!$alreadyDeducted) {
+                    $DB->insert('glpi_plugin_hh_pointmovements', [
+                        'movement_type' => 'consumption',
+                        'points' => number_format(-1 * (float)$quote['total_points'], 2, '.', ''),
+                        'movement_date' => date('Y-m-d'),
+                        'plugin_hh_quotes_id' => (int)$quoteId,
+                        'itemtype' => (string)$quote['itemtype'],
+                        'items_id' => (int)$quote['items_id'],
+                        'description' => 'Consumo automático por aprobación de ' . (string)$quote['name'],
+                        'users_id' => (int)Session::getLoginUserID(),
+                    ]);
+                }
+            }
             hhQWriteHistory((int)$quoteId, 'draft', $decision, $comment);
             $notice = 'Cotización ' . (string)$quote['name'] . ' ' . ($decision === 'approved' ? 'aprobada' : 'rechazada') . '. Queda bloqueada y disponible en el historial.';
             $refreshParentAfterDecision = true;
