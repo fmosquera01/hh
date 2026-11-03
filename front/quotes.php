@@ -692,7 +692,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
       <div id="hh-repair-cost-warning" class="alert alert-warning py-2 mt-2 mb-0" style="display:none">No se recomienda reparar: el costo es igual o superior al 40 % del valor de compra del equipo.</div>
       <?php if ($purchaseValue !== null): ?><div class="text-muted">Valor de compra registrado en GLPI: $<?=number_format($purchaseValue, 2)?></div><?php else: ?><div class="text-muted">No se puede calcular el porcentaje porque el equipo no tiene un valor de compra válido registrado en GLPI.</div><?php endif; ?>
     </div>
-    <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&new=1' : '/plugins/hh/front/quotes.php' ?>">Nueva / cancelar</a>
+    <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId : '/plugins/hh/front/quotes.php' ?>"><?= $embedded ? 'Volver a borradores' : 'Cancelar' ?></a>
    </form>
    <?php endif; ?>
    <?php endif; ?>
