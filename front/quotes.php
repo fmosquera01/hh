@@ -418,7 +418,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'WHERE' => ['plugin_hh_quotes_id' => (int)$quoteId, 'movement_type' => 'consumption'], 'LIMIT' => 1,
                 ]) as $movement) { $alreadyDeducted = true; break; }
                 if (!$alreadyDeducted) {
-                    $DB->insert('glpi_plugin_hh_pointmovements', [
+                    $movementSaved = $DB->insert('glpi_plugin_hh_pointmovements', [
                         'movement_type' => 'consumption',
                         'points' => number_format(-1 * (float)$quote['total_points'], 2, '.', ''),
                         'movement_date' => date('Y-m-d'),
@@ -428,6 +428,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'description' => 'Consumo automático por aprobación de ' . (string)$quote['name'],
                         'users_id' => (int)Session::getLoginUserID(),
                     ]);
+                    if (!$movementSaved) {
+                        $error = 'La cotización fue aprobada, pero no se pudo registrar el descuento de puntos. Revise el módulo Puntos antes de continuar.';
+                    }
                 }
             }
             hhQWriteHistory((int)$quoteId, 'draft', $decision, $comment);
