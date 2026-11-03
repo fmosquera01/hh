@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-use GlpiPlugin\\Hh\\Dashboard;
+use GlpiPlugin\Hh\Dashboard;
 
 include('../../../inc/includes.php');
 
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? '');
     $date = trim((string)($_POST['movement_date'] ?? date('Y-m-d')));
     $points = filter_var($_POST['points'] ?? null, FILTER_VALIDATE_FLOAT);
-    if (!preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $date) || strtotime($date) === false) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || strtotime($date) === false) {
         $error = 'Ingrese una fecha válida.';
     } elseif ($points === false || $points <= 0) {
         $error = 'La cantidad de puntos debe ser mayor que cero.';
