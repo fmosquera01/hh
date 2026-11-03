@@ -130,7 +130,7 @@ final class RepairTab extends CommonGLPI
         </style>";
         echo "<div class='hh-repair-tabs'>";
         echo "<input class='hh-tab-radio' type='radio' name='" . self::e($tabPrefix) . "' id='" . self::e($quotesTabId) . "' checked>";
-        echo "<label class='hh-tab-label' for='" . self::e($quotesTabId) . "'>Cotizaciones</label>";
+        echo "<label class='hh-tab-label' for='" . self::e($quotesTabId) . "'>Cotizaciones en borrador</label>";
         echo "<input class='hh-tab-radio' type='radio' name='" . self::e($tabPrefix) . "' id='" . self::e($historyTabId) . "'>";
         echo "<label class='hh-tab-label' for='" . self::e($historyTabId) . "'>Historial</label>";
         echo "<div class='hh-tab-panels'>";
