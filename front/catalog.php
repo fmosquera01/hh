@@ -21,6 +21,11 @@ function hhCatalogEscape(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function hhCatalogFormatMoney(float $value): string
+{
+    return rtrim(rtrim(number_format($value, 4, '.', ','), '0'), '.');
+}
+
 function hhCatalogCurrentPointValue(): array
 {
     global $DB;
@@ -198,7 +203,7 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
       <?php if ($message !== ''): ?><div class="alert alert-success"><?= hhCatalogEscape($message) ?></div><?php endif; ?>
       <?php if ($error !== ''): ?><div class="alert alert-danger"><?= hhCatalogEscape($error) ?></div><?php endif; ?>
       <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title mb-0">Valor vigente del punto</h3><strong class="fs-3">$<?=number_format((float)$point['value'], 4)?> USD</strong></div>
+        <div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title mb-0">Valor vigente del punto</h3><strong class="fs-3">$<?=hhCatalogEscape(hhCatalogFormatMoney((float)$point['value']))?> USD</strong></div>
         <div class="card-body">
           <p class="text-muted">Este valor se utiliza para calcular el importe de las cotizaciones nuevas. Las cotizaciones existentes mantienen el valor histórico con el que fueron guardadas.</p>
           <form method="post">
