@@ -28,9 +28,7 @@ if (in_array($purchaseItemType, ['Computer', 'Phone'], true) && $purchaseItemsId
     }
 }
 
-if (!Session::haveRight('config', UPDATE)) {
-    Html::displayRightError();
-}
+Rights::require(Rights::READ);
 
 function hhQe(string $value): string
 {
@@ -199,6 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save_quote') {
         $quoteId = (int)($_POST['quote_id'] ?? 0);
+        Rights::require($quoteId > 0 ? Rights::UPDATE : Rights::CREATE);
         $existing = null;
         if ($quoteId > 0) {
             foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => $quoteId], ['*'], []) as $row) { $existing = $row; break; }
@@ -384,6 +383,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'decide_quote') {
+        Rights::require(Rights::APPROVE);
         $quoteId = filter_var($_POST['quote_id'] ?? 0, FILTER_VALIDATE_INT);
         $decision = (string)($_POST['decision'] ?? '');
         $comment = trim((string)($_POST['comment'] ?? ''));
