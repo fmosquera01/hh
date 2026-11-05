@@ -6,6 +6,7 @@ use GlpiPlugin\Hh\Dashboard;
 include('../../../inc/includes.php');
 
 Session::checkLoginUser();
+Rights::require(Rights::READ);
 
 Html::header(__('Gestión de reparaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 
