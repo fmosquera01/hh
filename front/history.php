@@ -9,7 +9,7 @@ $itemtype = (string)($_GET['itemtype'] ?? '');
 $itemsId = (int)($_GET['items_id'] ?? 0);
 $allowed = ['Computer' => 'Computadora', 'Phone' => 'Teléfono'];
 if ($embedded && (!isset($allowed[$itemtype]) || $itemsId < 1)) { $itemtype = ''; $itemsId = 0; }
-if (!Session::haveRight('config', UPDATE)) Html::displayRightError();
+Rights::require(Rights::READ);
 
 function hhHistoryEscape(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 function hhHistoryRows(string $table, array $where = [], array $order = []): array {
