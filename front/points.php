@@ -6,9 +6,7 @@ use GlpiPlugin\Hh\Dashboard;
 include('../../../inc/includes.php');
 
 Session::checkLoginUser();
-if (!Session::haveRight('config', UPDATE)) {
-    Html::displayRightError();
-}
+Rights::require(Rights::POINTS);
 global $DB;
 
 function hhPe(string $value): string
