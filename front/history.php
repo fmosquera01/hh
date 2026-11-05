@@ -69,7 +69,6 @@ if ($search !== '' && !$embedded) {
         str_contains(mb_strtolower((string)$q['name']), $needle)
         || str_contains(mb_strtolower((string)($q['supplier_name_snapshot'] ?? '')), $needle)
         || str_contains(mb_strtolower((string)($q['supplier_quote_number'] ?? '')), $needle)
-        || str_contains(mb_strtolower((string)($q['diagnosis'] ?? '')), $needle)
     ));
 }
 if (!$embedded) Html::header(__('Historial de reparaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
@@ -97,8 +96,7 @@ $base = '/plugins/hh/front/history.php' . ($embedded ? '?embedded=1&itemtype=' .
     <div><small>Tipo / prioridad</small><strong><?=hhHistoryEscape(['corrective'=>'Correctiva','preventive'=>'Preventiva','diagnostic'=>'Diagnóstico'][$view['repair_type']] ?? (string)$view['repair_type'])?> / <?=hhHistoryEscape(['low'=>'Baja','normal'=>'Normal','high'=>'Alta','urgent'=>'Urgente'][$view['priority']] ?? (string)$view['priority'])?></strong></div>
     <div><small>Total</small><strong><?=number_format((float)$view['total_points'],2)?> puntos · $<?=number_format((float)$view['total_amount_snapshot'],2)?></strong></div>
    </div>
-   <?php if (trim((string)($view['diagnosis'] ?? '')) !== ''): ?><p><strong>Diagnóstico:</strong> <?=nl2br(hhHistoryEscape((string)$view['diagnosis']))?></p><?php endif; ?>
-   <?php if (trim((string)($view['observations'] ?? '')) !== ''): ?><p><strong>Observaciones / decisión:</strong> <?=nl2br(hhHistoryEscape((string)$view['observations']))?></p><?php endif; ?>
+   <?php if (trim((string)($view['observations'] ?? '')) !== ''): ?><p><strong>Diagnóstico / observaciones / decisión:</strong> <?=nl2br(hhHistoryEscape((string)$view['observations']))?></p><?php endif; ?>
    <h3>Repuestos y servicios</h3><div class="table-responsive mb-3"><table class="table table-sm table-striped table-bordered"><thead><tr><th>Código</th><th>Artículo</th><th>Cant.</th><th>Puntos/u.</th><th>Total puntos</th><th>Total USD</th><th>Garantía</th><th>Origen de pieza reutilizada</th></tr></thead><tbody>
    <?php if (!$lines): ?><tr><td colspan="8" class="text-center text-muted">Sin líneas de detalle.</td></tr><?php endif; ?>
    <?php foreach ($lines as $line): ?><tr><td><?=hhHistoryEscape((string)($line['code_snapshot'] ?? '—'))?></td><td><?=hhHistoryEscape((string)$line['description_snapshot'])?></td><td><?=number_format((float)$line['quantity'],2)?></td><td><?=number_format((float)$line['points_each'],2)?></td><td><?=number_format((float)$line['points_total'],2)?></td><td>$<?=number_format((float)$line['amount_snapshot'],2)?></td><td><?=!empty($line['is_warranty']) ? 'Sí' : 'No'?></td><td><?=!empty($line['source_itemtype']) && (int)($line['source_items_id'] ?? 0)>0 ? hhHistoryEscape(hhHistoryAsset((string)$line['source_itemtype'],(int)$line['source_items_id'])) : '—'?></td></tr><?php endforeach; ?>
