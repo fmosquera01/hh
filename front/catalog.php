@@ -23,7 +23,7 @@ function hhCatalogEscape(string $value): string
 
 function hhCatalogFormatMoney(float $value): string
 {
-    return rtrim(rtrim(number_format($value, 4, '.', ','), '0'), '.');
+    return number_format($value, 2, '.', ',');
 }
 
 function hhCatalogCurrentPointValue(): array
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $DB->update('glpi_plugin_hh_pointvalues', ['valid_until' => date('Y-m-d H:i:s', time() - 1)], ['id' => $point['id']]);
             }
             if ($DB->insert('glpi_plugin_hh_pointvalues', [
-                'value_per_point' => number_format((float)$value, 4, '.', ''),
+                'value_per_point' => number_format((float)$value, 2, '.', ''),
                 'currency' => 'USD',
                 'valid_from' => date('Y-m-d H:i:s'),
                 'valid_until' => null,
@@ -210,7 +210,7 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
             <input type="hidden" name="_glpi_csrf_token" value="<?=hhCatalogEscape(Session::getNewCSRFToken())?>">
             <input type="hidden" name="action" value="save_point_value">
             <div class="row g-2 align-items-end">
-              <div class="col-md-3"><label class="form-label">Valor en USD por punto</label><input class="form-control" type="number" name="value_per_point" min="0" step="0.0001" value="<?=hhCatalogEscape(number_format((float)$point['value'],4,'.',''))?>" required></div>
+              <div class="col-md-3"><label class="form-label">Valor en USD por punto</label><input class="form-control" type="number" name="value_per_point" min="0" step="0.01" value="<?=hhCatalogEscape(number_format((float)$point['value'],2,'.',''))?>" required></div>
               <div class="col-md-6"><label class="form-label">Motivo del cambio</label><input class="form-control" name="reason" maxlength="255" placeholder="Ej. actualización de tarifa anual" required></div>
               <div class="col-md-3"><button class="btn btn-outline-primary" type="submit">Actualizar valor del punto</button></div>
             </div>
