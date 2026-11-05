@@ -17,7 +17,7 @@ final class RepairTab extends CommonGLPI
 
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
     {
-        if ($withtemplate || (!$item instanceof Computer && !$item instanceof Phone)) {
+        if ($withtemplate || !Rights::can(Rights::READ) || (!$item instanceof Computer && !$item instanceof Phone)) {
             return '';
         }
         return self::getTypeName();
@@ -25,7 +25,7 @@ final class RepairTab extends CommonGLPI
 
     public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0)
     {
-        if (!$item instanceof Computer && !$item instanceof Phone) {
+        if (!Rights::can(Rights::READ) || (!$item instanceof Computer && !$item instanceof Phone)) {
             return true;
         }
 
