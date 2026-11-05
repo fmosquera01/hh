@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 use GlpiPlugin\Hh\Profile as HhProfile;
 use GlpiPlugin\Hh\Rights;
-use ProfileRight;
 
 function plugin_hh_install(): bool
 {
@@ -218,7 +217,12 @@ function plugin_hh_uninstall(): bool
 {
     global $DB;
 
-    // Remove HH-specific profile permissions.\n    foreach (HhProfile::getAllRights() as $right) {\n        ProfileRight::deleteProfileRights([(string)$right['field']]);\n    }\n\n    // Drop dependent/detail tables first, then their parent tables.
+    // Remove HH-specific profile permissions.
+    foreach (HhProfile::getAllRights() as $right) {
+        ProfileRight::deleteProfileRights([(string)$right['field']]);
+    }
+
+    // Drop dependent/detail tables first, then their parent tables.
     // Uninstalling HH intentionally resets all plugin-owned data.
     // GLPI core tables and asset/ticket records are never dropped.
     $tables = [
