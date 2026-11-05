@@ -148,7 +148,7 @@ function hhQHasActivePlatinumContract(string $type, int $id): bool
                     'WHERE' => ['id' => $typeId],
                     'LIMIT' => 1,
                 ]) as $typeRow) {
-                    if (strcasecmp(trim((string)($typeRow['name'] ?? '')), 'Platinum') === 0) return true;
+                    if (strcasecmp(trim((string)($typeRow['name'] ?? '')), 'Platinium') === 0) return true;
                 }
             }
         }
