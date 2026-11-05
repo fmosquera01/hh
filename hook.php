@@ -182,6 +182,25 @@ function plugin_hh_install(): bool
 
     $migration->executeMigration();
 
+    // Register HH-specific profile permissions without changing existing GLPI rights.
+    foreach (HhProfile::getAllRights() as $right) {
+        $field = (string)$right['field'];
+        $exists = false;
+        foreach ($DB->request(['SELECT' => ['id'], 'FROM' => 'glpi_profilerights', 'WHERE' => ['name' => $field], 'LIMIT' => 1]) as $unused) {
+            $exists = true;
+        }
+        if (!$exists) {
+            ProfileRight::addProfileRights([$field]);
+            foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_profiles']) as $profile) {
+                $profileName = strtolower((string)$profile['name']);
+                if (str_contains($profileName, 'super-admin') || str_contains($profileName, 'super admin')) {
+                    ProfileRight::updateProfileRights((int)$profile['id'], [$field => Rights::ALL]);
+                }
+            }
+        }
+    }
+    ProfileRight::cleanAllPossibleRights();
+
     return true;
 }
 
@@ -195,7 +214,7 @@ function plugin_hh_uninstall(): bool
 {
     global $DB;
 
-    // Drop dependent/detail tables first, then their parent tables.
+    // Remove HH-specific profile permissions.\n    foreach (HhProfile::getAllRights() as $right) {\n        ProfileRight::deleteProfileRights([(string)$right['field']]);\n    }\n\n    // Drop dependent/detail tables first, then their parent tables.
     // Uninstalling HH intentionally resets all plugin-owned data.
     // GLPI core tables and asset/ticket records are never dropped.
     $tables = [
