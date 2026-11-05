@@ -224,9 +224,7 @@ function plugin_hh_uninstall(): bool
     global $DB;
 
     // Remove HH-specific profile permissions.
-    foreach (HhProfile::getAllRights() as $right) {
-        ProfileRight::deleteProfileRights([(string)$right['field']]);
-    }
+    ProfileRight::deleteProfileRights(['plugin_hh']);
 
     // Drop dependent/detail tables first, then their parent tables.
     // Uninstalling HH intentionally resets all plugin-owned data.

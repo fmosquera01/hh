@@ -1,15 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace GlpiPlugin\\Hh;
+namespace GlpiPlugin\Hh;
 
 use Html;
 use Session;
 
-/**
- * Centralized authorization checks for HH operations.
- * Values are persisted in the native GLPI profile-right field plugin_hh.
- */
+/** Centralized authorization checks for native GLPI profile rights. */
 final class Rights
 {
     public const READ = 1;
