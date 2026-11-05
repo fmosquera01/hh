@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 use GlpiPlugin\Hh\Dashboard;
+use GlpiPlugin\Hh\Rights;
+use GlpiPlugin\Hh\Rights;
 include('../../../inc/includes.php');
 Session::checkLoginUser();
 global $DB;
