@@ -20,7 +20,7 @@ final class Rights
 
     public static function can(int $right): bool
     {
-        return Session::haveRight('plugin_hh', $right);
+        return (bool) Session::haveRight('plugin_hh', $right);
     }
 
     public static function require(int $right): void

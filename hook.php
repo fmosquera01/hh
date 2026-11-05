@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+use GlpiPlugin\Hh\Profile as HhProfile;
+use GlpiPlugin\Hh\Rights;
 
 function plugin_hh_install(): bool
 {
