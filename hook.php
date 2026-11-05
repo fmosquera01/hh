@@ -185,23 +185,29 @@ function plugin_hh_install(): bool
 
     $migration->executeMigration();
 
-    // Register HH-specific profile permissions without changing existing GLPI rights.
-    foreach (HhProfile::getAllRights() as $right) {
-        $field = (string)$right['field'];
-        $exists = false;
-        foreach ($DB->request(['SELECT' => ['id'], 'FROM' => 'glpi_profilerights', 'WHERE' => ['name' => $field], 'LIMIT' => 1]) as $unused) {
-            $exists = true;
-        }
-        if (!$exists) {
-            ProfileRight::addProfileRights([$field]);
-            foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_profiles']) as $profile) {
-                $profileName = strtolower((string)$profile['name']);
-                if (str_contains($profileName, 'super-admin') || str_contains($profileName, 'super admin')) {
-                    ProfileRight::updateProfileRights((int)$profile['id'], [$field => Rights::ALL]);
-                }
-            }
+    // Register the native GLPI profile right for every existing profile.
+    // Keep existing bitmasks unchanged; never grant HH access automatically.
+    $rightName = 'plugin_hh';
+    $profiles = $DB->request([
+        'SELECT' => ['id'],
+        'FROM'   => Profile::getTable(),
+    ]);
+
+    foreach ($profiles as $profile) {
+        $profilesId = (int) $profile['id'];
+        $existingRights = ProfileRight::getProfileRights($profilesId, [$rightName]);
+
+        if (!array_key_exists($rightName, $existingRights)) {
+            $DB->insert(
+                ProfileRight::getTable(),
+                [
+                    'profiles_id' => $profilesId,
+                    'name'        => $rightName,
+                ]
+            );
         }
     }
+
     ProfileRight::cleanAllPossibleRights();
 
     return true;

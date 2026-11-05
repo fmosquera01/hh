@@ -1,8 +1,15 @@
 <?php
 declare(strict_types=1);
 
-namespace GlpiPlugin\Hh;
+namespace GlpiPlugin\\Hh;
 
+use Html;
+use Session;
+
+/**
+ * Centralized authorization checks for HH operations.
+ * Values are persisted in the native GLPI profile-right field plugin_hh.
+ */
 final class Rights
 {
     public const READ = 1;
@@ -16,8 +23,7 @@ final class Rights
 
     public static function can(int $right): bool
     {
-        return Session::haveRight('plugin_hh', $right)
-            || Session::haveRight('config', UPDATE);
+        return Session::haveRight('plugin_hh', $right);
     }
 
     public static function require(int $right): void
