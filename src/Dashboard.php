@@ -19,6 +19,9 @@ final class Dashboard extends CommonGLPI
 
     public static function getMenuContent(): array
     {
+        if (!Rights::can(Rights::READ)) {
+            return [];
+        }
         return [
             'title' => self::getMenuName(),
             'page'  => '/plugins/hh/front/index.php',
