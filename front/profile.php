@@ -2,7 +2,6 @@
 declare(strict_types=1);
 
 use GlpiPlugin\Hh\Rights;
-use ProfileRight;
 
 include('../../../inc/includes.php');
 
@@ -13,7 +12,7 @@ if (!Session::haveRight('profile', UPDATE)) {
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['save_hh_rights'])) {
     Html::displayErrorAndDie('Solicitud no válida.');
 }
-Session::checkCSRFToken();
+Session::checkCSRF($_POST);
 
 $profilesId = filter_var($_POST['profiles_id'] ?? 0, FILTER_VALIDATE_INT);
 if ($profilesId === false || $profilesId < 1) {
