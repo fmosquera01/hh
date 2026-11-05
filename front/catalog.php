@@ -6,7 +6,7 @@ use GlpiPlugin\Hh\Dashboard;
 include('../../../inc/includes.php');
 
 Session::checkLoginUser();
-if (!Session::haveRight('config', UPDATE)) {
+if (!Rights::can(Rights::CATALOG) && !Rights::can(Rights::POINT_VALUE)) {
     Html::displayRightError();
 }
 
@@ -55,6 +55,7 @@ $point = hhCatalogCurrentPointValue();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string) ($_POST['action'] ?? '');
     if ($action === 'save_point_value') {
+        Rights::require(Rights::POINT_VALUE);
         $value = filter_var($_POST['value_per_point'] ?? null, FILTER_VALIDATE_FLOAT);
         $reason = trim((string)($_POST['reason'] ?? ''));
         if ($value === false || $value < 0 || $reason === '') {
@@ -78,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'save_item') {
+        Rights::require(Rights::CATALOG);
         $name = trim((string) ($_POST['name'] ?? ''));
         $description = trim((string) ($_POST['description'] ?? ''));
         $category = (string) ($_POST['category'] ?? 'part');
@@ -140,6 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'update_warranty_days') {
+        Rights::require(Rights::CATALOG);
         $id = filter_var($_POST['id'] ?? 0, FILTER_VALIDATE_INT);
         $days = filter_var($_POST['warranty_days'] ?? null, FILTER_VALIDATE_INT);
         if ($id === false || $id < 1 || $days === false || $days < 0 || $days > 3650) {
@@ -150,6 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             else $error = 'No se pudo actualizar la garantía del artículo.';
         }
     } elseif ($action === 'toggle_item') {
+        Rights::require(Rights::CATALOG);
         $id = filter_var($_POST['id'] ?? 0, FILTER_VALIDATE_INT);
         if ($id !== false && $id > 0) {
             $DB->update('glpi_plugin_hh_items', ['is_active' => (int) ($_POST['active'] ?? 0) ? 0 : 1], ['id' => $id]);
