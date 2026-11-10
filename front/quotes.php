@@ -421,7 +421,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'status' => $decision,
                     'observations' => trim((string)($quote['observations'] ?? '') . ($comment !== '' ? "\nDecisión: " . $comment : '')),
                 ], ['id' => (int)$quoteId, 'status' => 'draft']);
-                if (!$updated) throw new RuntimeException('No se pudo actualizar el estado de la cotización.');
+                if (!$updated || $DB->affectedRows() !== 1) {
+                    throw new RuntimeException('La cotización ya fue procesada por otro usuario o no está disponible.');
+                }
 
                 if ($decision === 'approved') {
                     $movementSaved = $DB->insert('glpi_plugin_hh_pointmovements', [
