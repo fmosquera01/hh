@@ -49,6 +49,8 @@ final class Reports
     {
         global $DB;
         $assets = [];
+        // Raw DB queries must preserve GLPI's active entity scope.
+        $activeEntities = Session::getActiveEntities();
         foreach (self::getAssetTypes() as $itemtype) {
             // Reports must never bypass the user's native GLPI asset permissions.
             if (!property_exists($itemtype, 'rightname') || !Session::haveRight($itemtype::$rightname, READ)) {
@@ -81,6 +83,13 @@ final class Reports
                 }
                 if ($DB->fieldExists($table, 'is_template')) {
                     $where['is_template'] = 0;
+                }
+                // Apply the active entity list because direct DBAL reads do not add GLPI entity criteria.
+                if ($DB->fieldExists($table, 'entities_id')) {
+                    if ($activeEntities === []) {
+                        continue;
+                    }
+                    $where['entities_id'] = $activeEntities;
                 }
                 // Custom asset classes share a table; filter by their definition ID.
                 if ($isCustom && $DB->fieldExists($table, 'assets_assetdefinitions_id')) {
