@@ -207,6 +207,51 @@ final class RepairAnalytics
         return $result;
     }
 
+    /**
+     * Count completed, approved repairs by return month for the filtered inventory.
+     *
+     * @param array<int, array<string, mixed>> $assets
+     * @return array<int, int>
+     */
+    public static function getMonthlyCompletedRepairs(int $year, array $assets): array
+    {
+        global $DB;
+
+        $months = array_fill(1, 12, 0);
+        if ($assets === [] || !$DB->tableExists('glpi_plugin_hh_quotes')) {
+            return array_values($months);
+        }
+
+        $assetKeys = [];
+        foreach ($assets as $asset) {
+            $assetKeys[(string)($asset['itemtype'] ?? '') . ':' . (int)($asset['id'] ?? 0)] = true;
+        }
+
+        foreach ($DB->request([
+            'SELECT' => ['id', 'itemtype', 'items_id', 'tickets_id', 'returned_at'],
+            'FROM' => 'glpi_plugin_hh_quotes',
+            'WHERE' => ['status' => 'approved'],
+        ]) as $quote) {
+            $key = (string)($quote['itemtype'] ?? '') . ':' . (int)($quote['items_id'] ?? 0);
+            if (!isset($assetKeys[$key])) {
+                continue;
+            }
+            $returnedAt = self::resolveReturnedAt($quote);
+            if ($returnedAt === '' || !preg_match('/^(\\d{4})-(\\d{2})-\\d{2}/', $returnedAt, $matches)) {
+                continue;
+            }
+            if ((int)$matches[1] !== $year) {
+                continue;
+            }
+            $month = (int)$matches[2];
+            if ($month >= 1 && $month <= 12) {
+                $months[$month]++;
+            }
+        }
+
+        return array_values($months);
+    }
+
     /** Use the linked GLPI ticket when the quote predates the return date. */
     private static function resolveReturnedAt(array $quote): string
     {
