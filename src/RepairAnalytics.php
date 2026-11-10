@@ -18,10 +18,19 @@ final class RepairAnalytics
         global $DB;
 
         $assetKeys = [];
+        $assetIds = [];
+        $itemTypes = [];
         $byAsset = [];
         foreach ($assets as $asset) {
-            $key = (string)($asset['itemtype'] ?? '') . ':' . (int)($asset['id'] ?? 0);
+            $itemtype = (string)($asset['itemtype'] ?? '');
+            $itemsId = (int)($asset['id'] ?? 0);
+            $key = $itemtype . ':' . $itemsId;
+            if ($itemtype === '' || $itemsId < 1) {
+                continue;
+            }
             $assetKeys[$key] = true;
+            $assetIds[$itemsId] = $itemsId;
+            $itemTypes[$itemtype] = $itemtype;
             $byAsset[$key] = [
                 'completed_repairs' => 0,
                 'parts_units' => 0.0,
@@ -35,19 +44,38 @@ final class RepairAnalytics
             return ['by_asset' => $byAsset, 'part_history' => []];
         }
 
-        $quotes = [];
+        // Restrict the quote scan to the selected inventory, then resolve all return dates in batches.
+        $candidateQuotes = [];
         foreach ($DB->request([
-            'SELECT' => ['id', 'name', 'itemtype', 'items_id', 'tickets_id', 'quote_date', 'returned_at', 'total_points'],
+            'SELECT' => ['id', 'name', 'itemtype', 'items_id', 'tickets_id', 'quote_date', 'returned_at'],
             'FROM' => 'glpi_plugin_hh_quotes',
-            'WHERE' => ['status' => 'approved'],
+            'WHERE' => [
+                'status' => 'approved',
+                'itemtype' => array_values($itemTypes),
+                'items_id' => array_values($assetIds),
+            ],
             'ORDER' => ['returned_at DESC', 'id DESC'],
         ]) as $quote) {
             $key = (string)($quote['itemtype'] ?? '') . ':' . (int)($quote['items_id'] ?? 0);
-            $returnedAt = self::resolveReturnedAt($quote);
-            if (!isset($assetKeys[$key]) || $returnedAt === '' || str_starts_with($returnedAt, '0000-00-00')) {
+            if (isset($assetKeys[$key])) {
+                $candidateQuotes[] = $quote;
+            }
+        }
+
+        if ($candidateQuotes === []) {
+            return ['by_asset' => $byAsset, 'part_history' => []];
+        }
+
+        $returnedDates = self::resolveReturnedAtBatch($candidateQuotes);
+        $completedQuotes = [];
+        foreach ($candidateQuotes as $quote) {
+            $quoteId = (int)$quote['id'];
+            $returnedAt = $returnedDates[$quoteId] ?? '';
+            if ($returnedAt === '') {
                 continue;
             }
-            $quotes[] = $quote;
+            $key = (string)$quote['itemtype'] . ':' . (int)$quote['items_id'];
+            $completedQuotes[$quoteId] = $quote;
             $byAsset[$key]['completed_repairs']++;
             if ($byAsset[$key]['last_returned_at'] === '' || $returnedAt > $byAsset[$key]['last_returned_at']) {
                 $byAsset[$key]['last_returned_at'] = $returnedAt;
@@ -55,17 +83,22 @@ final class RepairAnalytics
         }
 
         $partHistory = [];
-        foreach ($quotes as $quote) {
-            $key = (string)$quote['itemtype'] . ':' . (int)$quote['items_id'];
+        if ($completedQuotes !== []) {
             foreach ($DB->request([
-                'SELECT' => ['code_snapshot', 'category_snapshot', 'description_snapshot', 'quantity', 'points_total'],
+                'SELECT' => ['plugin_hh_quotes_id', 'code_snapshot', 'category_snapshot', 'description_snapshot', 'quantity', 'points_total'],
                 'FROM' => 'glpi_plugin_hh_quotedetails',
-                'WHERE' => ['plugin_hh_quotes_id' => (int)$quote['id']],
+                'WHERE' => ['plugin_hh_quotes_id' => array_keys($completedQuotes)],
                 'ORDER' => ['id ASC'],
             ]) as $line) {
                 if ((string)($line['category_snapshot'] ?? '') !== 'part') {
                     continue;
                 }
+                $quoteId = (int)$line['plugin_hh_quotes_id'];
+                if (!isset($completedQuotes[$quoteId])) {
+                    continue;
+                }
+                $quote = $completedQuotes[$quoteId];
+                $key = (string)$quote['itemtype'] . ':' . (int)$quote['items_id'];
                 $quantity = (float)($line['quantity'] ?? 0);
                 if ($quantity <= 0) {
                     continue;
@@ -77,7 +110,7 @@ final class RepairAnalytics
                     'items_id' => (int)$quote['items_id'],
                     'quote_name' => (string)$quote['name'],
                     'quote_date' => (string)($quote['quote_date'] ?? ''),
-                    'returned_at' => self::resolveReturnedAt($quote),
+                    'returned_at' => $returnedDates[$quoteId] ?? '',
                     'code' => (string)($line['code_snapshot'] ?? ''),
                     'description' => (string)($line['description_snapshot'] ?? ''),
                     'quantity' => $quantity,
@@ -88,7 +121,6 @@ final class RepairAnalytics
 
         return ['by_asset' => $byAsset, 'part_history' => $partHistory];
     }
-
 
     /**
      * Return one entry per asset currently at the external repair provider.
@@ -223,20 +255,41 @@ final class RepairAnalytics
         }
 
         $assetKeys = [];
+        $assetIds = [];
+        $itemTypes = [];
         foreach ($assets as $asset) {
-            $assetKeys[(string)($asset['itemtype'] ?? '') . ':' . (int)($asset['id'] ?? 0)] = true;
+            $itemtype = (string)($asset['itemtype'] ?? '');
+            $itemsId = (int)($asset['id'] ?? 0);
+            if ($itemtype === '' || $itemsId < 1) {
+                continue;
+            }
+            $assetKeys[$itemtype . ':' . $itemsId] = true;
+            $assetIds[$itemsId] = $itemsId;
+            $itemTypes[$itemtype] = $itemtype;
+        }
+        if ($assetKeys === []) {
+            return array_values($months);
         }
 
+        $candidateQuotes = [];
         foreach ($DB->request([
             'SELECT' => ['id', 'itemtype', 'items_id', 'tickets_id', 'returned_at'],
             'FROM' => 'glpi_plugin_hh_quotes',
-            'WHERE' => ['status' => 'approved'],
+            'WHERE' => [
+                'status' => 'approved',
+                'itemtype' => array_values($itemTypes),
+                'items_id' => array_values($assetIds),
+            ],
         ]) as $quote) {
             $key = (string)($quote['itemtype'] ?? '') . ':' . (int)($quote['items_id'] ?? 0);
-            if (!isset($assetKeys[$key])) {
-                continue;
+            if (isset($assetKeys[$key])) {
+                $candidateQuotes[] = $quote;
             }
-            $returnedAt = self::resolveReturnedAt($quote);
+        }
+
+        $returnedDates = self::resolveReturnedAtBatch($candidateQuotes);
+        foreach ($candidateQuotes as $quote) {
+            $returnedAt = $returnedDates[(int)$quote['id']] ?? '';
             if ($returnedAt === '' || !preg_match('/^(\\d{4})-(\\d{2})-\\d{2}/', $returnedAt, $matches)) {
                 continue;
             }
@@ -252,14 +305,97 @@ final class RepairAnalytics
         return array_values($months);
     }
 
-    /** Use the linked GLPI ticket when the quote predates the return date. */
-    private static function resolveReturnedAt(array $quote): string
+    /**
+     * Resolve quote return dates in two queries at most, rather than one query per quote.
+     *
+     * @param array<int, array<string, mixed>> $quotes
+     * @return array<int, string> Quote ID => confirmed return date
+     */
+    private static function resolveReturnedAtBatch(array $quotes): array
     {
         global $DB;
-        $value = trim((string)($quote['returned_at'] ?? ''));
-        if ($value !== '' && !str_starts_with($value, '0000-00-00')) {
-            return $value;
+
+        $dates = [];
+        $quoteTickets = [];
+        $ticketIds = [];
+        foreach ($quotes as $quote) {
+            $quoteId = (int)($quote['id'] ?? 0);
+            $returnedAt = trim((string)($quote['returned_at'] ?? ''));
+            if ($quoteId < 1) {
+                continue;
+            }
+            if ($returnedAt !== '' && !str_starts_with($returnedAt, '0000-00-00')) {
+                $dates[$quoteId] = $returnedAt;
+                continue;
+            }
+            $ticketId = (int)($quote['tickets_id'] ?? 0);
+            if ($ticketId > 0) {
+                $quoteTickets[$quoteId] = $ticketId;
+                $ticketIds[$ticketId] = $ticketId;
+            }
         }
+
+        $table = 'glpi_plugin_fields_ticketreparacions';
+        if ($ticketIds === [] || !$DB->tableExists($table)
+            || !$DB->fieldExists($table, 'items_id')
+            || !$DB->fieldExists($table, 'itemtype')
+            || !$DB->fieldExists($table, 'plugin_fields_containers_id')) {
+            return $dates;
+        }
+
+        $hasPreferred = $DB->fieldExists($table, 'fecharecepcionguiafieldtwo');
+        $hasFallback = $DB->fieldExists($table, 'fecharecepcionguiafield');
+        if (!$hasPreferred && !$hasFallback) {
+            return $dates;
+        }
+
+        $select = ['items_id', 'plugin_fields_containers_id'];
+        if ($hasPreferred) {
+            $select[] = 'fecharecepcionguiafieldtwo';
+        }
+        if ($hasFallback) {
+            $select[] = 'fecharecepcionguiafield';
+        }
+
+        $preferredDates = [];
+        $fallbackDates = [];
+        foreach ($DB->request([
+            'SELECT' => $select,
+            'FROM' => $table,
+            'WHERE' => [
+                'items_id' => array_values($ticketIds),
+                'itemtype' => 'Ticket',
+                'plugin_fields_containers_id' => [15, 1],
+            ],
+        ]) as $row) {
+            $ticketId = (int)($row['items_id'] ?? 0);
+            $containerId = (int)($row['plugin_fields_containers_id'] ?? 0);
+            if ($ticketId < 1) {
+                continue;
+            }
+            if ($containerId === 15 && $hasPreferred) {
+                $date = trim((string)($row['fecharecepcionguiafieldtwo'] ?? ''));
+                if ($date !== '' && !str_starts_with($date, '0000-00-00')) {
+                    $preferredDates[$ticketId] = $date;
+                }
+            } elseif ($containerId === 1 && $hasFallback) {
+                $date = trim((string)($row['fecharecepcionguiafield'] ?? ''));
+                if ($date !== '' && !str_starts_with($date, '0000-00-00')) {
+                    $fallbackDates[$ticketId] = $date;
+                }
+            }
+        }
+
+        foreach ($quoteTickets as $quoteId => $ticketId) {
+            $date = $preferredDates[$ticketId] ?? $fallbackDates[$ticketId] ?? '';
+            if ($date !== '') {
+                $dates[$quoteId] = $date;
+            }
+        }
+
+        return $dates;
+    }
+
         $ticketId = (int)($quote['tickets_id'] ?? 0);
         $table = 'glpi_plugin_fields_ticketreparacions';
         if ($ticketId < 1 || !$DB->tableExists($table)) {
