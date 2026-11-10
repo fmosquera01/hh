@@ -103,12 +103,20 @@ final class RepairAnalytics
         global $DB;
 
         $result = [];
+        $assetTickets = [];
+        foreach ($assets as $asset) {
+            $itemtype = (string)($asset['itemtype'] ?? '');
+            $itemsId = (int)($asset['id'] ?? 0);
+            if (in_array($itemtype, ['Computer', 'Phone'], true) && $itemsId > 0) {
+                $assetTickets[$itemtype . ':' . $itemsId] = [];
+            }
+        }
+
         $linksTable = 'glpi_items_tickets';
         $ticketsTable = 'glpi_tickets';
         $fieldsTable = 'glpi_plugin_fields_ticketreparacions';
-
-        if (!$DB->tableExists($linksTable) || !$DB->tableExists($ticketsTable)
-            || !$DB->tableExists($fieldsTable)) {
+        if ($assetTickets === [] || !$DB->tableExists($linksTable)
+            || !$DB->tableExists($ticketsTable) || !$DB->tableExists($fieldsTable)) {
             return $result;
         }
 
@@ -124,81 +132,80 @@ final class RepairAnalytics
             }
         }
 
-        foreach ($assets as $asset) {
-            $itemtype = (string)($asset['itemtype'] ?? '');
-            $itemsId = (int)($asset['id'] ?? 0);
-            if (!in_array($itemtype, ['Computer', 'Phone'], true) || $itemsId < 1) {
-                continue;
+        // Load links once, then retain only tickets belonging to the filtered inventory.
+        $ticketIds = [];
+        foreach ($DB->request([
+            'SELECT' => ['tickets_id', 'itemtype', 'items_id'],
+            'FROM' => $linksTable,
+            'WHERE' => ['itemtype' => ['Computer', 'Phone']],
+        ]) as $link) {
+            $key = (string)($link['itemtype'] ?? '') . ':' . (int)($link['items_id'] ?? 0);
+            $ticketId = (int)($link['tickets_id'] ?? 0);
+            if ($ticketId > 0 && isset($assetTickets[$key])) {
+                $assetTickets[$key][] = $ticketId;
+                $ticketIds[$ticketId] = $ticketId;
             }
+        }
+        if ($ticketIds === []) {
+            return $result;
+        }
 
-            $assetKey = $itemtype . ':' . $itemsId;
-            foreach ($DB->request([
-                'SELECT' => ['tickets_id'],
-                'FROM' => $linksTable,
-                'WHERE' => ['itemtype' => $itemtype, 'items_id' => $itemsId],
-                'ORDER' => ['tickets_id DESC'],
-            ]) as $link) {
-                $ticketId = (int)($link['tickets_id'] ?? 0);
-                if ($ticketId < 1) {
+        $ticketStatuses = [];
+        foreach ($DB->request([
+            'SELECT' => ['id', 'status'],
+            'FROM' => $ticketsTable,
+            'WHERE' => ['id' => array_values($ticketIds)],
+        ]) as $ticket) {
+            $ticketStatuses[(int)$ticket['id']] = (int)($ticket['status'] ?? 0);
+        }
+
+        $fieldsByTicket = [];
+        foreach ($DB->request([
+            'SELECT' => array_merge(['items_id'], $requiredFields),
+            'FROM' => $fieldsTable,
+            'WHERE' => [
+                'items_id' => array_values($ticketIds),
+                'itemtype' => 'Ticket',
+                'plugin_fields_containers_id' => 15,
+            ],
+        ]) as $fields) {
+            $fieldsByTicket[(int)$fields['items_id']] = $fields;
+        }
+
+        foreach ($assetTickets as $assetKey => $linkedTickets) {
+            rsort($linkedTickets);
+            foreach ($linkedTickets as $ticketId) {
+                $status = $ticketStatuses[$ticketId] ?? null;
+                if ($status === null || in_array($status, [5, 6], true)
+                    || !isset($fieldsByTicket[$ticketId])) {
                     continue;
                 }
 
-                // Solved/closed tickets cannot represent a currently open repair.
-                $ticketStatus = null;
-                foreach ($DB->request([
-                    'SELECT' => ['status'],
-                    'FROM' => $ticketsTable,
-                    'WHERE' => ['id' => $ticketId],
-                    'LIMIT' => 1,
-                ]) as $ticket) {
-                    $ticketStatus = (int)($ticket['status'] ?? 0);
-                    break;
-                }
-                if ($ticketStatus === null || in_array($ticketStatus, [5, 6], true)) {
+                $fields = $fieldsByTicket[$ticketId];
+                $guide = trim((string)($fields['nmerodeguafield'] ?? ''));
+                $sentAt = trim((string)($fields['fechaenvioaproveedorfieldtwo'] ?? ''));
+                $supplierReceivedAt = trim((string)($fields['fecharecepcionproveedorfieldtwo'] ?? ''));
+                $returnedAt = trim((string)($fields['fecharecepcionguiafieldtwo'] ?? ''));
+                $validDate = static fn(string $date): bool =>
+                    $date !== '' && !str_starts_with($date, '0000-00-00');
+
+                if ($guide === '' || !$validDate($sentAt) || !$validDate($supplierReceivedAt)
+                    || $validDate($returnedAt)) {
                     continue;
                 }
 
-                foreach ($DB->request([
-                    'SELECT' => $requiredFields,
-                    'FROM' => $fieldsTable,
-                    'WHERE' => [
-                        'items_id' => $ticketId,
-                        'itemtype' => 'Ticket',
-                        'plugin_fields_containers_id' => 15,
-                    ],
-                    'LIMIT' => 1,
-                ]) as $fields) {
-                    $guide = trim((string)($fields['nmerodeguafield'] ?? ''));
-                    $sentAt = trim((string)($fields['fechaenvioaproveedorfieldtwo'] ?? ''));
-                    $supplierReceivedAt = trim((string)($fields['fecharecepcionproveedorfieldtwo'] ?? ''));
-                    $returnedAt = trim((string)($fields['fecharecepcionguiafieldtwo'] ?? ''));
-
-                    $validDate = static fn(string $date): bool =>
-                        $date !== '' && !str_starts_with($date, '0000-00-00');
-
-                    if ($guide === '' || !$validDate($sentAt) || !$validDate($supplierReceivedAt) || $validDate($returnedAt)) {
-                        continue;
-                    }
-
-                    // One equipment is counted once even if it has multiple linked tickets.
-                    $result[$assetKey] = [
-                        'tickets_id' => $ticketId,
-                        'guide_number' => $guide,
-                        'sent_at' => $sentAt,
-                        'supplier_received_at' => $supplierReceivedAt,
-                    ];
-                    break;
-                }
-
-                if (isset($result[$assetKey])) {
-                    break;
-                }
+                $result[$assetKey] = [
+                    'tickets_id' => $ticketId,
+                    'guide_number' => $guide,
+                    'sent_at' => $sentAt,
+                    'supplier_received_at' => $supplierReceivedAt,
+                ];
+                break;
             }
         }
 
         return $result;
     }
-
 
     /** Use the linked GLPI ticket when the quote predates the return date. */
     private static function resolveReturnedAt(array $quote): string
