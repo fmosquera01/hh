@@ -247,10 +247,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Este activo no tiene un ticket asociado con número de guía, fecha de envío y fecha de recepción por el proveedor. No se puede guardar la cotización.';
         }
         if ($error === '' && $guideNumber !== '') {
-            foreach (hhQRows('glpi_plugin_hh_quotes', ['guide_number' => $guideNumber], ['id', 'name', 'status', 'itemtype', 'items_id'], ['id DESC']) as $sameGuideQuote) {
+            foreach (hhQRows('glpi_plugin_hh_quotes', ['guide_number' => $guideNumber], ['id'], ['id DESC']) as $sameGuideQuote) {
                 if ((int)$sameGuideQuote['id'] === $quoteId) continue;
-                $existingStatusLabel = $statuses[(string)$sameGuideQuote['status']] ?? (string)$sameGuideQuote['status'];
-                $error = 'La guía de salida ' . $guideNumber . ' ya está asociada a la cotización ' . (string)$sameGuideQuote['name'] . ' (' . $existingStatusLabel . '). No se puede crear otra cotización con la misma guía.';
+                // Guide numbers are organization-wide unique, but never disclose another entity's quote metadata.
+                $error = 'La guía de salida ' . $guideNumber . ' ya está asociada a otra cotización. No se puede reutilizar.';
                 break;
             }
         }
