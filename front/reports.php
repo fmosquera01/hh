@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use GlpiPlugin\Hh\Dashboard;
 use GlpiPlugin\Hh\Reports;
+use GlpiPlugin\Hh\RepairAnalytics;
 use GlpiPlugin\Hh\Rights;
 
 include('../../../inc/includes.php');
@@ -42,14 +43,28 @@ $inventory = array_values(array_filter($baseInventory, static function (array $a
     return ($subtypeFilter === '' || $subtypeFilter === $subtypeKey)
         && ($modelFilter === '' || $modelFilter === $modelKey);
 }));
+$repairAnalytics = RepairAnalytics::getExecutedRepairSummary($inventory);
+$partHistory = $repairAnalytics['part_history'];
+foreach ($inventory as &$asset) {
+    $key = $asset['itemtype'] . ':' . (int)$asset['id'];
+    $stats = $repairAnalytics['by_asset'][$key] ?? [];
+    $asset['completed_repairs'] = (int)($stats['completed_repairs'] ?? 0);
+    $asset['parts_units'] = (float)($stats['parts_units'] ?? 0);
+    $asset['parts_lines'] = (int)($stats['parts_lines'] ?? 0);
+    $asset['last_returned_at'] = (string)($stats['last_returned_at'] ?? '');
+}
+unset($asset);
 $months = Reports::getPointMovements($year);
 $totalAssets = count($inventory);
 $repairedAssets = count(array_filter($inventory, static fn(array $asset): bool => $asset['repair_count'] > 0));
 $totalRepairs = array_sum(array_column($inventory, 'repair_count'));
 $totalPoints = array_sum(array_column($inventory, 'points_consumed'));
+$totalCompletedRepairs = array_sum(array_column($inventory, 'completed_repairs'));
+$totalPartsUnits = array_sum(array_column($inventory, 'parts_units'));
+$totalPartLines = count($partHistory);
 $totalPurchased = array_sum(array_column($months, 'purchased'));
 $totalConsumed = array_sum(array_column($months, 'consumed'));
-$maxPoints = max(1.0, ...array_column($months, 'consumed'));
+$maxPoints = max(1.0, ...array_column($months, 'consumed'), ...array_column($months, 'purchased'));
 $assetTypes = Reports::getAssetTypes();
 
 function hhReportEscape(string $value): string
@@ -60,7 +75,7 @@ function hhReportEscape(string $value): string
 Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 ?>
 <style>
-.hh-reports{font-size:13px}.hh-reports .kpi{border:1px solid var(--tblr-border-color);border-radius:9px;padding:16px;height:100%;background:var(--tblr-bg-surface)}.hh-reports .kpi-label{color:var(--tblr-muted);font-size:12px}.hh-reports .kpi-value{font-size:1.65rem;font-weight:700;line-height:1.3}.hh-reports .chart-bars{display:grid;grid-template-columns:repeat(12,minmax(22px,1fr));gap:8px;align-items:end;height:190px;padding:10px 4px 0}.hh-reports .chart-col{display:flex;flex-direction:column;align-items:center;justify-content:end;height:100%;gap:5px}.hh-reports .chart-bar{width:min(100%,34px);min-height:2px;background:var(--tblr-primary);border-radius:4px 4px 0 0}.hh-reports .chart-month{font-size:10px;color:var(--tblr-muted)}.hh-reports .table{font-size:12px}.hh-reports .table th,.hh-reports .table td{vertical-align:middle;white-space:nowrap}
+.hh-reports{font-size:13px}.hh-reports .kpi{border:1px solid var(--tblr-border-color);border-radius:9px;padding:16px;height:100%;background:var(--tblr-bg-surface)}.hh-reports .kpi-label{color:var(--tblr-muted);font-size:12px}.hh-reports .kpi-value{font-size:1.65rem;font-weight:700;line-height:1.3}.hh-reports .chart-bars{display:grid;grid-template-columns:repeat(12,minmax(22px,1fr));gap:8px;align-items:end;height:190px;padding:10px 4px 0}.hh-reports .chart-col{display:flex;flex-direction:column;align-items:center;justify-content:end;height:100%;gap:5px}.hh-reports .chart-pair{display:flex;align-items:end;justify-content:center;gap:3px;height:145px;width:100%}.hh-reports .chart-bar{width:12px;min-height:2px;border-radius:4px 4px 0 0}.hh-reports .chart-bar.purchase{background:var(--tblr-success)}.hh-reports .chart-bar.consumption{background:var(--tblr-danger)}.hh-reports .chart-month{font-size:10px;color:var(--tblr-muted)}.hh-reports .table{font-size:12px}.hh-reports .table th,.hh-reports .table td{vertical-align:middle;white-space:nowrap}
 </style>
 <div class="container-fluid hh-reports">
  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
