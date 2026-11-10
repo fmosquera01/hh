@@ -57,6 +57,7 @@ final class Profile extends \Profile
                 Rights::CATALOG     => __('Administrar catálogo', 'hh'),
                 Rights::POINTS      => __('Administrar puntos', 'hh'),
                 Rights::POINT_VALUE => __('Modificar valor del punto', 'hh'),
+                Rights::REPORTS     => __('Consultar reportes gerenciales', 'hh'),
             ],
         ]];
 
