@@ -79,6 +79,8 @@ $inventory = array_values(array_filter($baseInventory, static function (array $a
 }));
 $repairAnalytics = RepairAnalytics::getExecutedRepairSummary($inventory);
 $activeRepairsByAsset = RepairAnalytics::getActiveRepairAssets($inventory);
+$monthlyRepairs = RepairAnalytics::getMonthlyCompletedRepairs($year, $inventory);
+$maxMonthlyRepairs = max(1, ...$monthlyRepairs);
 $partHistory = $repairAnalytics['part_history'];
 foreach ($inventory as &$asset) {
     $key = $asset['itemtype'] . ':' . (int)$asset['id'];
@@ -219,6 +221,12 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
 .hh-reports .metric-fill.warning{background:var(--tblr-warning)}.hh-reports .metric-fill.danger{background:var(--tblr-danger)}.hh-reports .metric-fill.success{background:var(--tblr-success)}
 .hh-reports .rank-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--tblr-border-color);font-size:12px}
 .hh-reports .rank-row:last-child{border-bottom:0}
+.hh-reports .repair-month-bars{display:grid;grid-template-columns:repeat(12,minmax(22px,1fr));gap:8px;align-items:end;height:155px;padding:10px 4px 0}
+.hh-reports .repair-month-col{height:100%;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:6px}
+.hh-reports .repair-month-bar{width:min(24px,70%);min-height:2px;border-radius:5px 5px 0 0;background:var(--tblr-primary)}
+.hh-reports .repair-month-label{font-size:10px;color:var(--tblr-muted)}
+@page{size:landscape;margin:10mm}
+
 @media print{.hh-no-print,#page,.navbar,.sidebar{display:none!important}.hh-reports{font-size:10px}.hh-reports .card,.hh-reports .analysis-card{break-inside:avoid;box-shadow:none!important}.hh-reports .table-responsive{overflow:visible!important}.hh-reports .table{font-size:9px}}
 
 </style>
@@ -231,7 +239,7 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
    <a class="btn btn-outline-secondary" href="/plugins/hh/front/index.php">Volver a HH</a>
   </div>
  </div>
- <form method="get" class="card card-body mb-3">
+ <form method="get" class="card card-body mb-3 hh-no-print">
   <div class="row g-2 align-items-end">
    <div class="col-sm-2"><label class="form-label">Año de análisis</label><select class="form-select" name="year"><?php for($y=(int)date('Y');$y>=(int)date('Y')-5;$y--): ?><option value="<?=$y?>" <?=$year===$y?'selected':''?>><?=$y?></option><?php endfor; ?></select></div>
    <div class="col-sm-2"><label class="form-label">Tipo de elemento GLPI</label><select class="form-select" name="itemtype"><option value="">Todos</option><?php foreach($assetTypes as $type): ?><option value="<?=hhReportEscape($type)?>" <?=$typeFilter===$type?'selected':''?>><?=hhReportEscape($type::getTypeName(1))?></option><?php endforeach; ?></select></div>
@@ -294,7 +302,17 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
    <p class="text-muted small mt-3 mb-0">Indicadores para priorizar revisión técnica; no ordenan reemplazos automáticamente.</p>
   </div></section></div>
  </div>
-<div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Inventario completo y reparaciones asociadas</h3><span class="text-muted small"><?=number_format($totalAssets)?> activos</span></div>
+
+ <div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title mb-0">Reparaciones finalizadas por mes</h3><span class="text-muted small"><?=$year?></span></div>
+  <div class="card-body">
+   <div class="d-flex gap-4 mb-2"><div><div class="text-muted small">Retornos confirmados</div><strong><?=number_format(array_sum($monthlyRepairs))?></strong></div><div><div class="text-muted small">Promedio mensual</div><strong><?=number_format(array_sum($monthlyRepairs)/12,1)?></strong></div></div>
+   <div class="repair-month-bars"><?php foreach($monthlyRepairs as $i=>$count): $height=($count/$maxMonthlyRepairs)*112; ?><div class="repair-month-col" title="<?=$count?> reparaciones"><strong class="small"><?=$count?></strong><div class="repair-month-bar" style="height:<?=$height?>px"></div><span class="repair-month-label"><?=$labels[$i]?></span></div><?php endforeach; ?></div>
+   <p class="text-muted small mb-0 mt-2">Se cuentan cotizaciones aprobadas con fecha de retorno registrada, agrupadas por mes de retorno.</p>
+  </div>
+ </div>
+ <div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Inventario completo y reparaciones asociadas</h3><span class="text-muted small"><?=number_format($totalAssets)?> activos</span></div>
   <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>Tipo elemento GLPI</th><th>Tipo activo</th><th>Modelo</th><th>Activo</th><th>Activo fijo</th><th>Serie</th><th>Fabricante</th><th>Compra</th><th>Antigüedad</th><th>Fin garantía</th><th>Estado actual</th><th>Guía proveedor</th><th class="text-end">Cotiz. aprobadas</th><th class="text-end">Retornos</th><th class="text-end">Repuestos (unid.)</th><th>Último retorno</th><th class="text-end">Puntos aprobados</th></tr></thead><tbody>
   <?php foreach($inventory as $asset): ?><tr><td><?=hhReportEscape($asset['type_name'])?></td><td><?=hhReportEscape($asset['subtype_name'])?></td><td><?=hhReportEscape($asset['model_name'])?></td><td><?=hhReportEscape($asset['name'])?></td><td><?=hhReportEscape($asset['otherserial'])?></td><td><?=hhReportEscape($asset['serial'])?></td><td><?=hhReportEscape($asset['manufacturer'])?></td><td><?=hhReportEscape($asset['purchase_date'])?></td><td><?=hhReportEscape($asset['age_label'])?></td><td><?=hhReportEscape($asset['warranty_end'])?></td><td><?php if($asset['currently_in_repair']): ?><span class="badge bg-warning text-dark">En reparación</span><?php else: ?><span class="badge bg-success">En inventario</span><?php endif; ?></td><td><?=hhReportEscape($asset['active_repair_guide'])?></td><td class="text-end"><?=number_format((int)$asset['repair_count'])?></td><td class="text-end"><?=number_format((int)$asset['completed_repairs'])?></td><td class="text-end"><?=number_format((float)$asset['parts_units'],2)?></td><td><?=hhReportEscape($asset['last_returned_at'])?></td><td class="text-end"><?=number_format((float)$asset['points_consumed'],2)?></td></tr><?php endforeach; ?>
   <?php if($inventory===[]): ?><tr><td colspan="17" class="text-center text-muted p-4">No se encontraron activos para los filtros seleccionados.</td></tr><?php endif; ?>
