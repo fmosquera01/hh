@@ -238,14 +238,39 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
 .hh-reports .repair-month-col{height:100%;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:6px}
 .hh-reports .repair-month-bar{width:min(24px,70%);min-height:2px;border-radius:5px 5px 0 0;background:var(--tblr-primary)}
 .hh-reports .repair-month-label{font-size:10px;color:var(--tblr-muted)}
+.hh-reports .kpi{box-shadow:0 2px 8px rgba(20,40,70,.045);transition:transform .18s ease,box-shadow .18s ease}
+.hh-reports .kpi:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(20,40,70,.09)}
+.hh-reports .card{border:1px solid var(--tblr-border-color);border-radius:12px;box-shadow:0 2px 10px rgba(20,40,70,.035);overflow:hidden}
+.hh-reports .card-header{background:var(--tblr-bg-surface-secondary);min-height:48px}
+.hh-reports .analysis-card{box-shadow:0 2px 8px rgba(20,40,70,.035)}
+.hh-reports .table-responsive.hh-touch-scroll{position:relative;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x pan-y;scrollbar-width:thin}
+.hh-reports .table-responsive.hh-touch-scroll table{min-width:max-content}
+.hh-reports .hh-scroll-top{height:18px;overflow-x:auto;overflow-y:hidden;margin:0 14px 5px;border:1px solid var(--tblr-border-color);border-radius:10px;background:var(--tblr-bg-surface-secondary);-webkit-overflow-scrolling:touch;touch-action:pan-x;scrollbar-width:thin}
+.hh-reports .hh-scroll-top-inner{height:1px}
+.hh-reports .hh-table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--tblr-border-color)}
+.hh-reports .hh-table-hint{font-size:12px;color:var(--tblr-muted)}
+.hh-reports .hh-section-toggle{display:inline-flex;align-items:center;gap:7px}
+.hh-reports .hh-hero{padding:18px 20px;border-radius:14px;background:linear-gradient(115deg,var(--tblr-bg-surface),var(--tblr-bg-surface-secondary));border:1px solid var(--tblr-border-color)}
+.hh-reports .hh-reports-subtitle{color:var(--tblr-muted);font-size:13px}
 @page{size:landscape;margin:10mm}
-
-@media print{.hh-no-print,#page,.navbar,.sidebar{display:none!important}.hh-reports{font-size:10px}.hh-reports .card,.hh-reports .analysis-card{break-inside:avoid;box-shadow:none!important}.hh-reports .table-responsive{overflow:visible!important}.hh-reports .table{font-size:9px}}
+@media(max-width:767px){.hh-reports .chart-bars{gap:3px}.hh-reports .chart-pair{gap:2px}.hh-reports .chart-bar{width:9px}.hh-reports .metric-row{grid-template-columns:82px 1fr 28px;gap:6px}.hh-reports .hh-table-hint{width:100%}}
+@media print{
+ body *{visibility:hidden!important}
+ .hh-reports,.hh-reports *{visibility:visible!important}
+ .hh-reports{position:absolute!important;left:0!important;top:0!important;width:100%!important;font-size:10px!important;background:#fff!important;color:#111!important}
+ .hh-no-print,.navbar,.sidebar,#header,.glpi-breadcrumb,.hh-scroll-top,.hh-table-toolbar{display:none!important}
+ .hh-reports .card,.hh-reports .analysis-card{break-inside:avoid;box-shadow:none!important}
+ .hh-reports .table-responsive{display:block!important;overflow:visible!important;max-width:none!important}
+ .hh-reports .table{font-size:8px!important;white-space:normal!important}
+ .hh-reports .table th,.hh-reports .table td{white-space:normal!important}
+ .hh-reports #hh-inventory-content[hidden],.hh-reports #hh-parts-content[hidden]{display:block!important}
+ .hh-reports .hh-hero{background:#fff!important}
+}
 
 </style>
 <div class="container-fluid hh-reports">
- <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-  <div><h2 class="mb-1">Dashboard gerencial HH</h2><div class="text-muted">Inventario global y comportamiento de reparaciones y puntos</div></div>
+ <div class="hh-hero d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+  <div><h2 class="mb-1">Dashboard gerencial HH</h2><div class="hh-reports-subtitle">Visión ejecutiva del inventario, reparaciones, garantías y consumo de puntos</div></div>
   <div class="d-flex gap-2 flex-wrap hh-no-print">
    <a class="btn btn-outline-success" href="?<?=hhReportEscape(http_build_query(array_merge($_GET, ['export' => 'excel'])))?>">Exportar Excel (CSV)</a>
    <button class="btn btn-outline-danger" type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
@@ -287,8 +312,6 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
    <p class="text-muted small mt-3 mb-0">La ausencia de reparaciones en HH no implica que el activo nunca haya sido reparado fuera del sistema.</p>
   </div></div></div>
  </div>
- <div class="card">
-  
  <div class="row g-3 mb-3">
   <div class="col-xl-4"><section class="analysis-card"><div class="analysis-head">Antigüedad del inventario</div><div class="analysis-body">
    <?php foreach($ageBuckets as $label=>$value): $width=($value/$maxAgeBucket)*100; ?><div class="metric-row"><span><?=hhReportEscape($label)?></span><div class="metric-track"><div class="metric-fill <?=$label==='7+ años'?'danger':($label==='5–6 años'?'warning':'')?>" style="width:<?=$width?>%"></div></div><strong class="text-end"><?=$value?></strong></div><?php endforeach; ?>
@@ -324,14 +347,29 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
    <p class="text-muted small mb-0 mt-2">Se cuentan cotizaciones aprobadas con fecha de retorno registrada, agrupadas por mes de retorno.</p>
   </div>
  </div>
- <div class="card">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Inventario completo y reparaciones asociadas</h3><span class="text-muted small"><?=number_format($totalAssets)?> activos</span></div>
-  <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>Tipo elemento GLPI</th><th>Tipo activo</th><th>Modelo</th><th>Activo</th><th>Activo fijo</th><th>Serie</th><th>Fabricante</th><th>Compra</th><th>Antigüedad</th><th>Fin garantía</th><th>Estado actual</th><th>Guía proveedor</th><th class="text-end">Cotiz. aprobadas</th><th class="text-end">Retornos</th><th class="text-end">Repuestos (unid.)</th><th>Último retorno</th><th class="text-end">Puntos aprobados</th></tr></thead><tbody>
+ <div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Inventario completo</h3><span class="text-muted small"><?=number_format($totalAssets)?> activos</span></div>
+  <div class="hh-table-toolbar hh-no-print"><span class="hh-table-hint">La tabla se mantiene oculta para facilitar la lectura del dashboard. Ábrela cuando necesites revisar el detalle.</span><button class="btn btn-outline-primary btn-sm hh-section-toggle" type="button" id="hh-toggle-inventory" aria-expanded="false" aria-controls="hh-inventory-content"><span id="hh-toggle-inventory-icon">＋</span><span id="hh-toggle-inventory-label">Visualizar inventario</span></button></div>
+  <div id="hh-inventory-content" hidden><div class="hh-scroll-top hh-no-print" id="hh-inventory-scroll-top" aria-label="Desplazamiento horizontal de inventario"><div class="hh-scroll-top-inner" id="hh-inventory-scroll-inner"></div></div>
+  <div class="table-responsive hh-touch-scroll" id="hh-inventory-scroll"><table class="table table-hover table-striped mb-0"><thead><tr><th>Tipo elemento GLPI</th><th>Tipo activo</th><th>Modelo</th><th>Activo</th><th>Activo fijo</th><th>Serie</th><th>Fabricante</th><th>Compra</th><th>Antigüedad</th><th>Fin garantía</th><th>Estado actual</th><th>Guía proveedor</th><th class="text-end">Cotiz. aprobadas</th><th class="text-end">Retornos</th><th class="text-end">Repuestos (unid.)</th><th>Último retorno</th><th class="text-end">Puntos aprobados</th></tr></thead><tbody>
   <?php foreach($inventory as $asset): ?><tr><td><?=hhReportEscape($asset['type_name'])?></td><td><?=hhReportEscape($asset['subtype_name'])?></td><td><?=hhReportEscape($asset['model_name'])?></td><td><?=hhReportEscape($asset['name'])?></td><td><?=hhReportEscape($asset['otherserial'])?></td><td><?=hhReportEscape($asset['serial'])?></td><td><?=hhReportEscape($asset['manufacturer'])?></td><td><?=hhReportEscape($asset['purchase_date'])?></td><td><?=hhReportEscape($asset['age_label'])?></td><td><?=hhReportEscape($asset['warranty_end'])?></td><td><?php if($asset['currently_in_repair']): ?><span class="badge bg-warning text-dark">En reparación</span><?php else: ?><span class="badge bg-success">En inventario</span><?php endif; ?></td><td><?=hhReportEscape($asset['active_repair_guide'])?></td><td class="text-end"><?=number_format((int)$asset['repair_count'])?></td><td class="text-end"><?=number_format((int)$asset['completed_repairs'])?></td><td class="text-end"><?=number_format((float)$asset['parts_units'],2)?></td><td><?=hhReportEscape($asset['last_returned_at'])?></td><td class="text-end"><?=number_format((float)$asset['points_consumed'],2)?></td></tr><?php endforeach; ?>
   <?php if($inventory===[]): ?><tr><td colspan="17" class="text-center text-muted p-4">No se encontraron activos para los filtros seleccionados.</td></tr><?php endif; ?>
   </tbody></table></div>
  </div>
- <div class="card mt-3"><div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title mb-0">Repuestos registrados en reparaciones con retorno confirmado</h3><span class="text-muted small"><?=number_format(count($partHistory))?> líneas</span></div><div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>Activo</th><th>Cotización</th><th>Fecha retorno</th><th>Código</th><th>Repuesto</th><th class="text-end">Cantidad</th><th class="text-end">Puntos</th></tr></thead><tbody><?php foreach($partHistory as $line): $assetLabel=$line['itemtype'].' #'.$line['items_id']; foreach($inventory as $candidate){if($candidate['itemtype']===$line['itemtype']&&(int)$candidate['id']===(int)$line['items_id']){$assetLabel=$candidate['name'];break;}} ?><tr><td><?=hhReportEscape($assetLabel)?></td><td><?=hhReportEscape($line['quote_name'])?></td><td><?=hhReportEscape($line['returned_at'])?></td><td><?=hhReportEscape($line['code'])?></td><td><?=hhReportEscape($line['description'])?></td><td class="text-end"><?=number_format((float)$line['quantity'],2)?></td><td class="text-end"><?=number_format((float)$line['points'],2)?></td></tr><?php endforeach; ?><?php if($partHistory===[]): ?><tr><td colspan="7" class="text-center text-muted p-4">Todavía no hay repuestos asociados a reparaciones aprobadas con fecha de retorno registrada.</td></tr><?php endif; ?></tbody></table></div></div>
+ <div class="card mt-3"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Repuestos registrados en reparaciones con retorno confirmado</h3><span class="text-muted small"><?=number_format(count($partHistory))?> líneas</span></div><div class="hh-table-toolbar hh-no-print"><span class="hh-table-hint">Detalle de repuestos instalados según retornos confirmados.</span><button class="btn btn-outline-primary btn-sm hh-section-toggle" type="button" id="hh-toggle-parts" aria-expanded="false" aria-controls="hh-parts-content"><span id="hh-toggle-parts-icon">＋</span><span id="hh-toggle-parts-label">Visualizar repuestos</span></button></div><div id="hh-parts-content" hidden><div class="hh-scroll-top hh-no-print" id="hh-parts-scroll-top" aria-label="Desplazamiento horizontal de repuestos"><div class="hh-scroll-top-inner" id="hh-parts-scroll-inner"></div></div><div class="table-responsive hh-touch-scroll" id="hh-parts-scroll"><table class="table table-hover table-striped mb-0"><thead><tr><th>Activo</th><th>Cotización</th><th>Fecha retorno</th><th>Código</th><th>Repuesto</th><th class="text-end">Cantidad</th><th class="text-end">Puntos</th></tr></thead><tbody><?php foreach($partHistory as $line): $assetLabel=$line['itemtype'].' #'.$line['items_id']; foreach($inventory as $candidate){if($candidate['itemtype']===$line['itemtype']&&(int)$candidate['id']===(int)$line['items_id']){$assetLabel=$candidate['name'];break;}} ?><tr><td><?=hhReportEscape($assetLabel)?></td><td><?=hhReportEscape($line['quote_name'])?></td><td><?=hhReportEscape($line['returned_at'])?></td><td><?=hhReportEscape($line['code'])?></td><td><?=hhReportEscape($line['description'])?></td><td class="text-end"><?=number_format((float)$line['quantity'],2)?></td><td class="text-end"><?=number_format((float)$line['points'],2)?></td></tr><?php endforeach; ?><?php if($partHistory===[]): ?><tr><td colspan="7" class="text-center text-muted p-4">Todavía no hay repuestos asociados a reparaciones aprobadas con fecha de retorno registrada.</td></tr><?php endif; ?></tbody></table></div></div></div>
  <div class="alert alert-info mt-3 mb-0"><strong>Criterio de ejecución:</strong> una cotización aprobada se considera reparación con retorno confirmado solo cuando tiene fecha de retorno registrada. Los repuestos se contabilizan desde el detalle de esa cotización; los borradores, rechazados y aprobados sin retorno no se presentan como piezas instaladas. El inventario se puede exportar en CSV compatible con Excel y el informe completo se puede imprimir o guardar como PDF desde el navegador.</div>
+<script>
+(function(){
+ const toggleSection=(buttonId,contentId,labelId,iconId,openText,closeText)=>{
+  const button=document.getElementById(buttonId),content=document.getElementById(contentId);if(!button||!content)return;
+  button.addEventListener('click',()=>{const opening=content.hidden;content.hidden=!opening;button.setAttribute('aria-expanded',opening?'true':'false');document.getElementById(labelId).textContent=opening?closeText:openText;document.getElementById(iconId).textContent=opening?'−':'＋';if(opening)content.querySelectorAll('.hh-touch-scroll').forEach(el=>el.dispatchEvent(new Event('hh:refresh-scroll')));});
+ };
+ toggleSection('hh-toggle-inventory','hh-inventory-content','hh-toggle-inventory-label','hh-toggle-inventory-icon','Visualizar inventario','Ocultar inventario');
+ toggleSection('hh-toggle-parts','hh-parts-content','hh-toggle-parts-label','hh-toggle-parts-icon','Visualizar repuestos','Ocultar repuestos');
+ const connectScroll=(topId,innerId,tableId)=>{const top=document.getElementById(topId),inner=document.getElementById(innerId),table=document.getElementById(tableId);if(!top||!inner||!table)return;let syncing=false;const refresh=()=>{inner.style.width=table.scrollWidth+'px';top.scrollLeft=table.scrollLeft;};top.addEventListener('scroll',()=>{if(syncing)return;syncing=true;table.scrollLeft=top.scrollLeft;syncing=false;});table.addEventListener('scroll',()=>{if(syncing)return;syncing=true;top.scrollLeft=table.scrollLeft;syncing=false;});table.addEventListener('hh:refresh-scroll',refresh);window.addEventListener('resize',refresh,{passive:true});if(window.ResizeObserver)new ResizeObserver(refresh).observe(table);refresh();};
+ connectScroll('hh-inventory-scroll-top','hh-inventory-scroll-inner','hh-inventory-scroll');
+ connectScroll('hh-parts-scroll-top','hh-parts-scroll-inner','hh-parts-scroll');
+})();
+</script>
 </div>
 <?php Html::footer(); ?>
