@@ -396,35 +396,4 @@ final class RepairAnalytics
         return $dates;
     }
 
-        $ticketId = (int)($quote['tickets_id'] ?? 0);
-        $table = 'glpi_plugin_fields_ticketreparacions';
-        if ($ticketId < 1 || !$DB->tableExists($table)) {
-            return '';
-        }
-        foreach ([
-            ['field' => 'fecharecepcionguiafieldtwo', 'container' => 15],
-            ['field' => 'fecharecepcionguiafield', 'container' => 1],
-        ] as $definition) {
-            $field = $definition['field'];
-            if (!$DB->fieldExists($table, $field)) {
-                continue;
-            }
-            foreach ($DB->request([
-                'SELECT' => [$field],
-                'FROM' => $table,
-                'WHERE' => [
-                    'items_id' => $ticketId,
-                    'itemtype' => 'Ticket',
-                    'plugin_fields_containers_id' => $definition['container'],
-                ],
-                'LIMIT' => 1,
-            ]) as $row) {
-                $date = trim((string)($row[$field] ?? ''));
-                if ($date !== '' && !str_starts_with($date, '0000-00-00')) {
-                    return $date;
-                }
-            }
-        }
-        return '';
-    }
 }
