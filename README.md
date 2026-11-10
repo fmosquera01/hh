@@ -27,12 +27,21 @@ La versión 0.5.0 incorpora el primer módulo de reportes gerenciales en modo le
 - `setup.php`: metadatos, compatibilidad GLPI 11 y registro de pestaña.
 - `hook.php`: tablas del plugin y migración aditiva del catálogo maestro, compatibilidad por tipo/modelo y cabecera/detalle de cotizaciones.
 - `src/Dashboard.php`: entrada del plugin en el menú.
-- `src/RepairTab.php`: experiencia visual dentro de la ficha de activo.\n- `src/Reports.php`: consultas de inventario, reparaciones aprobadas y movimientos de puntos.\n- `front/reports.php`: dashboard gerencial e inventario completo.
+- `src/RepairTab.php`: experiencia visual dentro de la ficha de activo.
+- `src/Reports.php`: consultas de inventario, reparaciones aprobadas y movimientos de puntos.
+- `front/reports.php`: dashboard gerencial e inventario completo.
 - `front/index.php`: pantalla de entrada del plugin.
 
 Las tablas existentes con prefijo `glpi_plugin_hh_` se conservan. La estructura ahora contempla catálogo maestro de ítems (`glpi_plugin_hh_items`), asignación por tipo/modelo (`glpi_plugin_hh_itemtypes`), cabecera (`glpi_plugin_hh_quotes`) y detalle (`glpi_plugin_hh_quotedetails`). Las migraciones agregan columnas faltantes sin borrar los datos existentes. La interfaz todavía no guarda cotizaciones.
 
-## Reportes gerenciales (0.5.0)\n\n- El acceso se controla con el permiso independiente **Consultar reportes gerenciales** en la matriz del perfil HH. No se concede automáticamente para evitar exponer información gerencial a perfiles que solo tenían lectura operativa.\n- El inventario se obtiene de los tipos registrados en `$CFG_GLPI['asset_types']`; los activos personalizados se filtran por su definición para evitar duplicados en la tabla compartida de GLPI 11.\n- El cruce de reparaciones de esta primera entrega contabiliza cotizaciones HH con estado `approved`. No equivale necesariamente a una reparación físicamente completada; se mejorará el criterio al incorporar estados de recepción y cierre.\n- La exportación Excel/PDF y el análisis de renovación tecnológica se implementarán en fases posteriores.\n\n## Instalar en entorno de pruebas
+## Reportes gerenciales (0.5.0)
+
+- El acceso se controla con el permiso independiente **Consultar reportes gerenciales** en la matriz del perfil HH. No se concede automáticamente para evitar exponer información gerencial a perfiles que solo tenían lectura operativa.
+- El inventario se obtiene de los tipos registrados en `$CFG_GLPI['asset_types']`; los activos personalizados se filtran por su definición para evitar duplicados en la tabla compartida de GLPI 11.
+- El cruce de reparaciones de esta primera entrega contabiliza cotizaciones HH con estado `approved`. No equivale necesariamente a una reparación físicamente completada; se mejorará el criterio al incorporar estados de recepción y cierre.
+- La exportación Excel/PDF y el análisis de renovación tecnológica se implementarán en fases posteriores.
+
+## Instalar en entorno de pruebas
 
 1. Copiar/actualizar el repositorio completo en `<GLPI_ROOT>/plugins/hh`.
 2. Confirmar que el directorio se llame exactamente `hh`.
