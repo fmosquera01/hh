@@ -14,7 +14,34 @@ $year = filter_var($_GET['year'] ?? date('Y'), FILTER_VALIDATE_INT);
 $year = ($year !== false && $year >= 2000 && $year <= 2100) ? (int) $year : (int) date('Y');
 $search = trim((string) ($_GET['q'] ?? ''));
 $typeFilter = trim((string) ($_GET['itemtype'] ?? ''));
-$inventory = Reports::getInventory($search, $typeFilter !== '' ? $typeFilter : null);
+$subtypeFilter = trim((string) ($_GET['subtype'] ?? ''));
+$modelFilter = trim((string) ($_GET['model'] ?? ''));
+$baseInventory = Reports::getInventory($search, $typeFilter !== '' ? $typeFilter : null);
+
+$subtypeOptions = [];
+$modelOptions = [];
+foreach ($baseInventory as $asset) {
+    if ((int) $asset['subtype_id'] > 0 && $asset['subtype_name'] !== '') {
+        $key = $asset['itemtype'] . ':' . (int) $asset['subtype_id'];
+        $subtypeOptions[$key] = $asset['type_name'] . ' — ' . $asset['subtype_name'];
+    }
+}
+foreach ($baseInventory as $asset) {
+    $subtypeKey = $asset['itemtype'] . ':' . (int) $asset['subtype_id'];
+    if ((int) $asset['model_id'] > 0 && $asset['model_name'] !== ''
+        && ($subtypeFilter === '' || $subtypeFilter === $subtypeKey)) {
+        $key = $asset['itemtype'] . ':' . (int) $asset['model_id'];
+        $modelOptions[$key] = $asset['type_name'] . ' — ' . $asset['model_name'];
+    }
+}
+asort($subtypeOptions);
+asort($modelOptions);
+$inventory = array_values(array_filter($baseInventory, static function (array $asset) use ($subtypeFilter, $modelFilter): bool {
+    $subtypeKey = $asset['itemtype'] . ':' . (int) $asset['subtype_id'];
+    $modelKey = $asset['itemtype'] . ':' . (int) $asset['model_id'];
+    return ($subtypeFilter === '' || $subtypeFilter === $subtypeKey)
+        && ($modelFilter === '' || $modelFilter === $modelKey);
+}));
 $months = Reports::getPointMovements($year);
 $totalAssets = count($inventory);
 $repairedAssets = count(array_filter($inventory, static fn(array $asset): bool => $asset['repair_count'] > 0));
@@ -42,9 +69,11 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
  </div>
  <form method="get" class="card card-body mb-3">
   <div class="row g-2 align-items-end">
-   <div class="col-sm-3"><label class="form-label">Año de análisis</label><select class="form-select" name="year"><?php for($y=(int)date('Y');$y>=(int)date('Y')-5;$y--): ?><option value="<?=$y?>" <?=$year===$y?'selected':''?>><?=$y?></option><?php endfor; ?></select></div>
-   <div class="col-sm-4"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype"><option value="">Todos los tipos</option><?php foreach($assetTypes as $type): ?><option value="<?=hhReportEscape($type)?>" <?=$typeFilter===$type?'selected':''?>><?=hhReportEscape($type::getTypeName(1))?></option><?php endforeach; ?></select></div>
-   <div class="col-sm-3"><label class="form-label">Buscar activo</label><input class="form-control" name="q" value="<?=hhReportEscape($search)?>" placeholder="Nombre, serie o activo fijo"></div>
+   <div class="col-sm-2"><label class="form-label">Año de análisis</label><select class="form-select" name="year"><?php for($y=(int)date('Y');$y>=(int)date('Y')-5;$y--): ?><option value="<?=$y?>" <?=$year===$y?'selected':''?>><?=$y?></option><?php endfor; ?></select></div>
+   <div class="col-sm-2"><label class="form-label">Tipo de elemento GLPI</label><select class="form-select" name="itemtype"><option value="">Todos</option><?php foreach($assetTypes as $type): ?><option value="<?=hhReportEscape($type)?>" <?=$typeFilter===$type?'selected':''?>><?=hhReportEscape($type::getTypeName(1))?></option><?php endforeach; ?></select></div>
+   <div class="col-sm-2"><label class="form-label">Tipo de activo</label><select class="form-select" name="subtype"><option value="">Todos</option><?php foreach($subtypeOptions as $key=>$label): ?><option value="<?=hhReportEscape($key)?>" <?=$subtypeFilter===$key?'selected':''?>><?=hhReportEscape($label)?></option><?php endforeach; ?></select></div>
+   <div class="col-sm-2"><label class="form-label">Modelo</label><select class="form-select" name="model"><option value="">Todos</option><?php foreach($modelOptions as $key=>$label): ?><option value="<?=hhReportEscape($key)?>" <?=$modelFilter===$key?'selected':''?>><?=hhReportEscape($label)?></option><?php endforeach; ?></select></div>
+   <div class="col-sm-2"><label class="form-label">Buscar activo</label><input class="form-control" name="q" value="<?=hhReportEscape($search)?>" placeholder="Nombre, serie o activo fijo"></div>
    <div class="col-sm-2"><button class="btn btn-primary w-100" type="submit">Aplicar</button></div>
   </div>
  </form>
@@ -69,9 +98,9 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
  </div>
  <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Inventario completo y reparaciones asociadas</h3><span class="text-muted small"><?=number_format($totalAssets)?> activos</span></div>
-  <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>Tipo</th><th>Activo</th><th>Activo fijo</th><th>Serie</th><th>Fabricante</th><th>Compra</th><th>Fin garantía</th><th class="text-end">Reparaciones</th><th class="text-end">Puntos aprobados</th></tr></thead><tbody>
-  <?php foreach($inventory as $asset): ?><tr><td><?=hhReportEscape($asset['type_name'])?></td><td><?=hhReportEscape($asset['name'])?></td><td><?=hhReportEscape($asset['otherserial'])?></td><td><?=hhReportEscape($asset['serial'])?></td><td><?=hhReportEscape($asset['manufacturer'])?></td><td><?=hhReportEscape($asset['purchase_date'])?></td><td><?=hhReportEscape($asset['warranty_end'])?></td><td class="text-end"><?=number_format((int)$asset['repair_count'])?></td><td class="text-end"><?=number_format((float)$asset['points_consumed'],2)?></td></tr><?php endforeach; ?>
-  <?php if($inventory===[]): ?><tr><td colspan="9" class="text-center text-muted p-4">No se encontraron activos para los filtros seleccionados.</td></tr><?php endif; ?>
+  <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>Tipo elemento GLPI</th><th>Tipo activo</th><th>Modelo</th><th>Activo</th><th>Activo fijo</th><th>Serie</th><th>Fabricante</th><th>Compra</th><th>Fin garantía</th><th class="text-end">Reparaciones</th><th class="text-end">Puntos aprobados</th></tr></thead><tbody>
+  <?php foreach($inventory as $asset): ?><tr><td><?=hhReportEscape($asset['type_name'])?></td><td><?=hhReportEscape($asset['subtype_name'])?></td><td><?=hhReportEscape($asset['model_name'])?></td><td><?=hhReportEscape($asset['name'])?></td><td><?=hhReportEscape($asset['otherserial'])?></td><td><?=hhReportEscape($asset['serial'])?></td><td><?=hhReportEscape($asset['manufacturer'])?></td><td><?=hhReportEscape($asset['purchase_date'])?></td><td><?=hhReportEscape($asset['warranty_end'])?></td><td class="text-end"><?=number_format((int)$asset['repair_count'])?></td><td class="text-end"><?=number_format((float)$asset['points_consumed'],2)?></td></tr><?php endforeach; ?>
+  <?php if($inventory===[]): ?><tr><td colspan="11" class="text-center text-muted p-4">No se encontraron activos para los filtros seleccionados.</td></tr><?php endif; ?>
   </tbody></table></div>
  </div>
  <div class="alert alert-info mt-3 mb-0"><strong>Alcance de esta primera entrega:</strong> consulta de activos registrados en los tipos habilitados en GLPI, incluidas las definiciones personalizadas, y cruce con cotizaciones aprobadas de HH. Las exportaciones Excel/PDF, análisis de renovación y filtros financieros avanzados se incorporarán en las siguientes etapas.</div>
