@@ -14,42 +14,59 @@ Rights::require(Rights::REPORTS);
 $year = filter_var($_GET['year'] ?? date('Y'), FILTER_VALIDATE_INT);
 $year = ($year !== false && $year >= 2000 && $year <= 2100) ? (int) $year : (int) date('Y');
 $search = trim((string) ($_GET['q'] ?? ''));
+$assetTypes = Reports::getAssetTypes();
 $typeFilter = trim((string) ($_GET['itemtype'] ?? ''));
 $subtypeFilter = trim((string) ($_GET['subtype'] ?? ''));
 $modelFilter = trim((string) ($_GET['model'] ?? ''));
+
+// Initial dashboard view: Phone + HANDHELD. Explicit user selections always win.
+if (!array_key_exists('itemtype', $_GET) && in_array('Phone', $assetTypes, true)) {
+    $typeFilter = 'Phone';
+}
 $baseInventory = Reports::getInventory($search, $typeFilter !== '' ? $typeFilter : null);
-// Enforce the selected GLPI itemtype again at the presentation layer.
-// This prevents subtype/model options from leaking across asset classes.
+// Apply the class constraint independently of the inventory query.
 if ($typeFilter !== '') {
     $baseInventory = array_values(array_filter(
         $baseInventory,
-        static fn(array $asset): bool => (string)($asset['itemtype'] ?? '') === $typeFilter
+        static fn(array $asset): bool => ($asset['itemtype'] ?? '') === $typeFilter
     ));
 }
 
+// Build one option per real dropdown ID, using only assets from the selected GLPI class.
 $subtypeOptions = [];
-$modelOptions = [];
 foreach ($baseInventory as $asset) {
-    if ((int) $asset['subtype_id'] > 0 && $asset['subtype_name'] !== '') {
-        $key = $asset['itemtype'] . ':' . (int) $asset['subtype_id'];
-        $subtypeOptions[$key] = $asset['type_name'] . ' — ' . $asset['subtype_name'];
+    $id = (int) ($asset['subtype_id'] ?? 0);
+    $name = trim((string) ($asset['subtype_name'] ?? ''));
+    if ($id > 0 && $name !== '') {
+        $subtypeOptions[$asset['itemtype'] . ':' . $id] = $name;
     }
 }
-asort($subtypeOptions);
-// A subtype from a previously selected GLPI itemtype is no longer valid.
+asort($subtypeOptions, SORT_NATURAL | SORT_FLAG_CASE);
+
+// Initial subtype is HANDHELD, but only when it exists for the selected GLPI class.
+if (!array_key_exists('subtype', $_GET) && $typeFilter === 'Phone') {
+    foreach ($subtypeOptions as $key => $label) {
+        if (mb_strtolower(trim($label)) === 'handheld') {
+            $subtypeFilter = $key;
+            break;
+        }
+    }
+}
 if ($subtypeFilter !== '' && !array_key_exists($subtypeFilter, $subtypeOptions)) {
     $subtypeFilter = '';
 }
+
+// Model options are unique model IDs and are constrained by both selected GLPI class and subtype.
 $modelOptions = [];
 foreach ($baseInventory as $asset) {
-    $subtypeKey = $asset['itemtype'] . ':' . (int)$asset['subtype_id'];
-    if ((int)$asset['model_id'] > 0 && $asset['model_name'] !== ''
-        && ($subtypeFilter === '' || $subtypeFilter === $subtypeKey)) {
-        $key = $asset['itemtype'] . ':' . (int)$asset['model_id'];
-        $modelOptions[$key] = $asset['type_name'] . ' — ' . $asset['model_name'];
+    $subtypeKey = ($asset['itemtype'] ?? '') . ':' . (int) ($asset['subtype_id'] ?? 0);
+    $id = (int) ($asset['model_id'] ?? 0);
+    $name = trim((string) ($asset['model_name'] ?? ''));
+    if ($id > 0 && $name !== '' && ($subtypeFilter === '' || $subtypeFilter === $subtypeKey)) {
+        $modelOptions[$asset['itemtype'] . ':' . $id] = $name;
     }
 }
-asort($modelOptions);
+asort($modelOptions, SORT_NATURAL | SORT_FLAG_CASE);
 if ($modelFilter !== '' && !array_key_exists($modelFilter, $modelOptions)) {
     $modelFilter = '';
 }
@@ -85,8 +102,6 @@ $totalPartLines = count($partHistory);
 $totalPurchased = array_sum(array_column($months, 'purchased'));
 $totalConsumed = array_sum(array_column($months, 'consumed'));
 $maxPoints = max(1.0, ...array_column($months, 'consumed'), ...array_column($months, 'purchased'));
-$assetTypes = Reports::getAssetTypes();
-
 function hhReportEscape(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
