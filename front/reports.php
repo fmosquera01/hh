@@ -132,6 +132,35 @@ $totalPartLines = count($partHistory);
 $totalPurchased = array_sum(array_column($months, 'purchased'));
 $totalConsumed = array_sum(array_column($months, 'consumed'));
 $maxPoints = max(1.0, ...array_column($months, 'consumed'), ...array_column($months, 'purchased'));
+
+$ageBuckets = ['< 1 año' => 0, '1–2 años' => 0, '3–4 años' => 0, '5–6 años' => 0, '7+ años' => 0, 'Sin fecha' => 0];
+$warrantyBuckets = ['Vigente' => 0, 'Vencida' => 0, 'Sin información' => 0];
+$modelRepairs = [];
+$mostRepairedAssets = [];
+foreach ($inventory as $asset) {
+    $age = $asset['age_years'];
+    if ($age === null) $ageBuckets['Sin fecha']++;
+    elseif ($age < 1) $ageBuckets['< 1 año']++;
+    elseif ($age < 3) $ageBuckets['1–2 años']++;
+    elseif ($age < 5) $ageBuckets['3–4 años']++;
+    elseif ($age < 7) $ageBuckets['5–6 años']++;
+    else $ageBuckets['7+ años']++;
+    $end = trim((string) ($asset['warranty_end'] ?? ''));
+    if ($end === '' || $end === '0000-00-00') $warrantyBuckets['Sin información']++;
+    elseif ($end >= $today->format('Y-m-d')) $warrantyBuckets['Vigente']++;
+    else $warrantyBuckets['Vencida']++;
+    $model = trim((string) ($asset['model_name'] ?? '')) ?: 'Modelo no especificado';
+    if (!isset($modelRepairs[$model])) $modelRepairs[$model] = ['model'=>$model,'repairs'=>0];
+    $modelRepairs[$model]['repairs'] += (int) ($asset['repair_count'] ?? 0);
+    if ((int) ($asset['repair_count'] ?? 0) > 0) $mostRepairedAssets[] = $asset;
+}
+usort($modelRepairs, static fn(array $a,array $b): int => $b['repairs'] <=> $a['repairs']);
+$modelRepairs = array_slice($modelRepairs, 0, 8);
+usort($mostRepairedAssets, static fn(array $a,array $b): int => (int)$b['repair_count'] <=> (int)$a['repair_count']);
+$mostRepairedAssets = array_slice($mostRepairedAssets, 0, 8);
+$maxAgeBucket = max(1, ...array_values($ageBuckets));
+$maxWarrantyBucket = max(1, ...array_values($warrantyBuckets));
+
 function hhReportEscape(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -141,11 +170,26 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
 ?>
 <style>
 .hh-reports{font-size:13px}.hh-reports .kpi{border:1px solid var(--tblr-border-color);border-radius:9px;padding:16px;height:100%;background:var(--tblr-bg-surface)}.hh-reports .kpi-label{color:var(--tblr-muted);font-size:12px}.hh-reports .kpi-value{font-size:1.65rem;font-weight:700;line-height:1.3}.hh-reports .chart-bars{display:grid;grid-template-columns:repeat(12,minmax(22px,1fr));gap:8px;align-items:end;height:190px;padding:10px 4px 0}.hh-reports .chart-col{display:flex;flex-direction:column;align-items:center;justify-content:end;height:100%;gap:5px}.hh-reports .chart-pair{display:flex;align-items:end;justify-content:center;gap:3px;height:145px;width:100%}.hh-reports .chart-bar{width:12px;min-height:2px;border-radius:4px 4px 0 0}.hh-reports .chart-bar.purchase{background:var(--tblr-success)}.hh-reports .chart-bar.consumption{background:var(--tblr-danger)}.hh-reports .chart-month{font-size:10px;color:var(--tblr-muted)}.hh-reports .table{font-size:12px}.hh-reports .table th,.hh-reports .table td{vertical-align:middle;white-space:nowrap}
+.hh-reports .analysis-card{border:1px solid var(--tblr-border-color);border-radius:10px;background:var(--tblr-bg-surface);height:100%}
+.hh-reports .analysis-head{padding:14px 16px;border-bottom:1px solid var(--tblr-border-color);font-weight:700}
+.hh-reports .analysis-body{padding:14px 16px}
+.hh-reports .metric-row{display:grid;grid-template-columns:95px 1fr 35px;gap:9px;align-items:center;margin:11px 0;font-size:12px}
+.hh-reports .metric-track{height:11px;background:var(--tblr-bg-surface-secondary);border-radius:20px;overflow:hidden}
+.hh-reports .metric-fill{height:100%;border-radius:20px;background:var(--tblr-primary)}
+.hh-reports .metric-fill.warning{background:var(--tblr-warning)}.hh-reports .metric-fill.danger{background:var(--tblr-danger)}.hh-reports .metric-fill.success{background:var(--tblr-success)}
+.hh-reports .rank-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--tblr-border-color);font-size:12px}
+.hh-reports .rank-row:last-child{border-bottom:0}
+@media print{.hh-no-print,#page,.navbar,.sidebar{display:none!important}.hh-reports{font-size:10px}.hh-reports .card,.hh-reports .analysis-card{break-inside:avoid;box-shadow:none!important}.hh-reports .table-responsive{overflow:visible!important}.hh-reports .table{font-size:9px}}
+
 </style>
 <div class="container-fluid hh-reports">
  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
   <div><h2 class="mb-1">Dashboard gerencial HH</h2><div class="text-muted">Inventario global y comportamiento de reparaciones y puntos</div></div>
-  <a class="btn btn-outline-secondary" href="/plugins/hh/front/index.php">Volver a HH</a>
+  <div class="d-flex gap-2 flex-wrap hh-no-print">
+   <a class="btn btn-outline-success" href="?<?=hhReportEscape(http_build_query(array_merge($_GET, ['export' => 'excel'])))?>">Exportar Excel (CSV)</a>
+   <button class="btn btn-outline-danger" type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
+   <a class="btn btn-outline-secondary" href="/plugins/hh/front/index.php">Volver a HH</a>
+  </div>
  </div>
  <form method="get" class="card card-body mb-3">
   <div class="row g-2 align-items-end">
@@ -183,7 +227,34 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
   </div></div></div>
  </div>
  <div class="card">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Inventario completo y reparaciones asociadas</h3><span class="text-muted small"><?=number_format($totalAssets)?> activos</span></div>
+  
+ <div class="row g-3 mb-3">
+  <div class="col-xl-4"><section class="analysis-card"><div class="analysis-head">Antigüedad del inventario</div><div class="analysis-body">
+   <?php foreach($ageBuckets as $label=>$value): $width=($value/$maxAgeBucket)*100; ?><div class="metric-row"><span><?=hhReportEscape($label)?></span><div class="metric-track"><div class="metric-fill <?=$label==='7+ años'?'danger':($label==='5–6 años'?'warning':'')?>" style="width:<?=$width?>%"></div></div><strong class="text-end"><?=$value?></strong></div><?php endforeach; ?>
+   <p class="text-muted small mt-3 mb-0">Calculado desde la fecha de compra registrada en GLPI.</p>
+  </div></section></div>
+  <div class="col-xl-4"><section class="analysis-card"><div class="analysis-head">Estado de garantía</div><div class="analysis-body">
+   <?php foreach($warrantyBuckets as $label=>$value): $width=($value/$maxWarrantyBucket)*100; ?><div class="metric-row"><span><?=hhReportEscape($label)?></span><div class="metric-track"><div class="metric-fill <?=$label==='Vencida'?'danger':($label==='Vigente'?'success':'')?>" style="width:<?=$width?>%"></div></div><strong class="text-end"><?=$value?></strong></div><?php endforeach; ?>
+   <p class="text-muted small mt-3 mb-0">Según fecha final de garantía de la ficha financiera.</p>
+  </div></section></div>
+  <div class="col-xl-4"><section class="analysis-card"><div class="analysis-head">Modelos con más reparaciones</div><div class="analysis-body">
+   <?php if($modelRepairs===[]): ?><p class="text-muted small">Sin datos para este filtro.</p><?php else: foreach($modelRepairs as $i=>$model): ?><div class="rank-row"><span><?=($i+1)?>. <?=hhReportEscape($model['model'])?></span><strong><?=$model['repairs']?></strong></div><?php endforeach; endif; ?>
+  </div></section></div>
+ </div>
+ <div class="row g-3 mb-3">
+  <div class="col-xl-7"><section class="analysis-card"><div class="analysis-head">Activos con mayor historial de reparaciones</div><div class="analysis-body">
+   <?php if($mostRepairedAssets===[]): ?><p class="text-muted small">No hay activos reparados en el inventario filtrado.</p><?php else: foreach($mostRepairedAssets as $i=>$asset): ?><div class="rank-row"><span><?=($i+1)?>. <strong><?=hhReportEscape($asset['name'])?></strong><span class="text-muted"> · <?=hhReportEscape($asset['model_name'])?></span></span><strong><?=$asset['repair_count']?> repar.</strong></div><?php endforeach; endif; ?>
+  </div></section></div>
+  <div class="col-xl-5"><section class="analysis-card"><div class="analysis-head">Alertas para evaluación de renovación</div><div class="analysis-body">
+   <div class="d-flex justify-content-between mb-2"><span>Antigüedad ≥ 5 años</span><strong><?=$assetsFiveYearsOrOlder?></strong></div>
+   <div class="progress mb-3" style="height:12px"><div class="progress-bar bg-warning" style="width:<?=$totalAssets>0?min(100,$assetsFiveYearsOrOlder/$totalAssets*100):0?>%"></div></div>
+   <div class="d-flex justify-content-between mb-2"><span>Garantía vencida</span><strong><?=$warrantyBuckets['Vencida']?></strong></div>
+   <div class="progress mb-3" style="height:12px"><div class="progress-bar bg-danger" style="width:<?=$totalAssets>0?min(100,$warrantyBuckets['Vencida']/$totalAssets*100):0?>%"></div></div>
+   <div class="d-flex justify-content-between mb-2"><span>Dos o más reparaciones</span><strong><?=count(array_filter($inventory,static fn(array $a):bool=>(int)$a['repair_count']>=2))?></strong></div>
+   <p class="text-muted small mt-3 mb-0">Indicadores para priorizar revisión técnica; no ordenan reemplazos automáticamente.</p>
+  </div></section></div>
+ </div>
+<div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Inventario completo y reparaciones asociadas</h3><span class="text-muted small"><?=number_format($totalAssets)?> activos</span></div>
   <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>Tipo elemento GLPI</th><th>Tipo activo</th><th>Modelo</th><th>Activo</th><th>Activo fijo</th><th>Serie</th><th>Fabricante</th><th>Compra</th><th>Antigüedad</th><th>Fin garantía</th><th>Estado actual</th><th>Guía proveedor</th><th class="text-end">Cotiz. aprobadas</th><th class="text-end">Retornos</th><th class="text-end">Repuestos (unid.)</th><th>Último retorno</th><th class="text-end">Puntos aprobados</th></tr></thead><tbody>
   <?php foreach($inventory as $asset): ?><tr><td><?=hhReportEscape($asset['type_name'])?></td><td><?=hhReportEscape($asset['subtype_name'])?></td><td><?=hhReportEscape($asset['model_name'])?></td><td><?=hhReportEscape($asset['name'])?></td><td><?=hhReportEscape($asset['otherserial'])?></td><td><?=hhReportEscape($asset['serial'])?></td><td><?=hhReportEscape($asset['manufacturer'])?></td><td><?=hhReportEscape($asset['purchase_date'])?></td><td><?=hhReportEscape($asset['age_label'])?></td><td><?=hhReportEscape($asset['warranty_end'])?></td><td><?php if($asset['currently_in_repair']): ?><span class="badge bg-warning text-dark">En reparación</span><?php else: ?><span class="badge bg-success">En inventario</span><?php endif; ?></td><td><?=hhReportEscape($asset['active_repair_guide'])?></td><td class="text-end"><?=number_format((int)$asset['repair_count'])?></td><td class="text-end"><?=number_format((int)$asset['completed_repairs'])?></td><td class="text-end"><?=number_format((float)$asset['parts_units'],2)?></td><td><?=hhReportEscape($asset['last_returned_at'])?></td><td class="text-end"><?=number_format((float)$asset['points_consumed'],2)?></td></tr><?php endforeach; ?>
   <?php if($inventory===[]): ?><tr><td colspan="17" class="text-center text-muted p-4">No se encontraron activos para los filtros seleccionados.</td></tr><?php endif; ?>
