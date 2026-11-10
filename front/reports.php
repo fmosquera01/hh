@@ -94,7 +94,7 @@ unset($asset);
 
 // Asset age is calculated from the GLPI purchase date. Five years is a review threshold,
 // not an automatic replacement rule; assets without a purchase date remain unclassified.
-$today = new \\DateTimeImmutable('today');
+$today = new \DateTimeImmutable('today');
 $assetsFiveYearsOrOlder = 0;
 $assetsWithPurchaseDate = 0;
 foreach ($inventory as &$asset) {
@@ -103,7 +103,7 @@ foreach ($inventory as &$asset) {
     $purchaseDate = trim((string) ($asset['purchase_date'] ?? ''));
     if ($purchaseDate !== '' && $purchaseDate !== '0000-00-00') {
         try {
-            $purchase = new \\DateTimeImmutable($purchaseDate);
+            $purchase = new \DateTimeImmutable($purchaseDate);
             if ($purchase <= $today) {
                 $age = $purchase->diff($today);
                 $asset['age_years'] = $age->y + ($age->m / 12) + ($age->d / 365.25);
