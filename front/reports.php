@@ -18,6 +18,14 @@ $typeFilter = trim((string) ($_GET['itemtype'] ?? ''));
 $subtypeFilter = trim((string) ($_GET['subtype'] ?? ''));
 $modelFilter = trim((string) ($_GET['model'] ?? ''));
 $baseInventory = Reports::getInventory($search, $typeFilter !== '' ? $typeFilter : null);
+// Enforce the selected GLPI itemtype again at the presentation layer.
+// This prevents subtype/model options from leaking across asset classes.
+if ($typeFilter !== '') {
+    $baseInventory = array_values(array_filter(
+        $baseInventory,
+        static fn(array $asset): bool => (string)($asset['itemtype'] ?? '') === $typeFilter
+    ));
+}
 
 $subtypeOptions = [];
 $modelOptions = [];
@@ -27,16 +35,24 @@ foreach ($baseInventory as $asset) {
         $subtypeOptions[$key] = $asset['type_name'] . ' — ' . $asset['subtype_name'];
     }
 }
+asort($subtypeOptions);
+// A subtype from a previously selected GLPI itemtype is no longer valid.
+if ($subtypeFilter !== '' && !array_key_exists($subtypeFilter, $subtypeOptions)) {
+    $subtypeFilter = '';
+}
+$modelOptions = [];
 foreach ($baseInventory as $asset) {
-    $subtypeKey = $asset['itemtype'] . ':' . (int) $asset['subtype_id'];
-    if ((int) $asset['model_id'] > 0 && $asset['model_name'] !== ''
+    $subtypeKey = $asset['itemtype'] . ':' . (int)$asset['subtype_id'];
+    if ((int)$asset['model_id'] > 0 && $asset['model_name'] !== ''
         && ($subtypeFilter === '' || $subtypeFilter === $subtypeKey)) {
-        $key = $asset['itemtype'] . ':' . (int) $asset['model_id'];
+        $key = $asset['itemtype'] . ':' . (int)$asset['model_id'];
         $modelOptions[$key] = $asset['type_name'] . ' — ' . $asset['model_name'];
     }
 }
-asort($subtypeOptions);
 asort($modelOptions);
+if ($modelFilter !== '' && !array_key_exists($modelFilter, $modelOptions)) {
+    $modelFilter = '';
+}
 $inventory = array_values(array_filter($baseInventory, static function (array $asset) use ($subtypeFilter, $modelFilter): bool {
     $subtypeKey = $asset['itemtype'] . ':' . (int) $asset['subtype_id'];
     $modelKey = $asset['itemtype'] . ':' . (int) $asset['model_id'];
