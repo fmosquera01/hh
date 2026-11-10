@@ -114,7 +114,7 @@ foreach ($inventory as &$asset) {
                     $asset['age_label'] .= ' · Revisar renovación';
                 }
             }
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             $asset['age_label'] = 'Fecha no válida';
         }
     }
