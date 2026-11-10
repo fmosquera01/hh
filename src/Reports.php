@@ -21,6 +21,30 @@ final class Reports
         return array_values(array_unique($types));
     }
 
+    /**
+     * Resolve GLPI's native subtype/model fields for an asset class.
+     * Example: Phone => phonetypes_id / phonemodels_id.
+     */
+    private static function getSubtypeModelMetadata(string $itemtype): array
+    {
+        global $DB;
+        $shortName = (new \ReflectionClass($itemtype))->getShortName();
+        $prefix = strtolower($shortName);
+        $table = $itemtype::getTable();
+
+        $typeField = $prefix . 'types_id';
+        $modelField = $prefix . 'models_id';
+        $typeTable = 'glpi_' . $prefix . 'types';
+        $modelTable = 'glpi_' . $prefix . 'models';
+
+        return [
+            'type_field' => $DB->fieldExists($table, $typeField) ? $typeField : null,
+            'model_field' => $DB->fieldExists($table, $modelField) ? $modelField : null,
+            'type_table' => $DB->tableExists($typeTable) ? $typeTable : null,
+            'model_table' => $DB->tableExists($modelTable) ? $modelTable : null,
+        ];
+    }
+
     public static function getInventory(?string $search = null, ?string $filterType = null): array
     {
         global $DB;
@@ -38,11 +62,17 @@ final class Reports
                 if (!$DB->tableExists($table)) {
                     continue;
                 }
+                $metadata = self::getSubtypeModelMetadata($itemtype);
                 $isCustom = is_a($itemtype, 'Glpi\\Asset\\Asset', true);
                 $fields = ['id', 'name'];
-                foreach (['serial', 'otherserial', 'manufacturers_id', 'states_id', 'locations_id', 'date_creation', 'is_deleted', 'is_template'] as $field) {
+                foreach (['serial', 'otherserial', 'manufacturers_id', 'states_id', 'date_creation', 'is_deleted', 'is_template'] as $field) {
                     if ($DB->fieldExists($table, $field)) {
                         $fields[] = $field;
+                    }
+                }
+                foreach (['type_field', 'model_field'] as $metadataField) {
+                    if ($metadata[$metadataField] !== null) {
+                        $fields[] = $metadata[$metadataField];
                     }
                 }
                 $where = [];
@@ -60,7 +90,7 @@ final class Reports
                         $where['assets_assetdefinitions_id'] = $definitionId;
                     }
                 }
-                $params = ['SELECT' => $fields, 'FROM' => $table, 'ORDER' => ['name ASC']];
+                $params = ['SELECT' => array_values(array_unique($fields)), 'FROM' => $table, 'ORDER' => ['name ASC']];
                 if ($where !== []) {
                     $params['WHERE'] = $where;
                 }
@@ -69,9 +99,15 @@ final class Reports
                     if ($id < 1) {
                         continue;
                     }
+                    $typeId = $metadata['type_field'] !== null ? (int) ($row[$metadata['type_field']] ?? 0) : 0;
+                    $modelId = $metadata['model_field'] !== null ? (int) ($row[$metadata['model_field']] ?? 0) : 0;
                     $assets[$itemtype . ':' . $id] = [
                         'itemtype' => $itemtype,
                         'type_name' => $itemtype::getTypeName(1),
+                        'subtype_id' => $typeId,
+                        'subtype_name' => $metadata['type_table'] !== null ? self::dropdownName($metadata['type_table'], $typeId) : '',
+                        'model_id' => $modelId,
+                        'model_name' => $metadata['model_table'] !== null ? self::dropdownName($metadata['model_table'], $modelId) : '',
                         'id' => $id,
                         'name' => (string) ($row['name'] ?? ''),
                         'serial' => (string) ($row['serial'] ?? ''),
@@ -96,6 +132,7 @@ final class Reports
                 return str_contains(mb_strtolower(implode(' ', [
                     $asset['name'], $asset['serial'], $asset['otherserial'],
                     $asset['manufacturer'], $asset['type_name'],
+                    $asset['subtype_name'], $asset['model_name'],
                 ])), $needle);
             });
         }
@@ -191,7 +228,12 @@ final class Reports
     public static function dropdownName(string $table, int $id): string
     {
         global $DB;
-        if ($id < 1 || !in_array($table, ['glpi_manufacturers', 'glpi_states', 'glpi_locations'], true) || !$DB->tableExists($table)) {
+        if (
+            $id < 1
+            || !preg_match('/^glpi_[a-z0-9_]+$/', $table)
+            || !$DB->tableExists($table)
+            || !$DB->fieldExists($table, 'name')
+        ) {
             return '';
         }
         foreach ($DB->request(['SELECT' => ['name'], 'FROM' => $table, 'WHERE' => ['id' => $id], 'LIMIT' => 1]) as $row) {
