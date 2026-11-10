@@ -228,17 +228,31 @@ final class Reports
     public static function dropdownName(string $table, int $id): string
     {
         global $DB;
+        static $cache = [];
+
         if (
             $id < 1
             || !preg_match('/^glpi_[a-z0-9_]+$/', $table)
-            || !$DB->tableExists($table)
-            || !$DB->fieldExists($table, 'name')
         ) {
             return '';
         }
-        foreach ($DB->request(['SELECT' => ['name'], 'FROM' => $table, 'WHERE' => ['id' => $id], 'LIMIT' => 1]) as $row) {
-            return (string) ($row['name'] ?? '');
+
+        $key = $table . ':' . $id;
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
         }
+
+        if (!$DB->tableExists($table) || !$DB->fieldExists($table, 'name')) {
+            $cache[$key] = '';
+            return '';
+        }
+
+        foreach ($DB->request(['SELECT' => ['name'], 'FROM' => $table, 'WHERE' => ['id' => $id], 'LIMIT' => 1]) as $row) {
+            $cache[$key] = (string) ($row['name'] ?? '');
+            return $cache[$key];
+        }
+
+        $cache[$key] = '';
         return '';
     }
 }
