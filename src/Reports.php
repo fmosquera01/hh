@@ -154,22 +154,50 @@ final class Reports
         if ($assets === []) {
             return;
         }
+        $itemTypes = [];
+        $itemIds = [];
+        $assetKeys = [];
+        foreach ($assets as $asset) {
+            $itemtype = (string)($asset['itemtype'] ?? '');
+            $itemsId = (int)($asset['id'] ?? 0);
+            if ($itemtype === '' || $itemsId < 1) {
+                continue;
+            }
+            $itemTypes[$itemtype] = $itemtype;
+            $itemIds[$itemsId] = $itemsId;
+            $assetKeys[$itemtype . ':' . $itemsId] = true;
+        }
+
         $infocomRows = [];
-        if ($DB->tableExists('glpi_infocoms')) {
+        if ($itemTypes !== [] && $itemIds !== [] && $DB->tableExists('glpi_infocoms')) {
             foreach ($DB->request([
                 'SELECT' => ['itemtype', 'items_id', 'buy_date', 'value', 'warranty_date', 'warranty_duration'],
                 'FROM' => 'glpi_infocoms',
+                'WHERE' => [
+                    'itemtype' => array_values($itemTypes),
+                    'items_id' => array_values($itemIds),
+                ],
             ]) as $info) {
-                $infocomRows[(string) $info['itemtype'] . ':' . (int) $info['items_id']] = $info;
+                $key = (string)$info['itemtype'] . ':' . (int)$info['items_id'];
+                if (isset($assetKeys[$key])) {
+                    $infocomRows[$key] = $info;
+                }
             }
         }
         $repairRows = [];
-        if ($DB->tableExists('glpi_plugin_hh_quotes')) {
+        if ($itemTypes !== [] && $itemIds !== [] && $DB->tableExists('glpi_plugin_hh_quotes')) {
             foreach ($DB->request([
                 'SELECT' => ['itemtype', 'items_id', 'status', 'total_points'],
                 'FROM' => 'glpi_plugin_hh_quotes',
+                'WHERE' => [
+                    'itemtype' => array_values($itemTypes),
+                    'items_id' => array_values($itemIds),
+                ],
             ]) as $quote) {
                 $key = (string) ($quote['itemtype'] ?? '') . ':' . (int) ($quote['items_id'] ?? 0);
+                if (!isset($assetKeys[$key])) {
+                    continue;
+                }
                 if (!isset($repairRows[$key])) {
                     $repairRows[$key] = ['count' => 0, 'points' => 0.0];
                 }
