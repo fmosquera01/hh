@@ -243,9 +243,11 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
 .hh-reports .card{border:1px solid var(--tblr-border-color);border-radius:12px;box-shadow:0 2px 10px rgba(20,40,70,.035);overflow:hidden}
 .hh-reports .card-header{background:var(--tblr-bg-surface-secondary);min-height:48px}
 .hh-reports .analysis-card{box-shadow:0 2px 8px rgba(20,40,70,.035)}
-.hh-reports .table-responsive.hh-touch-scroll{position:relative;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x pan-y;scrollbar-width:thin}
-.hh-reports .table-responsive.hh-touch-scroll table{min-width:max-content}
-.hh-reports .hh-scroll-top{height:18px;overflow-x:auto;overflow-y:hidden;margin:0 14px 5px;border:1px solid var(--tblr-border-color);border-radius:10px;background:var(--tblr-bg-surface-secondary);-webkit-overflow-scrolling:touch;touch-action:pan-x;scrollbar-width:thin}
+.hh-reports .table-responsive.hh-touch-scroll{position:relative;display:block;width:100%;max-width:100%;overflow-x:scroll!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-y;scrollbar-width:thin;cursor:grab}
+.hh-reports .table-responsive.hh-touch-scroll:active{cursor:grabbing}
+.hh-reports .table-responsive.hh-touch-scroll table{width:max-content!important;min-width:100%;table-layout:auto}
+.hh-reports .table-responsive.hh-touch-scroll th,.hh-reports .table-responsive.hh-touch-scroll td{white-space:nowrap}
+.hh-reports .hh-scroll-top{height:24px;overflow-x:scroll;overflow-y:hidden;margin:0 14px 7px;border:1px solid var(--tblr-border-color);border-radius:10px;background:var(--tblr-bg-surface-secondary);-webkit-overflow-scrolling:touch;touch-action:pan-x;scrollbar-width:thin;cursor:ew-resize}
 .hh-reports .hh-scroll-top-inner{height:1px}
 .hh-reports .hh-table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--tblr-border-color)}
 .hh-reports .hh-table-hint{font-size:12px;color:var(--tblr-muted)}
@@ -366,7 +368,37 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
  };
  toggleSection('hh-toggle-inventory','hh-inventory-content','hh-toggle-inventory-label','hh-toggle-inventory-icon','Visualizar inventario','Ocultar inventario');
  toggleSection('hh-toggle-parts','hh-parts-content','hh-toggle-parts-label','hh-toggle-parts-icon','Visualizar repuestos','Ocultar repuestos');
- const connectScroll=(topId,innerId,tableId)=>{const top=document.getElementById(topId),inner=document.getElementById(innerId),table=document.getElementById(tableId);if(!top||!inner||!table)return;let syncing=false;const refresh=()=>{inner.style.width=table.scrollWidth+'px';top.scrollLeft=table.scrollLeft;};top.addEventListener('scroll',()=>{if(syncing)return;syncing=true;table.scrollLeft=top.scrollLeft;syncing=false;});table.addEventListener('scroll',()=>{if(syncing)return;syncing=true;top.scrollLeft=table.scrollLeft;syncing=false;});table.addEventListener('hh:refresh-scroll',refresh);window.addEventListener('resize',refresh,{passive:true});if(window.ResizeObserver)new ResizeObserver(refresh).observe(table);refresh();};
+ const connectScroll=(topId,innerId,tableId)=>{
+  const top=document.getElementById(topId),inner=document.getElementById(innerId),table=document.getElementById(tableId);
+  if(!top||!inner||!table)return;
+  let syncing=false,touchX=0,touchY=0,startScroll=0,horizontalTouch=false;
+  const refresh=()=>{inner.style.width=Math.max(table.scrollWidth,table.clientWidth)+'px';top.scrollLeft=table.scrollLeft;};
+  const sync=(source,target)=>{if(syncing)return;syncing=true;target.scrollLeft=source.scrollLeft;syncing=false;};
+  top.addEventListener('scroll',()=>sync(top,table),{passive:true});
+  table.addEventListener('scroll',()=>sync(table,top),{passive:true});
+  // Trackpads emit horizontal wheel deltas; Shift+wheel is supported as a fallback.
+  table.addEventListener('wheel',event=>{
+   const horizontal=Math.abs(event.deltaX)>0?event.deltaX:(event.shiftKey?event.deltaY:0);
+   if(horizontal!==0&&table.scrollWidth>table.clientWidth){table.scrollLeft+=horizontal;event.preventDefault();}
+  },{passive:false});
+  // Some touch drivers do not start native horizontal panning on nested tables.
+  // Keep vertical page scrolling native, and handle only a clearly horizontal finger gesture.
+  table.addEventListener('touchstart',event=>{
+   if(!event.touches||event.touches.length!==1)return;
+   touchX=event.touches[0].clientX;touchY=event.touches[0].clientY;startScroll=table.scrollLeft;horizontalTouch=false;
+  },{passive:true});
+  table.addEventListener('touchmove',event=>{
+   if(!event.touches||event.touches.length!==1)return;
+   const dx=event.touches[0].clientX-touchX,dy=event.touches[0].clientY-touchY;
+   if(!horizontalTouch&&Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.15)horizontalTouch=true;
+   if(horizontalTouch&&table.scrollWidth>table.clientWidth){event.preventDefault();table.scrollLeft=startScroll-dx;}
+  },{passive:false});
+  table.addEventListener('touchend',()=>{horizontalTouch=false;},{passive:true});
+  table.addEventListener('hh:refresh-scroll',refresh);
+  window.addEventListener('resize',refresh,{passive:true});
+  if(window.ResizeObserver)new ResizeObserver(refresh).observe(table);
+  refresh();
+ };
  connectScroll('hh-inventory-scroll-top','hh-inventory-scroll-inner','hh-inventory-scroll');
  connectScroll('hh-parts-scroll-top','hh-parts-scroll-inner','hh-parts-scroll');
 })();
