@@ -164,9 +164,12 @@ final class Reports
         foreach ($DB->request([
             'SELECT' => ['movement_date', 'movement_type', 'points'],
             'FROM' => 'glpi_plugin_hh_pointmovements',
-            'WHERE' => ['movement_date' => ['>=', sprintf('%04d-01-01', $year)], 'movement_date' => ['<=', sprintf('%04d-12-31', $year)]],
         ]) as $movement) {
-            $month = (int) substr((string) ($movement['movement_date'] ?? ''), 5, 2);
+            $movementDate = (string) ($movement['movement_date'] ?? '');
+            if (substr($movementDate, 0, 4) !== (string) $year) {
+                continue;
+            }
+            $month = (int) substr($movementDate, 5, 2);
             if (!isset($months[$month])) {
                 continue;
             }
