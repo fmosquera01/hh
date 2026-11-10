@@ -20,9 +20,12 @@ function hhHistoryRows(string $table, array $where = [], array $order = []): arr
     $result = []; foreach ($DB->request($params) as $row) $result[] = $row; return $result;
 }
 function hhHistoryAsset(string $type, int $id): string {
+    global $DB;
     $tables = ['Computer' => 'glpi_computers', 'Phone' => 'glpi_phones'];
-    if (!isset($tables[$type]) || $id < 1) return 'Activo no disponible';
-    foreach (hhHistoryRows($tables[$type], ['id' => $id, 'is_deleted' => 0]) as $a) {
+    if (!isset($tables[$type]) || $id < 1 || !class_exists($type) || !property_exists($type, 'rightname') || !Session::haveRight($type::$rightname, READ)) return 'Activo no disponible';
+    $where = ['id' => $id, 'is_deleted' => 0];
+    if ($DB->fieldExists($tables[$type], 'entities_id')) $where['entities_id'] = Session::getActiveEntities();
+    foreach (hhHistoryRows($tables[$type], $where) as $a) {
         $v = trim((string)($a['name'] ?? ''));
         if (($a['otherserial'] ?? '') !== '') $v .= ($v !== '' ? ' | ' : '') . 'Activo fijo: ' . $a['otherserial'];
         if (($a['serial'] ?? '') !== '') $v .= ($v !== '' ? ' | ' : '') . 'Serie: ' . $a['serial'];
@@ -52,7 +55,8 @@ $viewId = filter_var($_GET['view'] ?? 0, FILTER_VALIDATE_INT);
 $view = null; $lines = []; $events = [];
 if ($viewId !== false && $viewId > 0) {
     foreach (hhHistoryRows('glpi_plugin_hh_quotes', ['id'=>(int)$viewId]) as $r) { $view = $r; break; }
-    if ($view && (!$embedded || ((string)$view['itemtype'] === $itemtype && (int)$view['items_id'] === $itemsId))) {
+    if ($view && hhHistoryAsset((string)$view['itemtype'], (int)$view['items_id']) !== 'Activo no disponible'
+        && (!$embedded || ((string)$view['itemtype'] === $itemtype && (int)$view['items_id'] === $itemsId))) {
         $ticketReturnDate = hhHistoryTicketReturnDate((int)($view['tickets_id'] ?? 0));
         if ($ticketReturnDate !== '') $view['returned_at'] = $ticketReturnDate;
         $lines = hhHistoryRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id'=>(int)$viewId], ['id ASC']);
@@ -63,6 +67,9 @@ $where = $embedded ? ['itemtype' => $itemtype, 'items_id' => $itemsId] : [];
 $where['status'] = ['approved', 'rejected'];
 if ($status !== '' && in_array($status, ['approved', 'rejected'], true)) $where['status'] = $status;
 $quotes = hhHistoryRows('glpi_plugin_hh_quotes', $where, ['date_mod DESC','id DESC']);
+$quotes = array_values(array_filter($quotes, static fn(array $quote): bool =>
+    hhHistoryAsset((string)($quote['itemtype'] ?? ''), (int)($quote['items_id'] ?? 0)) !== 'Activo no disponible'
+));
 if ($search !== '' && !$embedded) {
     $needle = mb_strtolower($search);
     $quotes = array_values(array_filter($quotes, static fn($q) =>
