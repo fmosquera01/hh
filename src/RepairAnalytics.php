@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace GlpiPlugin\\Hh;
+namespace GlpiPlugin\Hh;
 
 /**
  * Read-only analysis of approved repairs whose return to Songa is recorded.
