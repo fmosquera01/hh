@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace GlpiPlugin\Hh;
 
 use CommonDBTM;
+use Session;
 
 final class Reports
 {
@@ -25,6 +26,10 @@ final class Reports
         global $DB;
         $assets = [];
         foreach (self::getAssetTypes() as $itemtype) {
+            // Reports must never bypass the user's native GLPI asset permissions.
+            if (!property_exists($itemtype, 'rightname') || !Session::haveRight($itemtype::$rightname, READ)) {
+                continue;
+            }
             if ($filterType !== null && $filterType !== '' && $filterType !== $itemtype) {
                 continue;
             }
