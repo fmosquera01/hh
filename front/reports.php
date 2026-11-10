@@ -161,6 +161,46 @@ $mostRepairedAssets = array_slice($mostRepairedAssets, 0, 8);
 $maxAgeBucket = max(1, ...array_values($ageBuckets));
 $maxWarrantyBucket = max(1, ...array_values($warrantyBuckets));
 
+if (($_GET['export'] ?? '') === 'excel') {
+    $filename = 'HH_inventario_' . $year . '_' . date('Ymd_His') . '.csv';
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    $output = fopen('php://output', 'wb');
+    if ($output !== false) {
+        fwrite($output, "\xEF\xBB\xBF");
+        fputcsv($output, ['INVENTARIO Y REPARACIONES HH'], ';');
+        fputcsv($output, ['Año de análisis', $year], ';');
+        fputcsv($output, ['Tipo GLPI', $typeFilter, 'Tipo de activo', $subtypeFilter, 'Modelo', $modelFilter, 'Búsqueda', $search], ';');
+        fputcsv($output, [], ';');
+        fputcsv($output, ['Tipo GLPI', 'Tipo activo', 'Modelo', 'Activo', 'Activo fijo', 'Serie', 'Fabricante', 'Fecha compra', 'Antigüedad años', 'Fin garantía', 'Estado', 'Guía proveedor', 'Reparaciones aprobadas', 'Retornos confirmados', 'Repuestos unidades', 'Último retorno', 'Puntos consumidos'], ';');
+        foreach ($inventory as $asset) {
+            fputcsv($output, [
+                $asset['type_name'], $asset['subtype_name'], $asset['model_name'], $asset['name'],
+                $asset['otherserial'], $asset['serial'], $asset['manufacturer'], $asset['purchase_date'],
+                $asset['age_years'] === null ? '' : number_format((float)$asset['age_years'], 2, '.', ''),
+                $asset['warranty_end'], $asset['currently_in_repair'] ? 'En reparación' : 'En inventario',
+                $asset['active_repair_guide'], $asset['repair_count'], $asset['completed_repairs'],
+                number_format((float)$asset['parts_units'], 2, '.', ''), $asset['last_returned_at'],
+                number_format((float)$asset['points_consumed'], 2, '.', ''),
+            ], ';');
+        }
+        fputcsv($output, [], ';');
+        fputcsv($output, ['DETALLE DE REPUESTOS CON RETORNO CONFIRMADO'], ';');
+        fputcsv($output, ['Tipo GLPI', 'ID activo', 'Cotización', 'Fecha retorno', 'Código repuesto', 'Repuesto', 'Cantidad', 'Puntos'], ';');
+        foreach ($partHistory as $line) {
+            fputcsv($output, [
+                $line['itemtype'], $line['items_id'], $line['quote_name'], $line['returned_at'],
+                $line['code'], $line['description'], $line['quantity'], $line['points'],
+            ], ';');
+        }
+        fclose($output);
+    }
+    exit;
+}
+
+
 function hhReportEscape(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
