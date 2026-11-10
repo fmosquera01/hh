@@ -89,6 +89,117 @@ final class RepairAnalytics
         return ['by_asset' => $byAsset, 'part_history' => $partHistory];
     }
 
+
+    /**
+     * Return one entry per asset currently at the external repair provider.
+     * The guide, dispatch date and provider-received date must exist, while
+     * the return-to-Songa date must still be empty.
+     *
+     * @param array<int, array<string, mixed>> $assets
+     * @return array<string, array{tickets_id: int, guide_number: string, sent_at: string, supplier_received_at: string}>
+     */
+    public static function getActiveRepairAssets(array $assets): array
+    {
+        global $DB;
+
+        $result = [];
+        $linksTable = 'glpi_items_tickets';
+        $ticketsTable = 'glpi_tickets';
+        $fieldsTable = 'glpi_plugin_fields_ticketreparacions';
+
+        if (!$DB->tableExists($linksTable) || !$DB->tableExists($ticketsTable)
+            || !$DB->tableExists($fieldsTable)) {
+            return $result;
+        }
+
+        $requiredFields = [
+            'nmerodeguafield',
+            'fechaenvioaproveedorfieldtwo',
+            'fecharecepcionproveedorfieldtwo',
+            'fecharecepcionguiafieldtwo',
+        ];
+        foreach ($requiredFields as $field) {
+            if (!$DB->fieldExists($fieldsTable, $field)) {
+                return $result;
+            }
+        }
+
+        foreach ($assets as $asset) {
+            $itemtype = (string)($asset['itemtype'] ?? '');
+            $itemsId = (int)($asset['id'] ?? 0);
+            if (!in_array($itemtype, ['Computer', 'Phone'], true) || $itemsId < 1) {
+                continue;
+            }
+
+            $assetKey = $itemtype . ':' . $itemsId;
+            foreach ($DB->request([
+                'SELECT' => ['tickets_id'],
+                'FROM' => $linksTable,
+                'WHERE' => ['itemtype' => $itemtype, 'items_id' => $itemsId],
+                'ORDER' => ['tickets_id DESC'],
+            ]) as $link) {
+                $ticketId = (int)($link['tickets_id'] ?? 0);
+                if ($ticketId < 1) {
+                    continue;
+                }
+
+                // Solved/closed tickets cannot represent a currently open repair.
+                $ticketStatus = null;
+                foreach ($DB->request([
+                    'SELECT' => ['status'],
+                    'FROM' => $ticketsTable,
+                    'WHERE' => ['id' => $ticketId],
+                    'LIMIT' => 1,
+                ]) as $ticket) {
+                    $ticketStatus = (int)($ticket['status'] ?? 0);
+                    break;
+                }
+                if ($ticketStatus === null || in_array($ticketStatus, [5, 6], true)) {
+                    continue;
+                }
+
+                foreach ($DB->request([
+                    'SELECT' => $requiredFields,
+                    'FROM' => $fieldsTable,
+                    'WHERE' => [
+                        'items_id' => $ticketId,
+                        'itemtype' => 'Ticket',
+                        'plugin_fields_containers_id' => 15,
+                    ],
+                    'LIMIT' => 1,
+                ]) as $fields) {
+                    $guide = trim((string)($fields['nmerodeguafield'] ?? ''));
+                    $sentAt = trim((string)($fields['fechaenvioaproveedorfieldtwo'] ?? ''));
+                    $supplierReceivedAt = trim((string)($fields['fecharecepcionproveedorfieldtwo'] ?? ''));
+                    $returnedAt = trim((string)($fields['fecharecepcionguiafieldtwo'] ?? ''));
+
+                    $validDate = static fn(string $date): bool =>
+                        $date !== '' && !str_starts_with($date, '0000-00-00');
+
+                    if ($guide === '' || !$validDate($sentAt) || !$validDate($supplierReceivedAt) || $validDate($returnedAt)) {
+                        continue;
+                    }
+
+                    // One equipment is counted once even if it has multiple linked tickets.
+                    $result[$assetKey] = [
+                        'tickets_id' => $ticketId,
+                        'guide_number' => $guide,
+                        'sent_at' => $sentAt,
+                        'supplier_received_at' => $supplierReceivedAt,
+                    ];
+                    break;
+                }
+
+                if (isset($result[$assetKey])) {
+                    break;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+
     /** Use the linked GLPI ticket when the quote predates the return date. */
     private static function resolveReturnedAt(array $quote): string
     {
