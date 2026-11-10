@@ -17,8 +17,8 @@ function plugin_hh_install(): bool
             `id` int unsigned NOT NULL AUTO_INCREMENT,
             `value_per_point` decimal(12,4) NOT NULL,
             `currency` char(3) NOT NULL DEFAULT 'USD',
-            `valid_from` datetime NOT NULL,
-            `valid_until` datetime DEFAULT NULL,
+            `valid_from` timestamp NOT NULL,
+            `valid_until` timestamp DEFAULT NULL,
             `reason` varchar(255) DEFAULT NULL,
             `users_id` int unsigned NOT NULL,
             `date_creation` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -79,9 +79,9 @@ function plugin_hh_install(): bool
             `supplier_quote_number` varchar(100) DEFAULT NULL,
             `tickets_id` int unsigned DEFAULT NULL,
             `guide_number` varchar(100) DEFAULT NULL,
-            `sent_to_supplier_at` datetime DEFAULT NULL,
-            `supplier_received_at` datetime DEFAULT NULL,
-            `returned_at` datetime DEFAULT NULL,
+            `sent_to_supplier_at` timestamp DEFAULT NULL,
+            `supplier_received_at` timestamp DEFAULT NULL,
+            `returned_at` timestamp DEFAULT NULL,
             `repair_type` varchar(30) NOT NULL DEFAULT 'corrective',
             `priority` varchar(20) NOT NULL DEFAULT 'normal',
             `diagnosis` text DEFAULT NULL,
@@ -147,9 +147,9 @@ function plugin_hh_install(): bool
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `supplier_quote_number` varchar(100) DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `tickets_id` int unsigned DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `guide_number` varchar(100) DEFAULT NULL",
-            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `sent_to_supplier_at` datetime DEFAULT NULL",
-            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `supplier_received_at` datetime DEFAULT NULL",
-            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `returned_at` datetime DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `sent_to_supplier_at` timestamp DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `supplier_received_at` timestamp DEFAULT NULL",
+            "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `returned_at` timestamp DEFAULT NULL",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `repair_type` varchar(30) NOT NULL DEFAULT 'corrective'",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `priority` varchar(20) NOT NULL DEFAULT 'normal'",
             "ALTER TABLE `glpi_plugin_hh_quotes` ADD COLUMN IF NOT EXISTS `observations` text DEFAULT NULL",
@@ -174,6 +174,18 @@ function plugin_hh_install(): bool
                 $migration->addPostQuery($query);
             }
         }
+    }
+
+    // Convert legacy DATETIME columns to GLPI-preferred TIMESTAMP without losing stored values.
+    // These fields represent operational dates and are expected to remain within TIMESTAMP's supported range.
+    if ($DB->tableExists('glpi_plugin_hh_pointvalues')) {
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_pointvalues` MODIFY COLUMN `valid_from` timestamp NOT NULL");
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_pointvalues` MODIFY COLUMN `valid_until` timestamp NULL DEFAULT NULL");
+    }
+    if ($DB->tableExists('glpi_plugin_hh_quotes')) {
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_quotes` MODIFY COLUMN `sent_to_supplier_at` timestamp NULL DEFAULT NULL");
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_quotes` MODIFY COLUMN `supplier_received_at` timestamp NULL DEFAULT NULL");
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_quotes` MODIFY COLUMN `returned_at` timestamp NULL DEFAULT NULL");
     }
 
     // Preserve legacy diagnosis text in the single observations field, then remove the duplicate column.
