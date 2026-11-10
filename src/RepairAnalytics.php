@@ -136,11 +136,13 @@ final class RepairAnalytics
 
         $result = [];
         $assetTickets = [];
+        $assetIds = [];
         foreach ($assets as $asset) {
             $itemtype = (string)($asset['itemtype'] ?? '');
             $itemsId = (int)($asset['id'] ?? 0);
             if (in_array($itemtype, ['Computer', 'Phone'], true) && $itemsId > 0) {
                 $assetTickets[$itemtype . ':' . $itemsId] = [];
+                $assetIds[$itemsId] = $itemsId;
             }
         }
 
@@ -169,7 +171,10 @@ final class RepairAnalytics
         foreach ($DB->request([
             'SELECT' => ['tickets_id', 'itemtype', 'items_id'],
             'FROM' => $linksTable,
-            'WHERE' => ['itemtype' => ['Computer', 'Phone']],
+            'WHERE' => [
+                'itemtype' => ['Computer', 'Phone'],
+                'items_id' => array_values($assetIds),
+            ],
         ]) as $link) {
             $key = (string)($link['itemtype'] ?? '') . ':' . (int)($link['items_id'] ?? 0);
             $ticketId = (int)($link['tickets_id'] ?? 0);
