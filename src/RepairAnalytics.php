@@ -102,14 +102,22 @@ final class RepairAnalytics
         if ($ticketId < 1 || !$DB->tableExists($table)) {
             return '';
         }
-        foreach (['fecharecepcionguiafieldtwo', 'fecharecepcionguiafield'] as $field) {
+        foreach ([
+            ['field' => 'fecharecepcionguiafieldtwo', 'container' => 15],
+            ['field' => 'fecharecepcionguiafield', 'container' => 1],
+        ] as $definition) {
+            $field = $definition['field'];
             if (!$DB->fieldExists($table, $field)) {
                 continue;
             }
             foreach ($DB->request([
                 'SELECT' => [$field],
                 'FROM' => $table,
-                'WHERE' => ['items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 15],
+                'WHERE' => [
+                    'items_id' => $ticketId,
+                    'itemtype' => 'Ticket',
+                    'plugin_fields_containers_id' => $definition['container'],
+                ],
                 'LIMIT' => 1,
             ]) as $row) {
                 $date = trim((string)($row[$field] ?? ''));
