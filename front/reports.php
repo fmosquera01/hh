@@ -174,16 +174,16 @@ if (($_GET['export'] ?? '') === 'excel') {
         fwrite($output, "\xEF\xBB\xBF");
         fputcsv($output, ['INVENTARIO Y REPARACIONES HH'], ';');
         fputcsv($output, ['Año de análisis', $year], ';');
-        fputcsv($output, ['Tipo GLPI', $typeFilter, 'Tipo de activo', $subtypeFilter, 'Modelo', $modelFilter, 'Búsqueda', $search], ';');
+        fputcsv($output, ['Tipo GLPI', hhCsvSafe($typeFilter), 'Tipo de activo', hhCsvSafe($subtypeFilter), 'Modelo', hhCsvSafe($modelFilter), 'Búsqueda', hhCsvSafe($search)], ';');
         fputcsv($output, [], ';');
         fputcsv($output, ['Tipo GLPI', 'Tipo activo', 'Modelo', 'Activo', 'Activo fijo', 'Serie', 'Fabricante', 'Fecha compra', 'Antigüedad años', 'Fin garantía', 'Estado', 'Guía proveedor', 'Reparaciones aprobadas', 'Retornos confirmados', 'Repuestos unidades', 'Último retorno', 'Puntos consumidos'], ';');
         foreach ($inventory as $asset) {
             fputcsv($output, [
-                $asset['type_name'], $asset['subtype_name'], $asset['model_name'], $asset['name'],
-                $asset['otherserial'], $asset['serial'], $asset['manufacturer'], $asset['purchase_date'],
+                hhCsvSafe((string)$asset['type_name']), hhCsvSafe((string)$asset['subtype_name']), hhCsvSafe((string)$asset['model_name']), hhCsvSafe((string)$asset['name']),
+                hhCsvSafe((string)$asset['otherserial']), hhCsvSafe((string)$asset['serial']), hhCsvSafe((string)$asset['manufacturer']), $asset['purchase_date'],
                 $asset['age_years'] === null ? '' : number_format((float)$asset['age_years'], 2, '.', ''),
                 $asset['warranty_end'], $asset['currently_in_repair'] ? 'En reparación' : 'En inventario',
-                $asset['active_repair_guide'], $asset['repair_count'], $asset['completed_repairs'],
+                hhCsvSafe((string)$asset['active_repair_guide']), $asset['repair_count'], $asset['completed_repairs'],
                 number_format((float)$asset['parts_units'], 2, '.', ''), $asset['last_returned_at'],
                 number_format((float)$asset['points_consumed'], 2, '.', ''),
             ], ';');
@@ -206,8 +206,8 @@ if (($_GET['export'] ?? '') === 'excel') {
         fputcsv($output, ['Tipo GLPI', 'ID activo', 'Cotización', 'Fecha retorno', 'Código repuesto', 'Repuesto', 'Cantidad', 'Puntos'], ';');
         foreach ($partHistory as $line) {
             fputcsv($output, [
-                $line['itemtype'], $line['items_id'], $line['quote_name'], $line['returned_at'],
-                $line['code'], $line['description'], $line['quantity'], $line['points'],
+                hhCsvSafe((string)$line['itemtype']), $line['items_id'], hhCsvSafe((string)$line['quote_name']), $line['returned_at'],
+                hhCsvSafe((string)$line['code']), hhCsvSafe((string)$line['description']), $line['quantity'], $line['points'],
             ], ';');
         }
         fclose($output);
@@ -219,6 +219,12 @@ if (($_GET['export'] ?? '') === 'excel') {
 function hhReportEscape(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+/** Prevent spreadsheet formula execution in text fields exported to CSV. */
+function hhCsvSafe(string $value): string
+{
+    return preg_match('/^[\\t\\r ]*[=+\\-@]/', $value) === 1 ? "'" . $value : $value;
 }
 
 Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
