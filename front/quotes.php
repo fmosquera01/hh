@@ -64,7 +64,11 @@ function hhQAssetLabel(string $type, int $id): string
     global $DB;
     $tables = ['Computer' => 'glpi_computers', 'Phone' => 'glpi_phones'];
     if (!isset($tables[$type]) || $id < 1) return '';
-    foreach ($DB->request(['SELECT' => ['name', 'serial', 'otherserial'], 'FROM' => $tables[$type], 'WHERE' => ['id' => $id, 'is_deleted' => 0], 'LIMIT' => 1]) as $r) {
+    if (!class_exists($type) || !property_exists($type, 'rightname') || !Session::haveRight($type::$rightname, READ)) return '';
+    $where = ['id' => $id, 'is_deleted' => 0];
+    $activeEntities = Session::getActiveEntities();
+    if ($DB->fieldExists($tables[$type], 'entities_id')) $where['entities_id'] = $activeEntities;
+    foreach ($DB->request(['SELECT' => ['name', 'serial', 'otherserial'], 'FROM' => $tables[$type], 'WHERE' => $where, 'LIMIT' => 1]) as $r) {
         return trim((string)$r['name'] . ' | Serie: ' . (string)$r['serial'] . ' | Activo: ' . (string)$r['otherserial']);
     }
     return '';
@@ -175,7 +179,11 @@ $point = hhQCurrentPointValue();
 $allowedTypes = ['Computer' => 'Computadora', 'Phone' => 'Teléfono'];
 $assetOptions = [];
 foreach ([['type' => 'Computer', 'table' => 'glpi_computers', 'label' => 'Computadora'], ['type' => 'Phone', 'table' => 'glpi_phones', 'label' => 'Teléfono']] as $assetConfig) {
-    foreach (hhQRows($assetConfig['table'], ['is_deleted' => 0], ['id', 'name', 'serial', 'otherserial'], ['name ASC']) as $assetRow) {
+    $assetWhere = ['is_deleted' => 0];
+    if ($DB->fieldExists($assetConfig['table'], 'entities_id')) $assetWhere['entities_id'] = Session::getActiveEntities();
+    $assetClass = $assetConfig['type'];
+    if (!Session::haveRight($assetClass::$rightname, READ)) continue;
+    foreach (hhQRows($assetConfig['table'], $assetWhere, ['id', 'name', 'serial', 'otherserial'], ['name ASC']) as $assetRow) {
         if (hhQRepairTicketForAsset($assetConfig['type'], (int)$assetRow['id']) === null) continue;
         $assetOptions[] = [
             'itemtype' => $assetConfig['type'],
@@ -203,6 +211,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($quoteId > 0) {
             foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => $quoteId], ['*'], []) as $row) { $existing = $row; break; }
             if (!$existing) $error = 'La cotización solicitada no existe.';
+            elseif (hhQAssetLabel((string)$existing['itemtype'], (int)$existing['items_id']) === '') $error = 'No tiene acceso al activo asociado a esta cotización.';
+            elseif ($embedded && ((string)$existing['itemtype'] !== $contextItemType || (int)$existing['items_id'] !== $contextItemsId)) $error = 'La cotización no pertenece al activo abierto.';
             elseif ((string)$existing['status'] !== 'draft') $error = 'Esta cotización ya tiene una decisión final y está bloqueada.';
         }
 
@@ -393,6 +403,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$quoteId], ['*']) as $r) { $quote = $r; break; }
         }
         if (!$quote) $error = 'No se encontró la cotización.';
+        elseif (hhQAssetLabel((string)$quote['itemtype'], (int)$quote['items_id']) === '') $error = 'No tiene acceso al activo asociado a esta cotización.';
+        elseif ($embedded && ((string)$quote['itemtype'] !== $contextItemType || (int)$quote['items_id'] !== $contextItemsId)) $error = 'La cotización no pertenece al activo abierto.';
         elseif ((string)$quote['status'] !== 'draft') $error = 'La cotización ya tiene una decisión final y está bloqueada.';
         elseif (!in_array($decision, ['approved', 'rejected'], true)) $error = 'Decisión no válida.';
         else {
@@ -435,10 +447,14 @@ $editQuote = null;
 $editLines = [];
 if ($editId !== false && $editId > 0) {
     foreach (hhQRows('glpi_plugin_hh_quotes', ['id' => (int)$editId], ['*']) as $r) { $editQuote = $r; break; }
+    if ($editQuote && (hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']) === '' || ($embedded && ((string)$editQuote['itemtype'] !== $contextItemType || (int)$editQuote['items_id'] !== $contextItemsId)))) $editQuote = null;
     if ($editQuote) $editLines = hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$editId], ['*'], ['id ASC']);
 }
 $quoteCriteria = ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) ? ['itemtype' => $contextItemType, 'items_id' => $contextItemsId] : [];
 $allQuotes = hhQRows('glpi_plugin_hh_quotes', $quoteCriteria, ['*'], ['date_mod DESC', 'id DESC']);
+$allQuotes = array_values(array_filter($allQuotes, static fn(array $quote): bool =>
+    hhQAssetLabel((string)($quote['itemtype'] ?? ''), (int)($quote['items_id'] ?? 0)) !== ''
+));
 $catalogItems = [];
 foreach (hhQRows('glpi_plugin_hh_items', ['is_active' => 1], ['*'], ['name ASC']) as $item) {
     $maps = hhQRows('glpi_plugin_hh_itemtypes', ['plugin_hh_items_id' => (int)$item['id']]);
