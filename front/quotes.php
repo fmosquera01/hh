@@ -22,7 +22,8 @@ if (isset($_GET['edit']) && (int)$_GET['edit'] > 0) {
         break;
     }
 }
-if (in_array($purchaseItemType, ['Computer', 'Phone'], true) && $purchaseItemsId > 0) {
+if (in_array($purchaseItemType, ['Computer', 'Phone'], true) && $purchaseItemsId > 0
+    && hhQAssetLabel($purchaseItemType, $purchaseItemsId) !== '') {
     foreach (hhQRows('glpi_infocoms', ['items_id' => $purchaseItemsId, 'itemtype' => $purchaseItemType], ['value'], []) as $info) {
         if (is_numeric($info['value'] ?? null) && (float)$info['value'] > 0) $purchaseValue = (float)$info['value'];
         break;
@@ -62,16 +63,18 @@ function hhQCurrentPointValue(): array
 function hhQAssetLabel(string $type, int $id): string
 {
     global $DB;
+    static $cache = [];
+    $key = $type . ':' . $id;
+    if (array_key_exists($key, $cache)) return $cache[$key];
     $tables = ['Computer' => 'glpi_computers', 'Phone' => 'glpi_phones'];
-    if (!isset($tables[$type]) || $id < 1) return '';
-    if (!class_exists($type) || !property_exists($type, 'rightname') || !Session::haveRight($type::$rightname, READ)) return '';
+    if (!isset($tables[$type]) || $id < 1) return $cache[$key] = '';
+    if (!class_exists($type) || !property_exists($type, 'rightname') || !Session::haveRight($type::$rightname, READ)) return $cache[$key] = '';
     $where = ['id' => $id, 'is_deleted' => 0];
-    $activeEntities = Session::getActiveEntities();
-    if ($DB->fieldExists($tables[$type], 'entities_id')) $where['entities_id'] = $activeEntities;
+    if ($DB->fieldExists($tables[$type], 'entities_id')) $where['entities_id'] = Session::getActiveEntities();
     foreach ($DB->request(['SELECT' => ['name', 'serial', 'otherserial'], 'FROM' => $tables[$type], 'WHERE' => $where, 'LIMIT' => 1]) as $r) {
-        return trim((string)$r['name'] . ' | Serie: ' . (string)$r['serial'] . ' | Activo: ' . (string)$r['otherserial']);
+        return $cache[$key] = trim((string)$r['name'] . ' | Serie: ' . (string)$r['serial'] . ' | Activo: ' . (string)$r['otherserial']);
     }
-    return '';
+    return $cache[$key] = '';
 }
 
 function hhQNormalizeFieldDate(string $value): ?string
@@ -160,10 +163,10 @@ function hhQHasActivePlatinumContract(string $type, int $id): bool
     return false;
 }
 
-function hhQWriteHistory(int $quoteId, ?string $oldStatus, string $newStatus, string $comment = ''): void
+function hhQWriteHistory(int $quoteId, ?string $oldStatus, string $newStatus, string $comment = ''): bool
 {
     global $DB;
-    $DB->insert('glpi_plugin_hh_quotehistory', [
+    return (bool)$DB->insert('glpi_plugin_hh_quotehistory', [
         'plugin_hh_quotes_id' => $quoteId,
         'old_status' => $oldStatus,
         'new_status' => $newStatus,
@@ -408,14 +411,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         elseif ((string)$quote['status'] !== 'draft') $error = 'La cotización ya tiene una decisión final y está bloqueada.';
         elseif (!in_array($decision, ['approved', 'rejected'], true)) $error = 'Decisión no válida.';
         else {
-            $DB->update('glpi_plugin_hh_quotes', ['status' => $decision, 'observations' => trim((string)($quote['observations'] ?? '') . ($comment !== '' ? "\nDecisión: " . $comment : ''))], ['id' => (int)$quoteId]);
-            if ($decision === 'approved') {
-                $alreadyDeducted = false;
-                foreach ($DB->request([
-                    'SELECT' => ['id'], 'FROM' => 'glpi_plugin_hh_pointmovements',
-                    'WHERE' => ['plugin_hh_quotes_id' => (int)$quoteId, 'movement_type' => 'consumption'], 'LIMIT' => 1,
-                ]) as $movement) { $alreadyDeducted = true; break; }
-                if (!$alreadyDeducted) {
+            $transactionStarted = false;
+            try {
+                // GLPI 11 DBmysql supports nested transactions through savepoints.
+                // The unique key (quote_id, movement_type) is the final guard against double consumption.
+                $DB->beginTransaction();
+                $transactionStarted = true;
+                $updated = $DB->update('glpi_plugin_hh_quotes', [
+                    'status' => $decision,
+                    'observations' => trim((string)($quote['observations'] ?? '') . ($comment !== '' ? "\nDecisión: " . $comment : '')),
+                ], ['id' => (int)$quoteId, 'status' => 'draft']);
+                if (!$updated) throw new RuntimeException('No se pudo actualizar el estado de la cotización.');
+
+                if ($decision === 'approved') {
                     $movementSaved = $DB->insert('glpi_plugin_hh_pointmovements', [
                         'movement_type' => 'consumption',
                         'points' => number_format(-1 * (float)$quote['total_points'], 2, '.', ''),
@@ -426,15 +434,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'description' => 'Consumo automático por aprobación de ' . (string)$quote['name'],
                         'users_id' => (int)Session::getLoginUserID(),
                     ]);
-                    if (!$movementSaved) {
-                        $error = 'La cotización fue aprobada, pero no se pudo registrar el descuento de puntos. Revise el módulo Puntos antes de continuar.';
+                    if (!$movementSaved) throw new RuntimeException('No se pudo registrar el consumo de puntos.');
+                }
+
+                if (!hhQWriteHistory((int)$quoteId, 'draft', $decision, $comment)) {
+                    throw new RuntimeException('No se pudo registrar el historial de la decisión.');
+                }
+                $DB->commit();
+                $transactionStarted = false;
+                $notice = 'Cotización ' . (string)$quote['name'] . ' ' . ($decision === 'approved' ? 'aprobada' : 'rechazada') . '. Queda bloqueada y disponible en el historial.';
+                $refreshParentAfterDecision = true;
+                unset($_GET['edit']);
+            } catch (Throwable $transactionError) {
+                if ($transactionStarted) {
+                    try { $DB->rollBack(); } catch (Throwable $rollbackError) {
+                        Toolbox::logInFile('hh', 'No se pudo revertir la transacción de cotización: ' . $rollbackError->getMessage());
                     }
                 }
+                $error = 'No se aplicó la decisión. La cotización y los puntos se conservaron sin cambios. Detalle: ' . $transactionError->getMessage();
             }
-            hhQWriteHistory((int)$quoteId, 'draft', $decision, $comment);
-            $notice = 'Cotización ' . (string)$quote['name'] . ' ' . ($decision === 'approved' ? 'aprobada' : 'rechazada') . '. Queda bloqueada y disponible en el historial.';
-            $refreshParentAfterDecision = true;
-            unset($_GET['edit']);
         }
     } elseif ($action === 'delete_line' && isset($_POST['quote_id'])) {
         // Line editing is handled by saving the draft with the desired rows.
