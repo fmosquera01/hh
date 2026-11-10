@@ -189,6 +189,19 @@ if (($_GET['export'] ?? '') === 'excel') {
             ], ';');
         }
         fputcsv($output, [], ';');
+        fputcsv($output, ['RESUMEN MENSUAL DE PUNTOS Y REPARACIONES'], ';');
+        fputcsv($output, ['Mes', 'Puntos comprados', 'Puntos consumidos', 'Balance', 'Reparaciones finalizadas'], ';');
+        $monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        foreach ($months as $index => $month) {
+            fputcsv($output, [
+                $monthLabels[$index],
+                number_format((float)$month['purchased'], 2, '.', ''),
+                number_format((float)$month['consumed'], 2, '.', ''),
+                number_format((float)$month['purchased'] - (float)$month['consumed'], 2, '.', ''),
+                (int)($monthlyRepairs[$index] ?? 0),
+            ], ';');
+        }
+        fputcsv($output, [], ';');
         fputcsv($output, ['DETALLE DE REPUESTOS CON RETORNO CONFIRMADO'], ';');
         fputcsv($output, ['Tipo GLPI', 'ID activo', 'Cotización', 'Fecha retorno', 'Código repuesto', 'Repuesto', 'Cantidad', 'Puntos'], ';');
         foreach ($partHistory as $line) {
