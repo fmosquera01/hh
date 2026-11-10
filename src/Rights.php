@@ -16,7 +16,8 @@ final class Rights
     public const CATALOG = 16;
     public const POINTS = 32;
     public const POINT_VALUE = 64;
-    public const ALL = 127;
+    public const REPORTS = 128;
+    public const ALL = 255;
 
     public static function can(int $right): bool
     {
