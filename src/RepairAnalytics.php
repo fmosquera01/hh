@@ -37,13 +37,13 @@ final class RepairAnalytics
 
         $quotes = [];
         foreach ($DB->request([
-            'SELECT' => ['id', 'name', 'itemtype', 'items_id', 'quote_date', 'returned_at', 'total_points'],
+            'SELECT' => ['id', 'name', 'itemtype', 'items_id', 'tickets_id', 'quote_date', 'returned_at', 'total_points'],
             'FROM' => 'glpi_plugin_hh_quotes',
             'WHERE' => ['status' => 'approved'],
             'ORDER' => ['returned_at DESC', 'id DESC'],
         ]) as $quote) {
             $key = (string)($quote['itemtype'] ?? '') . ':' . (int)($quote['items_id'] ?? 0);
-            $returnedAt = trim((string)($quote['returned_at'] ?? ''));
+            $returnedAt = self::resolveReturnedAt($quote);
             if (!isset($assetKeys[$key]) || $returnedAt === '' || str_starts_with($returnedAt, '0000-00-00')) {
                 continue;
             }
@@ -77,7 +77,7 @@ final class RepairAnalytics
                     'items_id' => (int)$quote['items_id'],
                     'quote_name' => (string)$quote['name'],
                     'quote_date' => (string)($quote['quote_date'] ?? ''),
-                    'returned_at' => (string)$quote['returned_at'],
+                    'returned_at' => self::resolveReturnedAt($quote),
                     'code' => (string)($line['code_snapshot'] ?? ''),
                     'description' => (string)($line['description_snapshot'] ?? ''),
                     'quantity' => $quantity,
@@ -87,5 +87,37 @@ final class RepairAnalytics
         }
 
         return ['by_asset' => $byAsset, 'part_history' => $partHistory];
+    }
+
+    /** Use the linked GLPI ticket when the quote predates the return date. */
+    private static function resolveReturnedAt(array $quote): string
+    {
+        global $DB;
+        $value = trim((string)($quote['returned_at'] ?? ''));
+        if ($value !== '' && !str_starts_with($value, '0000-00-00')) {
+            return $value;
+        }
+        $ticketId = (int)($quote['tickets_id'] ?? 0);
+        $table = 'glpi_plugin_fields_ticketreparacions';
+        if ($ticketId < 1 || !$DB->tableExists($table)) {
+            return '';
+        }
+        foreach (['fecharecepcionguiafieldtwo', 'fecharecepcionguiafield'] as $field) {
+            if (!$DB->fieldExists($table, $field)) {
+                continue;
+            }
+            foreach ($DB->request([
+                'SELECT' => [$field],
+                'FROM' => $table,
+                'WHERE' => ['items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 15],
+                'LIMIT' => 1,
+            ]) as $row) {
+                $date = trim((string)($row[$field] ?? ''));
+                if ($date !== '' && !str_starts_with($date, '0000-00-00')) {
+                    return $date;
+                }
+            }
+        }
+        return '';
     }
 }
