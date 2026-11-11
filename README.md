@@ -4,12 +4,12 @@ HH es un **plugin nativo de GLPI 11**. La experiencia se trabaja dentro de la pe
 
 ## Integración con activos
 
-- Añade **Gestión de reparaciones** a las fichas de **Computadoras** y **Teléfonos**.
-- Recibe automáticamente tipo e ID del activo desde GLPI.
-- Muestra datos de contexto del activo disponibles en la ficha.
-- No modifica tablas nativas de GLPI.
+- Añade **Gestión de activos y reparaciones** a todos los tipos registrados en `$CFG_GLPI['asset_types']`, incluidos los activos personalizados de Asset Definitions de GLPI 11.
+- Conserva la vista especializada de garantía, contratos, cotizaciones y puntos para **Computadoras** y **Teléfonos**.
+- Incorpora un flujo general de reparación sin esquema de puntos para el resto de activos.
+- Mantiene los datos operativos en tablas propias; los cambios de estado se realizan mediante la API de objetos de GLPI para conservar el historial nativo.
 
-## Estado actual — versión 0.5.16
+## Estado actual — versión 0.5.17
 
 La pestaña nativa consulta en modo lectura los datos de activos, compra, garantía y contratos asociados para **Computadoras** y **Teléfonos**, utilizando la API de consultas de GLPI y sus relaciones `FKEY`. El tipo del contrato vigente es el valor que se muestra en **Tipo / información de garantía** y prevalece sobre la garantía propia del equipo para determinar la cobertura. La fecha de inicio de la garantía propia toma `warranty_date` y, si no está informada, usa `buy_date`.
 
@@ -71,3 +71,28 @@ No se requiere modificar archivos del núcleo de GLPI. Validar en la instancia d
 ## Reportes gerenciales 0.5.16
 
 Se amplía el dashboard con análisis visual de antigüedad del inventario, estado de garantía, modelos con más reparaciones, activos con mayor historial y alertas para priorizar renovación. El inventario y el detalle de repuestos se muestran bajo demanda para mantener limpia la vista ejecutiva. Las tablas incluyen desplazamiento horizontal táctil y una barra superior sincronizada. La impresión/PDF se aísla al contenido del informe, sin ocultar el contenedor principal de GLPI.
+
+
+## Flujo general de activos y reparaciones (0.5.17)
+
+- La pestaña de Gestión de reparaciones se registra dinámicamente para todos los tipos de activo de `$CFG_GLPI['asset_types']`, incluyendo clases nativas y clases creadas mediante Asset Definitions.
+- El módulo general no utiliza puntos. El esquema de puntos, contratos, garantías, cotizaciones y catálogo HH continúa reservado al flujo especializado de Handhelds y a la experiencia existente de Computadoras/Teléfonos.
+- La recepción del activo se detecta en el hook síncrono `ITEM_ADD` de `Ticket_Item`. El activo asociado al ticket cambia inmediatamente a **REPARACIÓN Sistemas**, sin Cron ni tarea programada.
+- Para impedir que tickets ordinarios cambien estados por accidente, el hook solo actúa cuando el ticket pertenece a la categoría exclusiva configurada en **Gestión de activos y reparaciones > Configurar flujo**. La categoría debe asignarse al formulario de recepción del catálogo de servicios.
+- Al enviar el equipo a proveedor, el técnico utiliza **Enviar a proveedor** y el estado cambia a **REPARACIÓN Proveedor**. Al recibirlo de vuelta, utiliza **Regresó del proveedor** para devolverlo a **REPARACIÓN Sistemas**.
+- Al finalizar, **Finalizar reparación** restaura el estado que el activo tenía antes de la recepción. La asignación del usuario no se modifica.
+- Cada transición se registra en `glpi_plugin_hh_asset_history` y se activa el historial nativo de GLPI en el cambio de estado.
+- El dashboard añade indicadores globales de **REPARACIÓN Sistemas**, **REPARACIÓN Proveedor**, **LIBRE** (backup), **DAÑADO** y **Asignados**. Los cinco indicadores se calculan sobre el inventario completo visible para el usuario, independientemente de los filtros de HH.
+- La migración agrega únicamente tablas propias del plugin y conserva las cotizaciones, puntos, catálogos y datos históricos existentes.
+
+### Configuración y prueba
+
+1. En GLPI, cree o identifique una categoría ITIL exclusiva para el formulario de recepción de equipos en reparación.
+2. En el formulario del catálogo de servicios, configure esa categoría como categoría del ticket creado.
+3. En **Plugins > Gestión de activos y reparaciones > Configurar flujo**, seleccione la misma categoría y active el cambio automático.
+4. Compruebe que existan los estados exactos **REPARACIÓN Sistemas** y **REPARACIÓN Proveedor**. Para los indicadores también se reconocen **LIBRE** y **DAÑADO**.
+5. Cree un ticket desde el formulario, seleccione un activo y verifique que su estado cambie antes de finalizar la respuesta de creación del ticket.
+6. Cree un ticket ordinario con otra categoría y confirme que el estado del activo no cambie.
+7. Pruebe el envío a proveedor, recepción desde proveedor y finalización. El último paso debe restaurar el estado previo a la recepción.
+
+La versión 0.5.17 es una primera entrega funcional del flujo general y debe validarse en una instancia de pruebas antes de producción. No ejecutar pruebas destructivas ni cambiar estados de activos productivos.
