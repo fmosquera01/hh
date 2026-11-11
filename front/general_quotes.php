@@ -263,6 +263,11 @@ if ($editId > 0 && Rights::can(Rights::UPDATE)) {
 }
 $suppliers = [];
 foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_suppliers', 'WHERE' => ['is_deleted' => 0], 'ORDER' => ['name']]) as $row) { $suppliers[] = $row; }
+$quoteStats = ['total' => count($quotes), 'draft' => 0, 'pending' => 0, 'approved' => 0, 'selected' => 0];
+foreach ($quotes as $quoteRow) {
+    $statusKey = (string) ($quoteRow['status'] ?? '');
+    if (isset($quoteStats[$statusKey])) { $quoteStats[$statusKey]++; }
+}
 
 if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF'], 'assets', 'hh'); }
 ?>
@@ -285,19 +290,26 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
 .hh-gq .table{width:100%;border-collapse:collapse;font-size:.7rem}.hh-gq .table th,.hh-gq .table td{padding:.38rem .45rem;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:middle}.hh-gq .table th{background:#f3f6fa;color:#475569}
 .hh-gq .table-bordered th,.hh-gq .table-bordered td{border:1px solid #e2e8f0}.hh-gq .table-responsive{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .hh-gq .alert{font-size:.72rem;padding:.45rem .6rem;border-radius:6px;border:1px solid #cbd5e1;background:#f1f7fd;color:#244765}
+.hh-gq .gq-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.45rem;margin-bottom:.6rem}.hh-gq .gq-kpi{border:1px solid #dce3eb;border-radius:8px;padding:.5rem .6rem;background:#fff;box-shadow:0 1px 5px #172b4d0a}.hh-gq .gq-kpi-label{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em}.hh-gq .gq-kpi-value{font-size:1.05rem;font-weight:800;color:#17365d}.hh-gq .gq-kpi.pending .gq-kpi-value{color:#946200}.hh-gq .gq-kpi.approved .gq-kpi-value{color:#16804a}.hh-gq .gq-kpi.selected .gq-kpi-value{color:#0f766e}
 .hh-gq .d-flex{display:flex;align-items:center}.hh-gq .flex-wrap{flex-wrap:wrap}.hh-gq .justify-content-between{justify-content:space-between}.hh-gq .align-items-center{align-items:center}.hh-gq .gap-2{gap:.5rem}
 .hh-gq .mt-1{margin-top:.25rem}.hh-gq .mt-2{margin-top:.5rem}.hh-gq .mt-3{margin-top:.75rem}.hh-gq .mb-0{margin-bottom:0}.hh-gq .mb-1{margin-bottom:.25rem}.hh-gq .mb-2{margin-bottom:.5rem}.hh-gq .mb-3{margin-bottom:.75rem}
 .hh-gq .text-muted{color:#64748b}.hh-gq .text-end{text-align:right}.hh-gq .small{font-size:.72rem}.hh-gq .text-success{color:#16804a}.hh-gq .border{border:1px solid #dce3eb}
 .hh-gq .row{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:.55rem;margin:0}.hh-gq .row>[class*="col-"]{grid-column:span 12;min-width:0}.hh-gq .row>.col-6{grid-column:span 6}.hh-gq .row>.col-md-3{grid-column:span 3}.hh-gq .row>.col-md-6{grid-column:span 6}
 .hh-gq .btn-light{background:#fff;color:#17365d;border:1px solid #dbe5ef}.hh-gq .btn-outline-secondary{background:#fff;color:#475569;border:1px solid #cbd5e1}.hh-gq .btn-outline-primary{background:#fff;color:#245b83;border:1px solid #245b83}.hh-gq .btn-outline-danger{background:#fff;color:#b4232c;border:1px solid #c43b45}
 .hh-gq a{color:#245b83;text-decoration:none}.hh-gq a:hover{text-decoration:underline}.hh-gq details summary{cursor:pointer;font-weight:650}.hh-gq form{margin:0}
-@media(max-width:650px){.hh-gq{font-size:11px}.hh-gq .row>.col-md-3,.hh-gq .row>.col-md-6{grid-column:span 6}.hh-gq .gq-hero .d-flex{align-items:flex-start}}
+@media(max-width:650px){.hh-gq .gq-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hh-gq{font-size:11px}.hh-gq .row>.col-md-3,.hh-gq .row>.col-md-6{grid-column:span 6}.hh-gq .gq-hero .d-flex{align-items:flex-start}}
 @media(max-width:420px){.hh-gq .row>[class*="col-"]{grid-column:span 12}.hh-gq .row>.col-6{grid-column:span 6}.hh-gq .gq-hero .d-flex{flex-direction:column}.hh-gq .gq-hero .btn{width:100%}.hh-gq .hh-gq-grand{margin-left:0;width:100%}}
 </style>
 <div class="hh-gq">
   <div class="card gq-hero mb-2"><div class="card-body d-flex justify-content-between align-items-center gap-2"><div><div class="gq-subtitle">SONGA · GESTIÓN DE REPARACIONES</div><h3>Cotizaciones de reparación</h3><div class="text-muted small"><?= $e($assetName) ?> · <?= $e($itemtype) ?> #<?= (int) $itemsId ?></div><div class="gq-subtitle mt-1">Comparación de proveedores, costos e historial de decisiones</div></div>
     <?php if (Rights::can(Rights::CREATE)): ?><button class="btn btn-light" type="button" onclick="document.getElementById('gq-new').hidden=false;this.hidden=true">+ Nueva cotización</button><?php endif; ?>
   </div></div>
+  <div class="gq-kpi-grid">
+    <div class="gq-kpi"><div class="gq-kpi-label">Cotizaciones</div><div class="gq-kpi-value"><?= (int) $quoteStats['total'] ?></div></div>
+    <div class="gq-kpi"><div class="gq-kpi-label">Borradores</div><div class="gq-kpi-value"><?= (int) $quoteStats['draft'] ?></div></div>
+    <div class="gq-kpi pending"><div class="gq-kpi-label">Pendientes</div><div class="gq-kpi-value"><?= (int) $quoteStats['pending'] ?></div></div>
+    <div class="gq-kpi approved"><div class="gq-kpi-label">Aprobadas</div><div class="gq-kpi-value"><?= (int) ($quoteStats['approved'] + $quoteStats['selected']) ?></div></div>
+  </div>
   <section class="card" id="gq-new" <?= $editingQuote ? '' : 'hidden' ?>>
     <div class="card-header"><h3><?= $editingQuote ? 'Editar cotización en borrador' : 'Nueva cotización · Proveedor' ?></h3></div>
     <div class="card-body">
