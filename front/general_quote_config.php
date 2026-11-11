@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use GlpiPlugin\Hh\Dashboard;
 use GlpiPlugin\Hh\Rights;
+use GlpiPlugin\Hh\RepairAlerts;
 
 include('../../../inc/includes.php');
 
@@ -12,21 +13,31 @@ global $DB;
 
 $message = '';
 $error = '';
-$currentRate = 15.0;\n$policy = RepairAlerts::getPolicy();
+$currentRate = 15.0;
+$policy = RepairAlerts::getPolicy();
 foreach ($DB->request(['SELECT' => ['iva_rate'], 'FROM' => 'glpi_plugin_hh_general_quote_config', 'WHERE' => ['id' => 1], 'LIMIT' => 1]) as $row) {
     $currentRate = (float) $row['iva_rate'];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rate = filter_var($_POST['iva_rate'] ?? null, FILTER_VALIDATE_FLOAT);
+    $repeatDays = filter_var($_POST['repair_repeat_days'] ?? null, FILTER_VALIDATE_INT);
+    $costPercent = filter_var($_POST['repair_cost_percent'] ?? null, FILTER_VALIDATE_FLOAT);
+    $renewalYears = filter_var($_POST['renewal_years'] ?? null, FILTER_VALIDATE_INT);
     if ($rate === false || $rate < 0 || $rate > 100) {
         $error = 'Ingrese una tasa de IVA entre 0 y 100 %.';
+    } elseif ($repeatDays === false || $repeatDays < 1 || $repeatDays > 365 || $costPercent === false || $costPercent < 1 || $costPercent > 100 || $renewalYears === false || $renewalYears < 1 || $renewalYears > 20) {
+        $error = 'Revise los criterios: días entre 1 y 365, porcentaje entre 1 y 100 y renovación entre 1 y 20 años.';
     } else {
         $DB->update('glpi_plugin_hh_general_quote_config', [
             'iva_rate' => number_format((float) $rate, 3, '.', ''),
-            'users_id' => (int) Session::getLoginUserID(),\n            'repair_repeat_days' => (int) $repeatDays,\n            'repair_cost_percent' => number_format((float) $costPercent, 2, '.', ''),\n            'renewal_years' => (int) $renewalYears,
+            'users_id' => (int) Session::getLoginUserID(),
+            'repair_repeat_days' => (int) $repeatDays,
+            'repair_cost_percent' => number_format((float) $costPercent, 2, '.', ''),
+            'renewal_years' => (int) $renewalYears,
         ], ['id' => 1]);
-        $currentRate = (float) $rate;\n        $policy = ['repair_repeat_days' => (int)$repeatDays, 'repair_cost_percent' => (float)$costPercent, 'renewal_years' => (int)$renewalYears];
+        $currentRate = (float) $rate;
+        $policy = ['repair_repeat_days' => (int)$repeatDays, 'repair_cost_percent' => (float)$costPercent, 'renewal_years' => (int)$renewalYears];
         $message = 'Configuración de criterios guardada. Las alertas se aplican a las nuevas consultas sin modificar el historial.';
     }
 }
