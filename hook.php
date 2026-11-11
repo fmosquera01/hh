@@ -239,6 +239,7 @@ function plugin_hh_install(): bool
             $DB->insert('glpi_plugin_hh_workflow_config', [
                 'id' => 1,
                 'itilcategories_id' => 0,
+                'requesttypes_id' => 0,
                 'enabled' => 0,
             ]);
         }
