@@ -25,9 +25,7 @@ if (!array_key_exists('itemtype', $_GET) && in_array('Phone', $assetTypes, true)
     $typeFilter = 'Phone';
 }
 $baseInventory = Reports::getInventory($search, $typeFilter !== '' ? $typeFilter : null);
-// Operational indicators cover all visible asset classes, independently of the HH filters.
-$workflowCounts = RepairWorkflow::getDashboardCounts(Reports::getInventory(null, null));
-// Apply the class constraint independently of the inventory query.
+// Keep the selected GLPI class constraint explicit for native and custom asset classes.
 if ($typeFilter !== '') {
     $baseInventory = array_values(array_filter(
         $baseInventory,
@@ -80,6 +78,9 @@ $inventory = array_values(array_filter($baseInventory, static function (array $a
     return ($subtypeFilter === '' || $subtypeFilter === $subtypeKey)
         && ($modelFilter === '' || $modelFilter === $modelKey);
 }));
+// Status indicators use exactly the same filtered inventory as the table.
+// The year selector applies to historical analysis, not today's current asset state.
+$workflowCounts = RepairWorkflow::getDashboardCounts($inventory);
 $repairAnalytics = RepairAnalytics::getExecutedRepairSummary($inventory);
 $activeRepairsByAsset = RepairAnalytics::getActiveRepairAssets($inventory);
 $monthlyRepairs = RepairAnalytics::getMonthlyCompletedRepairs($year, $inventory);
@@ -233,7 +234,7 @@ function hhCsvSafe(string $value): string
 Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 ?>
 <style>
-.hh-reports{font-size:13px}.hh-reports .kpi{border:1px solid var(--tblr-border-color);border-radius:9px;padding:16px;height:100%;background:var(--tblr-bg-surface)}.hh-reports .kpi-label{color:var(--tblr-muted);font-size:12px}.hh-reports .kpi-value{font-size:1.65rem;font-weight:700;line-height:1.3}.hh-reports .chart-bars{display:grid;grid-template-columns:repeat(12,minmax(22px,1fr));gap:8px;align-items:end;height:190px;padding:10px 4px 0}.hh-reports .chart-col{display:flex;flex-direction:column;align-items:center;justify-content:end;height:100%;gap:5px}.hh-reports .chart-pair{display:flex;align-items:end;justify-content:center;gap:3px;height:145px;width:100%}.hh-reports .chart-bar{width:12px;min-height:2px;border-radius:4px 4px 0 0}.hh-reports .chart-bar.purchase{background:var(--tblr-success)}.hh-reports .chart-bar.consumption{background:var(--tblr-danger)}.hh-reports .chart-month{font-size:10px;color:var(--tblr-muted)}.hh-reports .table{font-size:12px}.hh-reports .table th,.hh-reports .table td{vertical-align:middle;white-space:nowrap}
+.hh-reports{font-size:12px}.hh-reports .kpi{border:1px solid var(--tblr-border-color);border-radius:8px;padding:10px;height:100%;background:var(--tblr-bg-surface)}.hh-reports .kpi-label{color:var(--tblr-muted);font-size:12px}.hh-reports .kpi-value{font-size:1.35rem;font-weight:700;line-height:1.2}.hh-reports .chart-bars{display:grid;grid-template-columns:repeat(12,minmax(22px,1fr));gap:8px;align-items:end;height:190px;padding:10px 4px 0}.hh-reports .chart-col{display:flex;flex-direction:column;align-items:center;justify-content:end;height:100%;gap:5px}.hh-reports .chart-pair{display:flex;align-items:end;justify-content:center;gap:3px;height:145px;width:100%}.hh-reports .chart-bar{width:12px;min-height:2px;border-radius:4px 4px 0 0}.hh-reports .chart-bar.purchase{background:var(--tblr-success)}.hh-reports .chart-bar.consumption{background:var(--tblr-danger)}.hh-reports .chart-month{font-size:10px;color:var(--tblr-muted)}.hh-reports .table{font-size:12px}.hh-reports .table th,.hh-reports .table td{vertical-align:middle;white-space:nowrap}
 .hh-reports .analysis-card{border:1px solid var(--tblr-border-color);border-radius:10px;background:var(--tblr-bg-surface);height:100%}
 .hh-reports .analysis-head{padding:14px 16px;border-bottom:1px solid var(--tblr-border-color);font-weight:700}
 .hh-reports .analysis-body{padding:14px 16px}
@@ -261,10 +262,10 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
 .hh-reports .hh-table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--tblr-border-color)}
 .hh-reports .hh-table-hint{font-size:12px;color:var(--tblr-muted)}
 .hh-reports .hh-section-toggle{display:inline-flex;align-items:center;gap:7px}
-.hh-reports .hh-hero{padding:18px 20px;border-radius:14px;background:linear-gradient(115deg,var(--tblr-bg-surface),var(--tblr-bg-surface-secondary));border:1px solid var(--tblr-border-color)}
+.hh-reports .hh-hero{padding:12px 14px;border-radius:14px;background:linear-gradient(115deg,var(--tblr-bg-surface),var(--tblr-bg-surface-secondary));border:1px solid var(--tblr-border-color)}
 .hh-reports .hh-reports-subtitle{color:var(--tblr-muted);font-size:13px}
-.hh-reports .hh-status-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:18px}
-.hh-reports .hh-status-card{position:relative;min-height:132px;padding:17px 18px;border:1px solid var(--tblr-border-color);border-top:4px solid var(--tblr-primary);border-radius:12px;background:var(--tblr-bg-surface);box-shadow:0 3px 12px rgba(20,40,70,.055);transition:transform .18s ease,box-shadow .18s ease}
+.hh-reports .hh-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:12px}
+.hh-reports .hh-status-card{position:relative;min-height:94px;padding:10px 12px;border:1px solid var(--tblr-border-color);border-top:4px solid var(--tblr-primary);border-radius:12px;background:var(--tblr-bg-surface);box-shadow:0 3px 12px rgba(20,40,70,.055);transition:transform .18s ease,box-shadow .18s ease}
 .hh-reports .hh-status-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(20,40,70,.09)}
 .hh-reports .hh-status-card.systems{border-top-color:var(--tblr-primary)}
 .hh-reports .hh-status-card.supplier{border-top-color:var(--tblr-info)}
@@ -272,12 +273,12 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
 .hh-reports .hh-status-card.damaged{border-top-color:var(--tblr-danger)}
 .hh-reports .hh-status-card.assigned{border-top-color:var(--tblr-warning)}
 .hh-reports .hh-status-card.other{border-top-color:var(--tblr-muted)}
-.hh-reports .hh-status-label{font-size:13px;font-weight:650;color:var(--tblr-muted);margin-bottom:9px}
-.hh-reports .hh-status-value{font-size:2rem;line-height:1.1;font-weight:750;letter-spacing:-.035em;margin-bottom:8px}
-.hh-reports .hh-status-note{font-size:11px;color:var(--tblr-muted)}
+.hh-reports .hh-status-label{font-size:11px;font-weight:650;color:var(--tblr-muted);margin-bottom:5px}
+.hh-reports .hh-status-value{font-size:1.45rem;line-height:1.05;font-weight:750;letter-spacing:-.025em;margin-bottom:5px}
+.hh-reports .hh-status-note{font-size:10px;line-height:1.25;color:var(--tblr-muted)}
 .hh-reports .hh-section-title{font-size:14px;font-weight:700;margin:0 0 10px;color:var(--tblr-body-color)}
-@media(max-width:1199px){.hh-reports .hh-status-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:767px){.hh-reports .hh-status-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.hh-reports .hh-status-card{padding:13px;min-height:118px}.hh-reports .hh-status-value{font-size:1.65rem}}
+@media(max-width:991px){.hh-reports .hh-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:767px){.hh-reports{font-size:11px}.hh-reports .hh-status-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.hh-reports .hh-status-card{padding:9px;min-height:82px;border-top-width:3px}.hh-reports .hh-status-label{font-size:10px;margin-bottom:4px}.hh-reports .hh-status-value{font-size:1.25rem;margin-bottom:4px}.hh-reports .hh-status-note{font-size:9px}.hh-reports .hh-hero{padding:10px}.hh-reports .hh-hero h2{font-size:1.15rem}.hh-reports .card-header{min-height:38px;padding:8px 10px}.hh-reports .card-body{padding:10px}.hh-reports .analysis-head{padding:9px 11px}.hh-reports .analysis-body{padding:9px 11px}.hh-reports .hh-table-toolbar{padding:8px 10px}}
 @page{size:landscape;margin:10mm}
 @media(max-width:767px){.hh-reports .chart-bars{gap:3px}.hh-reports .chart-pair{gap:2px}.hh-reports .chart-bar{width:9px}.hh-reports .metric-row{grid-template-columns:82px 1fr 28px;gap:6px}.hh-reports .hh-table-hint{width:100%}}
 @media print{
@@ -296,7 +297,7 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
 </style>
 <div class="container-fluid hh-reports">
  <div class="hh-hero d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
-  <div><h2 class="mb-1">Control de activos Songa</h2><div class="hh-reports-subtitle">Inventario operativo, disponibilidad y seguimiento de reparaciones de todos los activos</div></div>
+  <div><h2 class="mb-1">Control de activos Songa</h2><div class="hh-reports-subtitle">Inventario, disponibilidad y reparaciones según los filtros seleccionados</div></div>
   <div class="d-flex gap-2 flex-wrap hh-no-print">
    <a class="btn btn-outline-success" href="?<?=hhReportEscape(http_build_query(array_merge($_GET, ['export' => 'excel'])))?>">Exportar Excel (CSV)</a>
    <button class="btn btn-outline-danger" type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
@@ -313,7 +314,7 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
    <div class="col-sm-2"><button class="btn btn-primary w-100" type="submit">Aplicar</button></div>
   </div>
  </form>
- <h3 class="hh-section-title">Estado actual del inventario</h3>
+ <h3 class="hh-section-title">Estado actual del inventario <span class="text-muted fw-normal">· <?=number_format($workflowCounts['total'])?> activos según filtros</span></h3>
  <div class="hh-status-grid">
   <div class="hh-status-card systems"><div class="hh-status-label">Reparación Sistemas</div><div class="hh-status-value"><?=number_format($workflowCounts['systems'])?></div><div class="hh-status-note">Reparaciones internas</div></div>
   <div class="hh-status-card supplier"><div class="hh-status-label">Reparación Proveedor</div><div class="hh-status-value"><?=number_format($workflowCounts['supplier'])?></div><div class="hh-status-note">Equipos en manos de proveedores</div></div>
@@ -327,7 +328,7 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">HH con guía pendiente de retorno</div><div class="kpi-value"><?=number_format($totalAssetsInRepair)?></div><div class="text-muted small">Seguimiento histórico de proveedores HH</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos en inventario</div><div class="kpi-value"><?=number_format($totalAssets)?></div><div class="text-muted small">Con filtros de tipo, modelo y búsqueda aplicados</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con 5+ años</div><div class="kpi-value"><?=number_format($assetsFiveYearsOrOlder)?></div><div class="text-muted small">Revisar renovación · <?=$assetsWithPurchaseDate?> con fecha de compra</div></div></div>
-  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con reparaciones aprobadas</div><div class="kpi-value"><?=number_format($repairedAssets)?></div><div class="text-muted small">De todos los activos consultados</div></div></div>
+  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con reparaciones aprobadas</div><div class="kpi-value"><?=number_format($repairedAssets)?></div><div class="text-muted small">Dentro del inventario filtrado</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Reparaciones aprobadas</div><div class="kpi-value"><?=number_format($totalRepairs)?></div><div class="text-muted small">Histórico HH</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Puntos asociados a reparaciones</div><div class="kpi-value"><?=number_format($totalPoints,2)?></div><div class="text-muted small">Suma de cotizaciones aprobadas</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Reparaciones con retorno registrado</div><div class="kpi-value"><?=number_format($totalCompletedRepairs)?></div><div class="text-muted small">Aprobadas y con fecha de retorno</div></div></div>
