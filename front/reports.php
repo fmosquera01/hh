@@ -263,6 +263,21 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
 .hh-reports .hh-section-toggle{display:inline-flex;align-items:center;gap:7px}
 .hh-reports .hh-hero{padding:18px 20px;border-radius:14px;background:linear-gradient(115deg,var(--tblr-bg-surface),var(--tblr-bg-surface-secondary));border:1px solid var(--tblr-border-color)}
 .hh-reports .hh-reports-subtitle{color:var(--tblr-muted);font-size:13px}
+.hh-reports .hh-status-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.hh-reports .hh-status-card{position:relative;min-height:132px;padding:17px 18px;border:1px solid var(--tblr-border-color);border-top:4px solid var(--tblr-primary);border-radius:12px;background:var(--tblr-bg-surface);box-shadow:0 3px 12px rgba(20,40,70,.055);transition:transform .18s ease,box-shadow .18s ease}
+.hh-reports .hh-status-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(20,40,70,.09)}
+.hh-reports .hh-status-card.systems{border-top-color:var(--tblr-primary)}
+.hh-reports .hh-status-card.supplier{border-top-color:var(--tblr-info)}
+.hh-reports .hh-status-card.free{border-top-color:var(--tblr-success)}
+.hh-reports .hh-status-card.damaged{border-top-color:var(--tblr-danger)}
+.hh-reports .hh-status-card.assigned{border-top-color:var(--tblr-warning)}
+.hh-reports .hh-status-card.other{border-top-color:var(--tblr-muted)}
+.hh-reports .hh-status-label{font-size:13px;font-weight:650;color:var(--tblr-muted);margin-bottom:9px}
+.hh-reports .hh-status-value{font-size:2rem;line-height:1.1;font-weight:750;letter-spacing:-.035em;margin-bottom:8px}
+.hh-reports .hh-status-note{font-size:11px;color:var(--tblr-muted)}
+.hh-reports .hh-section-title{font-size:14px;font-weight:700;margin:0 0 10px;color:var(--tblr-body-color)}
+@media(max-width:1199px){.hh-reports .hh-status-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:767px){.hh-reports .hh-status-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.hh-reports .hh-status-card{padding:13px;min-height:118px}.hh-reports .hh-status-value{font-size:1.65rem}}
 @page{size:landscape;margin:10mm}
 @media(max-width:767px){.hh-reports .chart-bars{gap:3px}.hh-reports .chart-pair{gap:2px}.hh-reports .chart-bar{width:9px}.hh-reports .metric-row{grid-template-columns:82px 1fr 28px;gap:6px}.hh-reports .hh-table-hint{width:100%}}
 @media print{
@@ -281,7 +296,7 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
 </style>
 <div class="container-fluid hh-reports">
  <div class="hh-hero d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
-  <div><h2 class="mb-1">Dashboard gerencial de activos y reparaciones</h2><div class="hh-reports-subtitle">Visión ejecutiva del inventario, disponibilidad, reparaciones y módulo especializado HH</div></div>
+  <div><h2 class="mb-1">Control de activos Songa</h2><div class="hh-reports-subtitle">Inventario operativo, disponibilidad y seguimiento de reparaciones de todos los activos</div></div>
   <div class="d-flex gap-2 flex-wrap hh-no-print">
    <a class="btn btn-outline-success" href="?<?=hhReportEscape(http_build_query(array_merge($_GET, ['export' => 'excel'])))?>">Exportar Excel (CSV)</a>
    <button class="btn btn-outline-danger" type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
@@ -298,14 +313,19 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
    <div class="col-sm-2"><button class="btn btn-primary w-100" type="submit">Aplicar</button></div>
   </div>
  </form>
+ <h3 class="hh-section-title">Estado actual del inventario</h3>
+ <div class="hh-status-grid">
+  <div class="hh-status-card systems"><div class="hh-status-label">Reparación Sistemas</div><div class="hh-status-value"><?=number_format($workflowCounts['systems'])?></div><div class="hh-status-note">Reparaciones internas</div></div>
+  <div class="hh-status-card supplier"><div class="hh-status-label">Reparación Proveedor</div><div class="hh-status-value"><?=number_format($workflowCounts['supplier'])?></div><div class="hh-status-note">Equipos en manos de proveedores</div></div>
+  <div class="hh-status-card free"><div class="hh-status-label">Equipos de backup</div><div class="hh-status-value"><?=number_format($workflowCounts['free'])?></div><div class="hh-status-note">Estado LIBRE · Disponibles</div></div>
+  <div class="hh-status-card damaged"><div class="hh-status-label">Equipos dañados</div><div class="hh-status-value"><?=number_format($workflowCounts['damaged'])?></div><div class="hh-status-note">Estado DAÑADO</div></div>
+  <div class="hh-status-card assigned"><div class="hh-status-label">Equipos asignados / en uso</div><div class="hh-status-value"><?=number_format($workflowCounts['assigned'])?></div><div class="hh-status-note">Estados ASIGNADO · PRÉSTAMO · RESERVADO</div></div>
+  <div class="hh-status-card other"><div class="hh-status-label">Otros / sin estado reconocido</div><div class="hh-status-value"><?=number_format($workflowCounts['other'])?></div><div class="hh-status-note">No se suman como asignados · Revisar</div></div>
+ </div>
+ <h3 class="hh-section-title">Indicadores complementarios del módulo HH</h3>
  <div class="row g-3 mb-3">
-  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Reparación Sistemas</div><div class="kpi-value"><?=number_format($workflowCounts['systems'])?></div><div class="text-muted small">Equipos en reparación interna</div></div></div>
-  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Reparación Proveedor</div><div class="kpi-value"><?=number_format($workflowCounts['supplier'])?></div><div class="text-muted small">Equipos enviados a proveedor</div></div></div>
-  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Equipos de backup · LIBRE</div><div class="kpi-value"><?=number_format($workflowCounts['free'])?></div><div class="text-muted small">Disponibles para asignación</div></div></div>
-  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Equipos dañados</div><div class="kpi-value"><?=number_format($workflowCounts['damaged'])?></div><div class="text-muted small">Estado DAÑADO</div></div></div>
-  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Equipos asignados</div><div class="kpi-value"><?=number_format($workflowCounts['assigned'])?></div><div class="text-muted small">Resto de activos inventariados</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">HH con guía pendiente de retorno</div><div class="kpi-value"><?=number_format($totalAssetsInRepair)?></div><div class="text-muted small">Seguimiento histórico de proveedores HH</div></div></div>
-  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos en inventario</div><div class="kpi-value"><?=number_format($totalAssets)?></div><div class="text-muted small">Con filtros aplicados</div></div></div>
+  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos en inventario</div><div class="kpi-value"><?=number_format($totalAssets)?></div><div class="text-muted small">Con filtros de tipo, modelo y búsqueda aplicados</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con 5+ años</div><div class="kpi-value"><?=number_format($assetsFiveYearsOrOlder)?></div><div class="text-muted small">Revisar renovación · <?=$assetsWithPurchaseDate?> con fecha de compra</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con reparaciones aprobadas</div><div class="kpi-value"><?=number_format($repairedAssets)?></div><div class="text-muted small">De todos los activos consultados</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Reparaciones aprobadas</div><div class="kpi-value"><?=number_format($totalRepairs)?></div><div class="text-muted small">Histórico HH</div></div></div>
@@ -368,7 +388,7 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
   <div class="hh-table-toolbar hh-no-print"><span class="hh-table-hint">La tabla se mantiene oculta para facilitar la lectura del dashboard. Ábrela cuando necesites revisar el detalle.</span><button class="btn btn-outline-primary btn-sm hh-section-toggle" type="button" id="hh-toggle-inventory" aria-expanded="false" aria-controls="hh-inventory-content"><span id="hh-toggle-inventory-icon">＋</span><span id="hh-toggle-inventory-label">Visualizar inventario</span></button></div>
   <div id="hh-inventory-content" hidden><div class="hh-scroll-top hh-no-print" id="hh-inventory-scroll-top" aria-label="Desplazamiento horizontal de inventario"><div class="hh-scroll-top-inner" id="hh-inventory-scroll-inner"></div></div>
   <div class="table-responsive hh-touch-scroll" id="hh-inventory-scroll"><table class="table table-hover table-striped mb-0"><thead><tr><th>Tipo elemento GLPI</th><th>Tipo activo</th><th>Modelo</th><th>Activo</th><th>Activo fijo</th><th>Serie</th><th>Fabricante</th><th>Compra</th><th>Antigüedad</th><th>Fin garantía</th><th>Estado actual</th><th>Guía proveedor</th><th class="text-end">Cotiz. aprobadas</th><th class="text-end">Retornos</th><th class="text-end">Repuestos (unid.)</th><th>Último retorno</th><th class="text-end">Puntos aprobados</th></tr></thead><tbody>
-  <?php foreach($inventory as $asset): ?><tr><td><?=hhReportEscape($asset['type_name'])?></td><td><?=hhReportEscape($asset['subtype_name'])?></td><td><?=hhReportEscape($asset['model_name'])?></td><td><?=hhReportEscape($asset['name'])?></td><td><?=hhReportEscape($asset['otherserial'])?></td><td><?=hhReportEscape($asset['serial'])?></td><td><?=hhReportEscape($asset['manufacturer'])?></td><td><?=hhReportEscape($asset['purchase_date'])?></td><td><?=hhReportEscape($asset['age_label'])?></td><td><?=hhReportEscape($asset['warranty_end'])?></td><td><?php if($asset['currently_in_repair']): ?><span class="badge bg-warning text-dark">En reparación</span><?php else: ?><span class="badge bg-success">En inventario</span><?php endif; ?></td><td><?=hhReportEscape($asset['active_repair_guide'])?></td><td class="text-end"><?=number_format((int)$asset['repair_count'])?></td><td class="text-end"><?=number_format((int)$asset['completed_repairs'])?></td><td class="text-end"><?=number_format((float)$asset['parts_units'],2)?></td><td><?=hhReportEscape($asset['last_returned_at'])?></td><td class="text-end"><?=number_format((float)$asset['points_consumed'],2)?></td></tr><?php endforeach; ?>
+  <?php foreach($inventory as $asset): ?><tr><td><?=hhReportEscape($asset['type_name'])?></td><td><?=hhReportEscape($asset['subtype_name'])?></td><td><?=hhReportEscape($asset['model_name'])?></td><td><?=hhReportEscape($asset['name'])?></td><td><?=hhReportEscape($asset['otherserial'])?></td><td><?=hhReportEscape($asset['serial'])?></td><td><?=hhReportEscape($asset['manufacturer'])?></td><td><?=hhReportEscape($asset['purchase_date'])?></td><td><?=hhReportEscape($asset['age_label'])?></td><td><?=hhReportEscape($asset['warranty_end'])?></td><td><?=hhReportEscape((string)($asset['status_name'] ?? 'Sin estado'))?></td><td><?=hhReportEscape($asset['active_repair_guide'])?></td><td class="text-end"><?=number_format((int)$asset['repair_count'])?></td><td class="text-end"><?=number_format((int)$asset['completed_repairs'])?></td><td class="text-end"><?=number_format((float)$asset['parts_units'],2)?></td><td><?=hhReportEscape($asset['last_returned_at'])?></td><td class="text-end"><?=number_format((float)$asset['points_consumed'],2)?></td></tr><?php endforeach; ?>
   <?php if($inventory===[]): ?><tr><td colspan="17" class="text-center text-muted p-4">No se encontraron activos para los filtros seleccionados.</td></tr><?php endif; ?>
   </tbody></table></div></div>
  </div>
