@@ -9,21 +9,21 @@ include('../../../inc/includes.php');
 Session::checkLoginUser();
 Rights::require(Rights::READ);
 
-Html::header(__('Gestión de reparaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
+Html::header(__('Gestión de activos y reparaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 
 $catalogUrl = '/plugins/hh/front/catalog.php';
 $reportsAllowed = Rights::can(Rights::REPORTS);
 ?>
 <div class="container-fluid">
   <div class="card">
-    <div class="card-header"><h2 class="card-title">Gestión de reparaciones</h2></div>
+    <div class="card-header"><h2 class="card-title">Gestión de activos y reparaciones</h2></div>
     <div class="card-body">
-      <p class="text-muted">Administración de repuestos y servicios, cotizaciones e historial de reparaciones. La información de este módulo se almacena en las tablas del plugin, sin modificar las tablas nativas de GLPI.</p>
+      <p class="text-muted">Control general de reparaciones para activos nativos y personalizados. El módulo especializado HH conserva su esquema de puntos, garantías, contratos y cotizaciones.</p>
       <div class="row g-3">
         <?php if ($reportsAllowed): ?>
         <div class="col-sm-6 col-xl-4">
           <div class="card card-body h-100">
-            <h3><i class="ti ti-chart-bar me-2"></i>Dashboard gerencial</h3>
+            <h3><i class="ti ti-chart-bar me-2"></i>Dashboard gerencial de activos</h3>
             <p class="text-muted">Inventario completo, reparaciones aprobadas y análisis mensual de puntos.</p>
             <a class="btn btn-primary mt-auto" href="/plugins/hh/front/reports.php">Ver reportes</a>
           </div>
