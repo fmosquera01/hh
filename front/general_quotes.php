@@ -135,10 +135,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Session::addMessageAfterRedirect('Indique proveedor, fecha y descripción de la reparación.', false, ERROR);
             Html::redirect($backUrl);
         }
-        if ($totalInput === '' && $mode === 'detailed' && count($lines) > 0 && count(array_filter($lines, static fn($line) => $line['line_total'] === null)) === 0) {
-            $total = $lineSum;
+        $subtotal = $total;
+        if ($totalInput === '' && $mode === 'detailed' && count($lines) > 0) {
+            $unpricedLines = count(array_filter($lines, static fn($line) => $line['line_total'] === null));
+            $subtotal = $unpricedLines === 0 ? $lineSum : 0.0;
         }
-        $subtotal = $total > 0 ? $total : $lineSum;
         if ($subtotal <= 0) {
             Session::addMessageAfterRedirect('Ingrese el total de la cotización. Si el proveedor no desglosa los valores, utilice modalidad Importe global.', false, ERROR);
             Html::redirect($backUrl);
@@ -367,10 +368,16 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
  const money=n=>'$'+(Number.isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
  function update(){
    let amount=parseFloat(subtotal?.value)||0;
-   if(amount<=0){amount=0;root.querySelectorAll('[name="line_description[]"]').forEach((desc)=>{
-     const row=desc.closest('.line-row');const qty=parseFloat(row?.querySelector('[name="line_quantity[]"]')?.value)||0;const price=parseFloat(row?.querySelector('[name="line_price[]"]')?.value);
-     if(Number.isFinite(price))amount+=qty*price;
-   });}
+   if(amount<=0){
+     amount=0;let hasLines=false,allPriced=true;
+     root.querySelectorAll('[name="line_description[]"]').forEach((desc)=>{
+       if(!desc.value.trim())return;
+       hasLines=true;const row=desc.closest('.line-row');const qty=parseFloat(row?.querySelector('[name="line_quantity[]"]')?.value)||0;const priceText=row?.querySelector('[name="line_price[]"]')?.value??'';
+       if(priceText.trim()===''){allPriced=false;return;}
+       const price=parseFloat(priceText);if(Number.isFinite(price))amount+=qty*price;else allPriced=false;
+     });
+     if(hasLines&&!allPriced)amount=0;
+   }
    const base=Math.max(0,amount-(parseFloat(discount?.value)||0)+(parseFloat(transport?.value)||0));
    const iva=Math.round(base*rate)/100;
    if(baseOut)baseOut.textContent=money(base);if(ivaOut)ivaOut.textContent=money(iva);if(totalOut)totalOut.textContent=money(base+iva);
