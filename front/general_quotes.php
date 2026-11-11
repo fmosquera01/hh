@@ -276,7 +276,7 @@ foreach ($DB->request([
 $editingQuote = null;
 $editingLines = [];
 $editId = max(0, (int) ($_GET['edit'] ?? 0));
-if ($editId > 0 && Rights::can(Rights::UPDATE)) {
+if ($editId > 0 && Rights::can(Rights::UPDATE) && $isEligibleForQuote) {
     foreach ($quotes as $candidate) {
         if ((int) $candidate['id'] === $editId && $candidate['status'] === 'draft') {
             $editingQuote = $candidate;
