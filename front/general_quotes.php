@@ -55,7 +55,9 @@ if ($downloadId !== false && $downloadId > 0) {
     exit;
 }
 
-$backUrl = '/plugins/hh/front/general_quotes.php?embedded=1&itemtype=' . rawurlencode($itemtype) . '&items_id=' . (int) $itemsId;
+$view = (string) ($_GET['view'] ?? 'all');
+if (!in_array($view, ['all', 'drafts', 'history'], true)) { $view = 'all'; }
+$backUrl = '/plugins/hh/front/general_quotes.php?embedded=1&itemtype=' . rawurlencode($itemtype) . '&items_id=' . (int) $itemsId . '&view=' . rawurlencode($view);
 $e = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $money = static fn($value): string => '$' . number_format((float) $value, 2, '.', ',');
 $ivaRate = 15.0;
@@ -95,11 +97,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $mode = (string) ($_POST['quote_mode'] ?? 'global');
         if (!in_array($mode, ['global', 'detailed'], true)) { $mode = 'global'; }
-        $supplierId = max(0, (int) ($_POST['suppliers_id'] ?? 0));
-        $supplierName = trim((string) ($_POST['supplier_name'] ?? ''));
-        if ($supplierId > 0) {
-            foreach ($DB->request(['SELECT' => ['name'], 'FROM' => 'glpi_suppliers', 'WHERE' => ['id' => $supplierId], 'LIMIT' => 1]) as $supplier) {
-                $supplierName = (string) $supplier['name']; break;
+        $supplierId = filter_var($_POST['suppliers_id'] ?? '', FILTER_VALIDATE_INT);
+        $supplierName = '';
+        if ($supplierId !== false && $supplierId > 0) {
+            foreach ($DB->request([
+                'SELECT' => ['name'],
+                'FROM' => 'glpi_suppliers',
+                'WHERE' => ['id' => (int) $supplierId, 'is_deleted' => 0],
+                'LIMIT' => 1,
+            ]) as $supplier) {
+                $supplierName = (string) $supplier['name'];
+                break;
             }
         }
         $quoteNumber = trim((string) ($_POST['quote_number'] ?? ''));
@@ -131,8 +139,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $lines[] = ['description' => mb_substr($lineDescription, 0, 255), 'quantity' => $quantity, 'unit_price' => $unitPrice, 'line_total' => $lineTotal];
             }
         }
-        if ($supplierName === '' || $description === '' || $quoteDate === '') {
-            Session::addMessageAfterRedirect('Indique proveedor, fecha y descripción de la reparación.', false, ERROR);
+        if ($supplierId === false || $supplierId < 1 || $supplierName === '' || $description === '' || $quoteDate === '') {
+            Session::addMessageAfterRedirect('Seleccione un proveedor registrado en GLPI e indique fecha y descripción de la reparación.', false, ERROR);
             Html::redirect($backUrl);
         }
         $subtotal = $total;
@@ -244,7 +252,11 @@ foreach ($DB->request([
     'SELECT' => '*', 'FROM' => 'glpi_plugin_hh_general_quotes',
     'WHERE' => ['itemtype' => $itemtype, 'items_id' => (int) $itemsId],
     'ORDER' => ['date_creation DESC', 'id DESC'],
-]) as $row) { $quotes[] = $row; }
+]) as $row) {
+    if ($view === 'drafts' && (string) ($row['status'] ?? '') !== 'draft') { continue; }
+    if ($view === 'history' && (string) ($row['status'] ?? '') === 'draft') { continue; }
+    $quotes[] = $row;
+}
 $editingQuote = null;
 $editingLines = [];
 $editId = max(0, (int) ($_GET['edit'] ?? 0));
@@ -303,7 +315,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
 </style>
 <div class="hh-gq">
   <div class="card gq-hero mb-2"><div class="card-body d-flex justify-content-between align-items-center gap-2"><div><div class="gq-subtitle">SONGA · GESTIÓN DE REPARACIONES</div><h3>Cotizaciones de reparación</h3><div class="text-muted small"><?= $e($assetName) ?> · <?= $e($itemtype) ?> #<?= (int) $itemsId ?></div><div class="gq-subtitle mt-1">Comparación de proveedores, costos e historial de decisiones</div></div>
-    <?php if (Rights::can(Rights::CREATE)): ?><button class="btn btn-light" type="button" onclick="document.getElementById('gq-new').hidden=false;this.hidden=true">+ Nueva cotización</button><?php endif; ?>
+    <?php if (Rights::can(Rights::CREATE) && $view !== 'history'): ?><button class="btn btn-light" type="button" onclick="document.getElementById('gq-new').hidden=false;this.hidden=true">+ Nueva cotización</button><?php endif; ?>
   </div></div>
   <div class="gq-kpi-grid">
     <div class="gq-kpi"><div class="gq-kpi-label">Cotizaciones</div><div class="gq-kpi-value"><?= (int) $quoteStats['total'] ?></div></div>
@@ -318,8 +330,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
         <input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>">
         <input type="hidden" name="action" value="save"><input type="hidden" name="quote_id" value="<?= (int) ($editingQuote['id'] ?? 0) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>">
         <div class="row g-2">
-          <div class="col-12 col-md-6"><label>Proveedor registrado en GLPI</label><select class="form-select" name="suppliers_id"><option value="0">Seleccionar o escribir proveedor</option><?php foreach ($suppliers as $supplier): ?><option value="<?= (int) $supplier['id'] ?>" <?= (int) ($editingQuote['suppliers_id'] ?? 0) === (int) $supplier['id'] ? 'selected' : '' ?>><?= $e($supplier['name']) ?></option><?php endforeach; ?></select></div>
-          <div class="col-12 col-md-6"><label>Proveedor (si no está en GLPI)</label><input class="form-control" name="supplier_name" maxlength="180" value="<?= $e($editingQuote['supplier_name_snapshot'] ?? '') ?>"></div>
+          <div class="col-12 col-md-6"><label>Proveedor registrado en GLPI</label><select class="form-select" name="suppliers_id" required><option value="">Seleccione un proveedor registrado</option><?php foreach ($suppliers as $supplier): ?><option value="<?= (int) $supplier['id'] ?>" <?= (int) ($editingQuote['suppliers_id'] ?? 0) === (int) $supplier['id'] ? 'selected' : '' ?>><?= $e($supplier['name']) ?></option><?php endforeach; ?></select></div>
           <div class="col-6 col-md-3"><label>N.º cotización</label><input class="form-control" name="quote_number" maxlength="100" value="<?= $e($editingQuote['quote_number'] ?? '') ?>"></div>
           <div class="col-6 col-md-3"><label>Fecha</label><input class="form-control" type="date" name="quote_date" value="<?= $e($editingQuote['quote_date'] ?? date('Y-m-d')) ?>" required></div>
           <div class="col-6 col-md-3"><label>Vigencia hasta</label><input class="form-control" type="date" name="valid_until" value="<?= $e($editingQuote['valid_until'] ?? '') ?>"></div>
@@ -339,7 +350,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
       </form>
     </div>
   </section>
-  <?php if (!$quotes): ?><div class="alert alert-light border small">Todavía no hay cotizaciones para este activo. Puedes registrar una aunque no exista ticket ni esté en estado de reparación.</div><?php endif; ?>
+  <?php if (!$quotes): ?><div class="alert alert-light border small"><?php if ($view === 'drafts'): ?>No hay cotizaciones en borrador para este activo.<?php elseif ($view === 'history'): ?>Todavía no hay cotizaciones en el historial de este activo.<?php else: ?>Todavía no hay cotizaciones para este activo. Puedes registrar una aunque no exista ticket ni esté en estado de reparación.<?php endif; ?></div><?php endif; ?>
   <?php foreach ($quotes as $q): ?>
     <article class="card quote-card status-<?= $e($q['status']) ?>"><div class="card-body">
       <div class="d-flex flex-wrap justify-content-between gap-2"><div><strong><?= $e($q['supplier_name_snapshot']) ?></strong> <span class="status status-<?= $e($q['status']) ?>"><?= $e(strtoupper((string) $q['status'])) ?></span><div class="text-muted small"><?= $e($q['quote_number'] ?: 'Sin número') ?> · <?= $e($q['quote_date']) ?> · <?= $e($q['description']) ?></div></div><div class="text-end"><strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong><div class="text-muted small"><?= $q['quote_mode'] === 'global' ? 'Importe global' : 'Detalle libre' ?> · IVA <?= number_format((float) ($q['iva_rate_snapshot'] ?? 15), 2) ?> %</div></div></div>
