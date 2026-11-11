@@ -190,7 +190,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Html::redirect($backUrl);
     }
 
-    if (!$quote || !Rights::can(Rights::APPROVE)) { Html::displayRightError(); }
+    if (!$quote) { Html::displayErrorAndDie('Cotización no encontrada.'); }
+    if (($action === 'submit' && !Rights::can(Rights::UPDATE))
+        || (in_array($action, ['approve', 'reject', 'select', 'cancel'], true) && !Rights::can(Rights::APPROVE))) {
+        Html::displayRightError();
+    }
     $oldStatus = (string) $quote['status'];
     if ($action === 'submit' && $oldStatus === 'draft') {
         $newStatus = 'pending';
@@ -274,7 +278,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
     <?php endif; ?>
   </div>
   <section class="card" id="gq-new" <?= $editingQuote ? '' : 'hidden' ?>>
-    <div class="card-header"><h3>Nueva cotización · Proveedor</h3></div>
+    <div class="card-header"><h3><?= $editingQuote ? 'Editar cotización en borrador' : 'Nueva cotización · Proveedor' ?></h3></div>
     <div class="card-body">
       <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>">
@@ -305,6 +309,14 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
     <article class="card quote-card"><div class="card-body">
       <div class="d-flex flex-wrap justify-content-between gap-2"><div><strong><?= $e($q['supplier_name_snapshot']) ?></strong> <span class="status"><?= $e(strtoupper((string) $q['status'])) ?></span><div class="text-muted small"><?= $e($q['quote_number'] ?: 'Sin número') ?> · <?= $e($q['quote_date']) ?> · <?= $e($q['description']) ?></div></div><div class="text-end"><strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong><div class="text-muted small"><?= $q['quote_mode'] === 'global' ? 'Importe global' : 'Detalle libre' ?></div></div></div>
       <?php if (!empty($q['attachment_path'])): ?><div class="small mt-2"><a href="<?= $e($backUrl . '&download=' . (int) $q['id']) ?>" target="_blank" rel="noopener">Ver documento del proveedor: <?= $e($q['attachment_name']) ?></a></div><?php endif; ?>
+      <?php
+        $quoteLines = [];
+        foreach ($DB->request(['SELECT' => '*', 'FROM' => 'glpi_plugin_hh_general_quotelines', 'WHERE' => ['general_quotes_id' => (int) $q['id']], 'ORDER' => ['id']]) as $line) { $quoteLines[] = $line; }
+        $quoteEvents = [];
+        foreach ($DB->request(['SELECT' => '*', 'FROM' => 'glpi_plugin_hh_general_quotehistory', 'WHERE' => ['general_quotes_id' => (int) $q['id']], 'ORDER' => ['date_creation DESC', 'id DESC']]) as $event) { $quoteEvents[] = $event; }
+      ?>
+      <?php if ($quoteLines): ?><div class="table-responsive mt-2"><table class="table table-sm table-bordered mb-1"><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unitario</th><th>Total línea</th></tr></thead><tbody><?php foreach ($quoteLines as $line): ?><tr><td><?= $e($line['description']) ?></td><td><?= number_format((float) $line['quantity'], 2) ?></td><td><?= $line['unit_price'] !== null ? $e($q['currency']) . ' ' . number_format((float) $line['unit_price'], 2) : 'No desglosado' ?></td><td><?= $line['line_total'] !== null ? $e($q['currency']) . ' ' . number_format((float) $line['line_total'], 2) : 'No desglosado' ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
+      <?php if ($quoteEvents): ?><details class="small mt-2"><summary>Historial de decisiones (<?= count($quoteEvents) ?>)</summary><ul class="mb-0 mt-1"><?php foreach ($quoteEvents as $event): ?><li><?= $e($event['date_creation']) ?> · <?= $e($event['old_status'] ?: 'Nueva') ?> → <?= $e($event['new_status']) ?> · <?= $e($event['comment'] ?? '') ?></li><?php endforeach; ?></ul></details><?php endif; ?>
       <?php if ($q['status'] === 'draft' && Rights::can(Rights::UPDATE)): ?><a class="btn btn-sm btn-outline-secondary mt-2" href="<?= $e($backUrl . '&edit=' . (int) $q['id']) ?>">Editar borrador</a><form method="post" class="mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><button class="btn btn-sm btn-outline-primary" name="action" value="submit">Enviar a aprobación</button></form><?php endif; ?>
       <?php if ($q['status'] === 'pending' && Rights::can(Rights::APPROVE)): ?><form method="post" class="d-flex flex-wrap gap-2 mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><input class="form-control form-control-sm" name="comment" placeholder="Comentario de aprobación / rechazo"><button class="btn btn-sm btn-success" name="action" value="approve">Aprobar</button><button class="btn btn-sm btn-outline-danger" name="action" value="reject">Rechazar</button></form><?php endif; ?>
       <?php if ($q['status'] === 'approved' && Rights::can(Rights::APPROVE)): ?><form method="post" class="mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><input class="form-control form-control-sm mb-1" name="comment" placeholder="Motivo de selección del proveedor" required><button class="btn btn-sm btn-primary" name="action" value="select">Seleccionar proveedor</button></form><?php endif; ?>
