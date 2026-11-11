@@ -156,3 +156,9 @@ La versión 0.5.18 ajusta la identificación del formulario de recepción para u
 - Las cotizaciones HH requieren que el activo esté en **REPARACIÓN Proveedor** y que el ticket asociado tenga **número de guía**, **fecha de envío al proveedor** y **fecha de recepción por el proveedor**.
 - Las condiciones se validan tanto en la interfaz como en el servidor al guardar. La lista de activos disponibles para cotizar HH también se limita a los que cumplen los requisitos.
 - Si el activo deja de cumplir las condiciones, no se puede crear ni editar un borrador. El historial de cotizaciones existentes se conserva.
+
+
+## Corrección de sintaxis PHP (0.5.33)
+
+- Corrige el cierre de las condiciones PHP de la pantalla de cotizaciones HH. La versión 0.5.32 podía provocar un error de análisis al cargar el formulario.
+- Cuando el activo no cumple los requisitos de cotización, la pantalla muestra el aviso de bloqueo sin intentar renderizar el formulario.
