@@ -12,7 +12,7 @@ global $DB;
 
 $message = '';
 $error = '';
-$currentRate = 15.0;
+$currentRate = 15.0;\n$policy = RepairAlerts::getPolicy();
 foreach ($DB->request(['SELECT' => ['iva_rate'], 'FROM' => 'glpi_plugin_hh_general_quote_config', 'WHERE' => ['id' => 1], 'LIMIT' => 1]) as $row) {
     $currentRate = (float) $row['iva_rate'];
 }
@@ -24,10 +24,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $DB->update('glpi_plugin_hh_general_quote_config', [
             'iva_rate' => number_format((float) $rate, 3, '.', ''),
-            'users_id' => (int) Session::getLoginUserID(),
+            'users_id' => (int) Session::getLoginUserID(),\n            'repair_repeat_days' => (int) $repeatDays,\n            'repair_cost_percent' => number_format((float) $costPercent, 2, '.', ''),\n            'renewal_years' => (int) $renewalYears,
         ], ['id' => 1]);
-        $currentRate = (float) $rate;
-        $message = 'Configuración de IVA guardada. Las nuevas cotizaciones utilizarán esta tasa; las anteriores conservarán su porcentaje.';
+        $currentRate = (float) $rate;\n        $policy = ['repair_repeat_days' => (int)$repeatDays, 'repair_cost_percent' => (float)$costPercent, 'renewal_years' => (int)$renewalYears];
+        $message = 'Configuración de criterios guardada. Las alertas se aplican a las nuevas consultas sin modificar el historial.';
     }
 }
 
@@ -42,8 +42,8 @@ Html::header('Configuración de IVA', $_SERVER['PHP_SELF'], 'plugins', Dashboard
 <div class="container-fluid hh-iva">
   <div class="card hero mb-3"><div class="card-body">
     <div class="small text-uppercase">Songa · Gestión de reparaciones</div>
-    <h2 class="mb-1">Configuración de IVA</h2>
-    <div class="text-muted small">Tasa aplicada automáticamente a las cotizaciones generales de activos que no son Handheld.</div>
+    <h2 class="mb-1">Configuración de criterios de reparación</h2>
+    <div class="text-muted small">Define los umbrales de alertas de reparación y revisión de renovación. Las cotizaciones generales continúan registrándose sin IVA.</div>
   </div></div>
   <div class="card"><div class="card-header"><strong>Impuesto al valor agregado</strong></div><div class="card-body">
     <?php if ($message !== ''): ?><div class="alert alert-success"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
@@ -54,6 +54,12 @@ Html::header('Configuración de IVA', $_SERVER['PHP_SELF'], 'plugins', Dashboard
         <input class="form-control" id="iva_rate" name="iva_rate" type="number" min="0" max="100" step="0.001" value="<?= htmlspecialchars(number_format($currentRate, 3, '.', ''), ENT_QUOTES, 'UTF-8') ?>" required>
         <div class="form-hint">Valor inicial: 15 %. Puedes modificarlo cuando cambie la tasa tributaria.</div>
       </div>
+      <div class="border rounded p-3 mb-3">
+        <h3 class="h4">Alertas y ciclo de vida</h3>
+        <div class="mb-3"><label for="repair_repeat_days" class="form-label">Días para detectar reparación recurrente</label><input class="form-control" id="repair_repeat_days" name="repair_repeat_days" type="number" min="1" max="365" value="<?= (int)$policy['repair_repeat_days'] ?>" required><div class="form-hint">Al registrar una nueva cotización, advierte si el activo regresó de una reparación dentro de este período.</div></div>
+        <div class="mb-3"><label for="repair_cost_percent" class="form-label">Umbral de costo de reparación (%)</label><input class="form-control" id="repair_cost_percent" name="repair_cost_percent" type="number" min="1" max="100" step="0.01" value="<?= htmlspecialchars(number_format((float)$policy['repair_cost_percent'], 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>" required><div class="form-hint">Advierte cuando el costo cotizado alcance este porcentaje del valor de compra del activo.</div></div>
+        <div class="mb-3"><label for="renewal_years" class="form-label">Antigüedad para revisar renovación (años)</label><input class="form-control" id="renewal_years" name="renewal_years" type="number" min="1" max="20" value="<?= (int)$policy['renewal_years'] ?>" required><div class="form-hint">Es un indicador de revisión, no una orden automática de reemplazo.</div></div>
+      </div>
       <div class="rounded border p-3 mb-3">
         <div class="text-muted small">Ejemplo de cálculo con subtotal de $100,00</div>
         <div class="iva-value text-primary"><?= number_format($currentRate, 2) ?> %</div>
@@ -61,7 +67,7 @@ Html::header('Configuración de IVA', $_SERVER['PHP_SELF'], 'plugins', Dashboard
         <div>IVA: <strong>$<?= number_format(100 * $currentRate / 100, 2, '.', ',') ?></strong></div>
         <div>Total: <strong>$<?= number_format(100 + 100 * $currentRate / 100, 2, '.', ',') ?></strong></div>
       </div>
-      <button class="btn btn-primary" type="submit">Guardar tasa de IVA</button>
+      <button class="btn btn-primary" type="submit">Guardar criterios</button>
       <a class="btn btn-secondary" href="/plugins/hh/front/index.php">Volver</a>
     </form>
   </div></div>
