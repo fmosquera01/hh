@@ -95,6 +95,74 @@ final class RepairWorkflow
         }
     }
 
+
+    /** Verify that an asset is currently in the supplier-repair state. */
+    public static function isInSupplierRepairState(string $itemtype, int $itemsId): bool
+    {
+        global $DB, $CFG_GLPI;
+        if ($itemsId < 1 || !in_array($itemtype, $CFG_GLPI['asset_types'] ?? [], true)
+            || !class_exists($itemtype) || !is_a($itemtype, CommonDBTM::class, true)) {
+            return false;
+        }
+        $asset = new $itemtype();
+        if (!$asset->getFromDB($itemsId)) return false;
+        $stateId = (int) ($asset->fields['states_id'] ?? 0);
+        if ($stateId < 1 || !$DB->tableExists('glpi_states')) return false;
+        foreach ($DB->request(['SELECT' => ['name'], 'FROM' => 'glpi_states', 'WHERE' => ['id' => $stateId], 'LIMIT' => 1]) as $state) {
+            return self::normalize((string) ($state['name'] ?? '')) === self::normalize(self::STATUS_SUPPLIER);
+        }
+        return false;
+    }
+
+    /**
+     * Find the latest linked ticket with the required supplier dispatch data.
+     * Non-HH assets require guide + dispatch date; HH additionally requires
+     * supplier-received date.
+     */
+    public static function getSupplierTrackingForAsset(string $itemtype, int $itemsId, bool $requireSupplierReceived): ?array
+    {
+        global $DB;
+        if ($itemsId < 1 || !$DB->tableExists('glpi_items_tickets')
+            || !$DB->tableExists('glpi_plugin_fields_ticketreparacions')) return null;
+        $required = ['nmerodeguafield', 'fechaenvioaproveedorfieldtwo'];
+        if ($requireSupplierReceived) $required[] = 'fecharecepcionproveedorfieldtwo';
+        foreach ($required as $field) {
+            if (!$DB->fieldExists('glpi_plugin_fields_ticketreparacions', $field)) return null;
+        }
+        foreach ($DB->request([
+            'SELECT' => ['tickets_id'],
+            'FROM' => 'glpi_items_tickets',
+            'WHERE' => ['itemtype' => $itemtype, 'items_id' => $itemsId],
+            'ORDER' => ['tickets_id DESC'],
+        ]) as $link) {
+            $ticketId = (int) ($link['tickets_id'] ?? 0);
+            if ($ticketId < 1) continue;
+            foreach ($DB->request([
+                'SELECT' => $required,
+                'FROM' => 'glpi_plugin_fields_ticketreparacions',
+                'WHERE' => ['items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 15],
+                'LIMIT' => 1,
+            ]) as $fields) {
+                $guide = trim((string) ($fields['nmerodeguafield'] ?? ''));
+                $sent = trim((string) ($fields['fechaenvioaproveedorfieldtwo'] ?? ''));
+                $received = trim((string) ($fields['fecharecepcionproveedorfieldtwo'] ?? ''));
+                $validDate = static function (string $value): bool {
+                    if ($value === '' || str_starts_with($value, '0000-00-00')) return false;
+                    try { new DateTimeImmutable($value); return true; } catch (Throwable $e) { return false; }
+                };
+                if ($guide !== '' && $validDate($sent) && (!$requireSupplierReceived || $validDate($received))) {
+                    return [
+                        'tickets_id' => $ticketId,
+                        'guide_number' => $guide,
+                        'sent_to_supplier_at' => $sent,
+                        'supplier_received_at' => $received,
+                    ];
+                }
+            }
+        }
+        return null;
+    }
+
     public static function changeAssetState(
         string $itemtype,
         int $itemsId,
