@@ -7,6 +7,8 @@ use GlpiPlugin\Hh\Rights;
 
 include('../../../inc/includes.php');
 
+global $DB;
+
 Session::checkLoginUser();
 Rights::require(Rights::CATALOG);
 
