@@ -45,8 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($requestTypeId === false || $requestTypeId < 1 || mb_strtolower($selectedOrigin) !== 'formularioreparacion') {
         $error = 'Seleccione exactamente el origen de solicitud FormularioReparacion en GLPI.';
     } elseif (RepairWorkflow::findStateId(RepairWorkflow::STATUS_SYSTEMS) < 1
-        || RepairWorkflow::findStateId(RepairWorkflow::STATUS_SUPPLIER) < 1) {
-        $error = 'No se encontraron los estados REPARACIÓN Sistemas y/o REPARACIÓN Proveedor en los estados de GLPI.';
+        || RepairWorkflow::findStateId(RepairWorkflow::STATUS_SUPPLIER) < 1
+        || RepairWorkflow::findStateId(RepairWorkflow::STATUS_FREE) < 1) {
+        $error = 'No se encontraron los estados REPARACIÓN Sistemas, REPARACIÓN Proveedor y/o LIBRE en los estados de GLPI.';
     } else {
         RepairWorkflow::saveConfig((int) $requestTypeId, $enabled);
         $current = RepairWorkflow::getConfig();
@@ -81,7 +82,8 @@ Html::header(__('Configuración del flujo de reparación', 'hh'), $_SERVER['PHP_
           <ul>
             <li>REPARACIÓN Sistemas: <?= RepairWorkflow::findStateId(RepairWorkflow::STATUS_SYSTEMS) > 0 ? '<span class="text-success">Encontrado</span>' : '<span class="text-danger">No encontrado</span>' ?></li>
             <li>REPARACIÓN Proveedor: <?= RepairWorkflow::findStateId(RepairWorkflow::STATUS_SUPPLIER) > 0 ? '<span class="text-success">Encontrado</span>' : '<span class="text-danger">No encontrado</span>' ?></li>
-            <li>LIBRE y DAÑADO se utilizan para los indicadores del dashboard.</li>
+            <li>LIBRE: <?= RepairWorkflow::findStateId(RepairWorkflow::STATUS_FREE) > 0 ? '<span class="text-success">Encontrado</span>' : '<span class="text-danger">No encontrado</span>' ?></li>
+            <li>DAÑADO se utiliza para los indicadores del dashboard.</li>
           </ul>
         </div>
         <button class="btn btn-primary" type="submit">Guardar configuración</button>
