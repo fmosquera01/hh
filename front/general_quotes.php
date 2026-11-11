@@ -233,6 +233,23 @@ foreach ($DB->request([
     'WHERE' => ['itemtype' => $itemtype, 'items_id' => (int) $itemsId],
     'ORDER' => ['date_creation DESC', 'id DESC'],
 ]) as $row) { $quotes[] = $row; }
+$editingQuote = null;
+$editingLines = [];
+$editId = max(0, (int) ($_GET['edit'] ?? 0));
+if ($editId > 0 && Rights::can(Rights::UPDATE)) {
+    foreach ($quotes as $candidate) {
+        if ((int) $candidate['id'] === $editId && $candidate['status'] === 'draft') {
+            $editingQuote = $candidate;
+            break;
+        }
+    }
+    if ($editingQuote) {
+        foreach ($DB->request([
+            'SELECT' => '*', 'FROM' => 'glpi_plugin_hh_general_quotelines',
+            'WHERE' => ['general_quotes_id' => $editId], 'ORDER' => ['id'],
+        ]) as $line) { $editingLines[] = $line; }
+    }
+}
 $suppliers = [];
 foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_suppliers', 'WHERE' => ['is_deleted' => 0], 'ORDER' => ['name']]) as $row) { $suppliers[] = $row; }
 
@@ -252,34 +269,34 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
 <div class="hh-gq">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <div><h3>Cotizaciones de reparación</h3><div class="text-muted small"><?= $e($assetName) ?> · <?= $e($itemtype) ?> #<?= (int) $itemsId ?></div></div>
-    <?php if (Rights::can(Rights::CREATE) || Rights::can(Rights::UPDATE)): ?>
+    <?php if (Rights::can(Rights::CREATE)): ?>
       <button class="btn btn-primary" type="button" onclick="document.getElementById('gq-new').hidden=false;this.hidden=true">Nueva cotización</button>
     <?php endif; ?>
   </div>
-  <section class="card" id="gq-new" hidden>
+  <section class="card" id="gq-new" <?= $editingQuote ? '' : 'hidden' ?>>
     <div class="card-header"><h3>Nueva cotización · Proveedor</h3></div>
     <div class="card-body">
       <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>">
-        <input type="hidden" name="action" value="save"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>">
+        <input type="hidden" name="action" value="save"><input type="hidden" name="quote_id" value="<?= (int) ($editingQuote['id'] ?? 0) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>">
         <div class="row g-2">
-          <div class="col-12 col-md-6"><label>Proveedor registrado en GLPI</label><select class="form-select" name="suppliers_id"><option value="0">Seleccionar o escribir proveedor</option><?php foreach ($suppliers as $supplier): ?><option value="<?= (int) $supplier['id'] ?>"><?= $e($supplier['name']) ?></option><?php endforeach; ?></select></div>
-          <div class="col-12 col-md-6"><label>Proveedor (si no está en GLPI)</label><input class="form-control" name="supplier_name" maxlength="180"></div>
-          <div class="col-6 col-md-3"><label>N.º cotización</label><input class="form-control" name="quote_number" maxlength="100"></div>
-          <div class="col-6 col-md-3"><label>Fecha</label><input class="form-control" type="date" name="quote_date" value="<?= date('Y-m-d') ?>" required></div>
-          <div class="col-6 col-md-3"><label>Vigencia hasta</label><input class="form-control" type="date" name="valid_until"></div>
-          <div class="col-6 col-md-3"><label>Moneda</label><select class="form-select" name="currency"><option>USD</option><option>EUR</option><option>COP</option><option>PEN</option></select></div>
-          <div class="col-12"><label>Descripción de la reparación / alcance</label><input class="form-control" name="description" maxlength="255" required placeholder="Ej. Reparación de monitor, cambio de panel..."></div>
-          <div class="col-12"><label>Formato recibido del proveedor</label><select class="form-select" name="quote_mode" id="gq-mode" onchange="document.getElementById('gq-lines').hidden=this.value!=='detailed'"><option value="global">Importe global (sin desglose)</option><option value="detailed">Detalle libre de conceptos</option></select></div>
-          <div class="col-12" id="gq-lines" hidden><label>Conceptos (no requiere catálogo ni códigos)</label><div id="gq-line-list"><div class="line-row"><input class="form-control line-description" name="line_description[]" placeholder="Concepto o trabajo"><input class="form-control" name="line_quantity[]" type="number" min="0.01" step="0.01" value="1" placeholder="Cant."><input class="form-control" name="line_price[]" type="number" min="0" step="0.01" placeholder="Precio unitario (opcional)"><span></span></div></div><button class="btn btn-outline-secondary" type="button" onclick="const n=document.querySelector('.line-row').cloneNode(true);n.querySelectorAll('input').forEach(i=>i.value='');document.getElementById('gq-line-list').appendChild(n)">Agregar concepto</button></div>
-          <div class="col-6 col-md-3"><label>Subtotal / importe informado</label><input class="form-control" name="total_amount" type="number" min="0.01" step="0.01" required placeholder="0.00"></div>
-          <div class="col-6 col-md-3"><label>Descuento</label><input class="form-control" name="discount" type="number" min="0" step="0.01" value="0"></div>
-          <div class="col-6 col-md-3"><label>Impuestos</label><input class="form-control" name="tax" type="number" min="0" step="0.01" value="0"></div>
-          <div class="col-6 col-md-3"><label>Transporte / otros</label><input class="form-control" name="transport" type="number" min="0" step="0.01" value="0"></div>
-          <div class="col-12"><label>Observaciones y condiciones</label><textarea class="form-control" name="observations" rows="2"></textarea></div>
+          <div class="col-12 col-md-6"><label>Proveedor registrado en GLPI</label><select class="form-select" name="suppliers_id"><option value="0">Seleccionar o escribir proveedor</option><?php foreach ($suppliers as $supplier): ?><option value="<?= (int) $supplier['id'] ?>" <?= (int) ($editingQuote['suppliers_id'] ?? 0) === (int) $supplier['id'] ? 'selected' : '' ?>><?= $e($supplier['name']) ?></option><?php endforeach; ?></select></div>
+          <div class="col-12 col-md-6"><label>Proveedor (si no está en GLPI)</label><input class="form-control" name="supplier_name" maxlength="180" value="<?= $e($editingQuote['supplier_name_snapshot'] ?? '') ?>"></div>
+          <div class="col-6 col-md-3"><label>N.º cotización</label><input class="form-control" name="quote_number" maxlength="100" value="<?= $e($editingQuote['quote_number'] ?? '') ?>"></div>
+          <div class="col-6 col-md-3"><label>Fecha</label><input class="form-control" type="date" name="quote_date" value="<?= $e($editingQuote['quote_date'] ?? date('Y-m-d')) ?>" required></div>
+          <div class="col-6 col-md-3"><label>Vigencia hasta</label><input class="form-control" type="date" name="valid_until" value="<?= $e($editingQuote['valid_until'] ?? '') ?>"></div>
+          <div class="col-6 col-md-3"><label>Moneda</label><select class="form-select" name="currency"><?php foreach (['USD','EUR','COP','PEN'] as $currency): ?><option <?= ($editingQuote['currency'] ?? 'USD') === $currency ? 'selected' : '' ?>><?= $currency ?></option><?php endforeach; ?></select></div>
+          <div class="col-12"><label>Descripción de la reparación / alcance</label><input class="form-control" name="description" maxlength="255" required placeholder="Ej. Reparación de monitor, cambio de panel..." value="<?= $e($editingQuote['description'] ?? '') ?>"></div>
+          <div class="col-12"><label>Formato recibido del proveedor</label><select class="form-select" name="quote_mode" id="gq-mode" onchange="document.getElementById('gq-lines').hidden=this.value!=='detailed'"><option value="global" <?= ($editingQuote['quote_mode'] ?? 'global') === 'global' ? 'selected' : '' ?>>Importe global (sin desglose)</option><option value="detailed" <?= ($editingQuote['quote_mode'] ?? '') === 'detailed' ? 'selected' : '' ?>>Detalle libre de conceptos</option></select></div>
+          <div class="col-12" id="gq-lines" <?= ($editingQuote['quote_mode'] ?? '') === 'detailed' ? '' : 'hidden' ?>><label>Conceptos (no requiere catálogo ni códigos)</label><div id="gq-line-list"><?php if ($editingLines): foreach ($editingLines as $line): ?><div class="line-row"><input class="form-control line-description" name="line_description[]" placeholder="Concepto o trabajo" value="<?= $e($line['description']) ?>"><input class="form-control" name="line_quantity[]" type="number" min="0.01" step="0.01" value="<?= $e($line['quantity']) ?>" placeholder="Cant."><input class="form-control" name="line_price[]" type="number" min="0" step="0.01" placeholder="Precio unitario (opcional)" value="<?= $line['unit_price'] !== null ? $e($line['unit_price']) : '' ?>"><span></span></div><?php endforeach; else: ?><div class="line-row"><input class="form-control line-description" name="line_description[]" placeholder="Concepto o trabajo"><input class="form-control" name="line_quantity[]" type="number" min="0.01" step="0.01" value="1" placeholder="Cant."><input class="form-control" name="line_price[]" type="number" min="0" step="0.01" placeholder="Precio unitario (opcional)"><span></span></div><?php endif; ?></div><button class="btn btn-outline-secondary" type="button" onclick="const n=document.querySelector('.line-row').cloneNode(true);n.querySelectorAll('input').forEach(i=>i.value='');document.getElementById('gq-line-list').appendChild(n)">Agregar concepto</button></div>
+          <div class="col-6 col-md-3"><label>Subtotal / importe informado</label><input class="form-control" name="total_amount" type="number" min="0.01" step="0.01" required placeholder="0.00" value="<?= $e($editingQuote['subtotal'] ?? '') ?>"></div>
+          <div class="col-6 col-md-3"><label>Descuento</label><input class="form-control" name="discount" type="number" min="0" step="0.01" value="<?= $e($editingQuote['discount'] ?? '0') ?>"></div>
+          <div class="col-6 col-md-3"><label>Impuestos</label><input class="form-control" name="tax" type="number" min="0" step="0.01" value="<?= $e($editingQuote['tax'] ?? '0') ?>"></div>
+          <div class="col-6 col-md-3"><label>Transporte / otros</label><input class="form-control" name="transport" type="number" min="0" step="0.01" value="<?= $e($editingQuote['transport'] ?? '0') ?>"></div>
+          <div class="col-12"><label>Observaciones y condiciones</label><textarea class="form-control" name="observations" rows="2"><?= $e($editingQuote['observations'] ?? '') ?></textarea></div>
           <div class="col-12"><label>Documento original (PDF, JPG o PNG; máximo 12 MB)</label><input class="form-control" type="file" name="quote_file" accept=".pdf,.jpg,.jpeg,.png"></div>
         </div>
-        <div class="d-flex gap-2 mt-3"><button class="btn btn-primary" type="submit">Guardar borrador</button><button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('gq-new').hidden=true">Cancelar</button></div>
+        <div class="d-flex gap-2 mt-3"><button class="btn btn-primary" type="submit"><?= $editingQuote ? 'Guardar cambios' : 'Guardar borrador' ?></button><button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('gq-new').hidden=true">Cancelar</button></div>
       </form>
     </div>
   </section>
@@ -288,7 +305,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
     <article class="card quote-card"><div class="card-body">
       <div class="d-flex flex-wrap justify-content-between gap-2"><div><strong><?= $e($q['supplier_name_snapshot']) ?></strong> <span class="status"><?= $e(strtoupper((string) $q['status'])) ?></span><div class="text-muted small"><?= $e($q['quote_number'] ?: 'Sin número') ?> · <?= $e($q['quote_date']) ?> · <?= $e($q['description']) ?></div></div><div class="text-end"><strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong><div class="text-muted small"><?= $q['quote_mode'] === 'global' ? 'Importe global' : 'Detalle libre' ?></div></div></div>
       <?php if (!empty($q['attachment_path'])): ?><div class="small mt-2"><a href="<?= $e($backUrl . '&download=' . (int) $q['id']) ?>" target="_blank" rel="noopener">Ver documento del proveedor: <?= $e($q['attachment_name']) ?></a></div><?php endif; ?>
-      <?php if ($q['status'] === 'draft' && Rights::can(Rights::UPDATE)): ?><form method="post" class="mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><button class="btn btn-sm btn-outline-primary" name="action" value="submit">Enviar a aprobación</button></form><?php endif; ?>
+      <?php if ($q['status'] === 'draft' && Rights::can(Rights::UPDATE)): ?><a class="btn btn-sm btn-outline-secondary mt-2" href="<?= $e($backUrl . '&edit=' . (int) $q['id']) ?>">Editar borrador</a><form method="post" class="mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><button class="btn btn-sm btn-outline-primary" name="action" value="submit">Enviar a aprobación</button></form><?php endif; ?>
       <?php if ($q['status'] === 'pending' && Rights::can(Rights::APPROVE)): ?><form method="post" class="d-flex flex-wrap gap-2 mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><input class="form-control form-control-sm" name="comment" placeholder="Comentario de aprobación / rechazo"><button class="btn btn-sm btn-success" name="action" value="approve">Aprobar</button><button class="btn btn-sm btn-outline-danger" name="action" value="reject">Rechazar</button></form><?php endif; ?>
       <?php if ($q['status'] === 'approved' && Rights::can(Rights::APPROVE)): ?><form method="post" class="mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><input class="form-control form-control-sm mb-1" name="comment" placeholder="Motivo de selección del proveedor" required><button class="btn btn-sm btn-primary" name="action" value="select">Seleccionar proveedor</button></form><?php endif; ?>
       <?php if ($q['status'] === 'selected'): ?><div class="small text-success mt-2">Proveedor seleccionado · <?= $e($q['selection_reason']) ?></div><?php endif; ?>
