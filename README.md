@@ -103,7 +103,7 @@ Se amplía el dashboard con análisis visual de antigüedad del inventario, esta
 - El módulo general no utiliza puntos. El esquema de puntos, contratos, garantías, cotizaciones y catálogo HH continúa reservado exclusivamente a Handhelds.
 - La recepción del activo se detecta en el hook síncrono `ITEM_ADD` de `Ticket_Item`. El activo asociado al ticket cambia inmediatamente a **REPARACIÓN Sistemas**, sin Cron ni tarea programada, únicamente cuando el ticket tiene el origen de solicitud configurado como **FormularioReparacion** (`requesttypes_id`).
 - Para impedir que tickets ordinarios cambien estados por accidente, el hook solo actúa cuando el origen de solicitud del ticket coincide con **FormularioReparacion**, seleccionado en **Gestión de activos y reparaciones > Configurar flujo**. Asigne ese origen al formulario de recepción del catálogo de servicios.
-- Al enviar el equipo a proveedor, el técnico utiliza **Enviar a proveedor** y el estado cambia a **REPARACIÓN Proveedor**. Al recibirlo de vuelta, utiliza **Regresó del proveedor** para devolverlo a **REPARACIÓN Sistemas**.
+- Al enviar el equipo a proveedor, el técnico utiliza **Enviar a proveedor** y el estado cambia a **REPARACIÓN Proveedor**. Al recibirlo de vuelta, utiliza **Regresó del proveedor · LIBRE** para cambiarlo directamente a **LIBRE**.
 - Al finalizar, **Finalizar reparación** restaura el estado que el activo tenía antes de la recepción. La asignación del usuario no se modifica.
 - Cada transición se registra en `glpi_plugin_hh_asset_history` y se activa el historial nativo de GLPI en el cambio de estado.
 - El dashboard añade indicadores globales de **REPARACIÓN Sistemas**, **REPARACIÓN Proveedor**, **LIBRE** (backup), **DAÑADO** y **Asignados**. Los cinco indicadores se calculan sobre el inventario completo visible para el usuario, independientemente de los filtros de HH.
@@ -114,10 +114,10 @@ Se amplía el dashboard con análisis visual de antigüedad del inventario, esta
 1. En GLPI, cree o identifique el origen de solicitud **FormularioReparacion** en **Configuración > Desplegables > Origen de la solicitud**.
 2. En el formulario del catálogo de servicios, configure **FormularioReparacion** como origen de la solicitud del ticket creado.
 3. En **Plugins > Gestión de activos y reparaciones > Configurar flujo**, seleccione **FormularioReparacion** y active el cambio automático.
-4. Compruebe que existan los estados exactos **REPARACIÓN Sistemas** y **REPARACIÓN Proveedor**. Para los indicadores también se reconocen **LIBRE** y **DAÑADO**.
+4. Compruebe que existan los estados exactos **REPARACIÓN Sistemas**, **REPARACIÓN Proveedor** y **LIBRE**. Para los indicadores también se reconoce **DAÑADO**.
 5. Cree un ticket desde el formulario, seleccione un activo y verifique que su estado cambie antes de finalizar la respuesta de creación del ticket.
 6. Cree un ticket ordinario con otra categoría y confirme que el estado del activo no cambie.
-7. Pruebe el envío a proveedor, recepción desde proveedor y finalización. El último paso debe restaurar el estado previo a la recepción.
+7. Pruebe el envío a proveedor y recepción desde proveedor. Al regresar, el activo debe quedar directamente en **LIBRE**. Para reparaciones internas sin envío a proveedor, **Finalizar reparación** conserva la restauración del estado previo.
 
 La versión 0.5.18 ajusta la identificación del formulario de recepción para utilizar el origen de solicitud `FormularioReparacion` en lugar de una categoría ITIL. El flujo general debe validarse en una instancia de pruebas antes de producción. No ejecutar pruebas destructivas ni cambiar estados de activos productivos.
 
@@ -126,3 +126,10 @@ La versión 0.5.18 ajusta la identificación del formulario de recepción para u
 - Homologa la cabecera de Gestión de reparaciones para activos nativos y Asset Definitions, mostrando datos de compra, garantía, contrato y seguimiento cuando GLPI dispone de ellos.
 - Añade las pestañas Cotizaciones en borrador e Historial para las cotizaciones generales de activos no HH.
 - Exige seleccionar un proveedor previamente registrado en GLPI; elimina la captura manual de nombres de proveedor.
+
+
+## Correcciones del flujo de recepción (0.5.29)
+
+- Corrige el hook de GLPI 11 para escuchar la clase de relación real `Item_Ticket` (tabla `glpi_items_tickets`); antes estaba registrado con el nombre incorrecto `Ticket_Item`, por lo que no se ejecutaba al asociar el activo al ticket.
+- Al confirmar el regreso del proveedor, el activo pasa directamente de **REPARACIÓN Proveedor** a **LIBRE**.
+- La configuración valida que exista también el estado **LIBRE**, necesario para completar el retorno.
