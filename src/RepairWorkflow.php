@@ -233,60 +233,17 @@ final class RepairWorkflow
         return $history;
     }
 
-    public static function getOriginalStateForOpenRepair(string $itemtype, int $itemsId): int
-    {
-        global $DB;
-        $rows = $DB->request([
-            'SELECT' => ['action', 'old_states_id'],
-            'FROM' => 'glpi_plugin_hh_asset_history',
-            'WHERE' => ['itemtype' => $itemtype, 'items_id' => $itemsId],
-            'ORDER' => ['id DESC'],
-        ]);
-        foreach ($rows as $row) {
-            $action = (string) ($row['action'] ?? '');
-            if ($action === 'finish') {
-                return 0;
-            }
-            if ($action === 'receive_systems') {
-                return (int) ($row['old_states_id'] ?? 0);
-            }
-        }
-        return 0;
-    }
-
+    /** Read-only movement history. State transitions after reception are managed manually in GLPI. */
     public static function renderAssetPanel(CommonDBTM $asset): void
     {
         $itemtype = $asset::getType();
         $itemsId = (int) $asset->getID();
-        $fields = $asset->fields ?? [];
-        $stateName = Reports::dropdownName('glpi_states', (int) ($fields['states_id'] ?? 0));
         $history = self::getAssetHistory($itemtype, $itemsId);
-        $isRepair = in_array(self::normalize($stateName), [
-            self::normalize(self::STATUS_SYSTEMS),
-            self::normalize(self::STATUS_SUPPLIER),
-        ], true);
-        $canUpdate = Rights::can(Rights::UPDATE) && $asset->can($itemsId, UPDATE);
 
-        echo '<div class="card mb-3"><div class="card-header"><h3 class="card-title">Flujo general de reparación</h3></div><div class="card-body">';
-        echo '<p><strong>Estado actual:</strong> ' . htmlspecialchars($stateName !== '' ? $stateName : 'Sin estado', ENT_QUOTES, 'UTF-8') . '</p>';
-        echo '<p class="text-muted">La recepción desde el catálogo de servicios cambia el estado a REPARACIÓN Sistemas en tiempo real. Los movimientos posteriores se registran aquí y en el historial nativo de GLPI.</p>';
-
-        if ($canUpdate && $isRepair) {
-            echo '<div class="d-flex flex-wrap gap-2 mb-3">';
-            if (self::normalize($stateName) === self::normalize(self::STATUS_SYSTEMS)) {
-                self::actionForm($itemtype, $itemsId, 'send_supplier', 'Enviar a proveedor', 'btn btn-outline-primary');
-                self::actionForm($itemtype, $itemsId, 'finish', 'Finalizar reparación', 'btn btn-success');
-            } elseif (self::normalize($stateName) === self::normalize(self::STATUS_SUPPLIER)) {
-                self::actionForm($itemtype, $itemsId, 'return_free', 'Regresó del proveedor · LIBRE', 'btn btn-success');
-            }
-            echo '</div>';
-        } elseif (!$canUpdate) {
-            echo '<div class="text-muted small mb-3">Se requiere permiso de actualización del activo y del plugin para cambiar la etapa de reparación.</div>';
-        }
-
-        echo '<h4 class="mt-3">Historial de movimientos</h4>';
+        echo '<div class="card mb-3"><div class="card-header"><h3 class="card-title">Historial de recepción de reparación</h3></div><div class="card-body">';
+        echo '<p class="text-muted">El estado cambia automáticamente a REPARACIÓN Sistemas al crear el ticket desde el formulario configurado. Los cambios posteriores de estado se realizan manualmente en GLPI.</p>';
         if ($history === []) {
-            echo '<div class="text-muted">No hay movimientos registrados por el flujo general.</div>';
+            echo '<div class="text-muted">No hay movimientos registrados por la recepción automática.</div>';
         } else {
             echo '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Estado anterior</th><th>Estado nuevo</th><th>Ticket</th><th>Usuario</th></tr></thead><tbody>';
             foreach ($history as $row) {
@@ -300,83 +257,5 @@ final class RepairWorkflow
             echo '</tbody></table></div>';
         }
         echo '</div></div>';
-    }
-
-    /** Compact repair actions for non-Handheld assets; no duplicate movement history. */
-    public static function renderAssetActions(CommonDBTM $asset): void
-    {
-        $itemtype = $asset::getType();
-        $itemsId = (int) $asset->getID();
-        $stateName = Reports::dropdownName('glpi_states', (int) (($asset->fields ?? [])['states_id'] ?? 0));
-        $normalizedState = self::normalize($stateName);
-        $isSystems = $normalizedState === self::normalize(self::STATUS_SYSTEMS);
-        $isSupplier = $normalizedState === self::normalize(self::STATUS_SUPPLIER);
-        if (!$isSystems && !$isSupplier) {
-            return;
-        }
-
-        $canUpdate = Rights::can(Rights::UPDATE) && $asset->can($itemsId, UPDATE);
-        echo '<div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 border rounded">';
-        echo '<strong>Reparación:</strong> <span class="badge ' . ($isSupplier ? 'bg-orange' : 'bg-blue') . '">' . htmlspecialchars($stateName, ENT_QUOTES, 'UTF-8') . '</span>';
-        if ($canUpdate) {
-            if ($isSystems) {
-                self::actionForm($itemtype, $itemsId, 'send_supplier', 'Enviar a proveedor', 'btn btn-sm btn-outline-primary');
-                self::actionForm($itemtype, $itemsId, 'finish', 'Finalizar reparación', 'btn btn-sm btn-success');
-            } else {
-                self::actionForm($itemtype, $itemsId, 'return_free', 'Regresó del proveedor · LIBRE', 'btn btn-sm btn-success');
-            }
-        }
-        echo '</div>';
-    }
-
-    private static function actionForm(string $itemtype, int $itemsId, string $action, string $label, string $class): void
-    {
-        echo '<form method="post" action="/plugins/hh/front/workflow.php" class="d-inline">';
-        echo '<input type="hidden" name="_glpi_csrf_token" value="' . htmlspecialchars(Session::getNewCSRFToken(), ENT_QUOTES, 'UTF-8') . '">';
-        echo '<input type="hidden" name="itemtype" value="' . htmlspecialchars($itemtype, ENT_QUOTES, 'UTF-8') . '">';
-        echo '<input type="hidden" name="items_id" value="' . $itemsId . '">';
-        echo '<input type="hidden" name="action" value="' . htmlspecialchars($action, ENT_QUOTES, 'UTF-8') . '">';
-        echo '<button type="submit" class="' . $class . '">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</button></form>';
-    }
-
-    public static function processAction(string $itemtype, int $itemsId, string $action): bool
-    {
-        global $CFG_GLPI;
-        if (!in_array($itemtype, $CFG_GLPI['asset_types'] ?? [], true) || !class_exists($itemtype)) {
-            return false;
-        }
-        $asset = new $itemtype();
-        if (!$asset->getFromDB($itemsId) || !$asset->can($itemsId, UPDATE) || !Rights::can(Rights::UPDATE)) {
-            return false;
-        }
-
-        $currentState = (int) ($asset->fields['states_id'] ?? 0);
-        $systemsState = self::findStateId(self::STATUS_SYSTEMS);
-        $supplierState = self::findStateId(self::STATUS_SUPPLIER);
-
-        if ($action === 'send_supplier') {
-            if ($systemsState < 1 || $currentState !== $systemsState) {
-                return false;
-            }
-            return $supplierState > 0 && self::changeAssetState($itemtype, $itemsId, $supplierState, $action, 0, 'Equipo enviado a proveedor');
-        }
-        if ($action === 'return_free') {
-            if ($supplierState < 1 || $currentState !== $supplierState) {
-                return false;
-            }
-            $freeState = self::findStateId(self::STATUS_FREE);
-            return $freeState > 0 && self::changeAssetState($itemtype, $itemsId, $freeState, $action, 0, 'Equipo regresó del proveedor y quedó disponible en estado LIBRE');
-        }
-        if ($action === 'finish') {
-            if ($systemsState < 1 || $currentState !== $systemsState) {
-                return false;
-            }
-            $target = self::getOriginalStateForOpenRepair($itemtype, $itemsId);
-            if ($target < 1) {
-                return false;
-            }
-            return self::changeAssetState($itemtype, $itemsId, $target, 'finish', 0, 'Reparación finalizada; se restaura el estado previo a la recepción');
-        }
-        return false;
     }
 }
