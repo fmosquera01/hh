@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace GlpiPlugin\Hh;
 
+use CommonDBTM;
 use CommonGLPI;
 use Computer;
 use Phone;
@@ -17,7 +18,10 @@ final class RepairTab extends CommonGLPI
 
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
     {
-        if ($withtemplate || !Rights::can(Rights::READ) || (!$item instanceof Computer && !$item instanceof Phone)) {
+        if ($withtemplate || !Rights::can(Rights::READ) || !$item instanceof CommonDBTM) {
+            return '';
+        }
+        if (!in_array($item::getType(), Reports::getAssetTypes(), true)) {
             return '';
         }
         return self::getTypeName();
@@ -25,7 +29,22 @@ final class RepairTab extends CommonGLPI
 
     public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0)
     {
-        if (!Rights::can(Rights::READ) || (!$item instanceof Computer && !$item instanceof Phone)) {
+        if (!Rights::can(Rights::READ) || !$item instanceof CommonDBTM
+            || !in_array($item::getType(), Reports::getAssetTypes(), true)) {
+            return true;
+        }
+
+        if (!$item instanceof Computer && !$item instanceof Phone) {
+            $fields = $item->fields ?? [];
+            echo "<div class='container-fluid hh-repairs'><div class='card mb-3'><div class='card-header'><h2 class='card-title'>Gestión de reparaciones</h2></div><div class='card-body'>";
+            echo '<div class="row g-3">';
+            self::assetDetail(__('Activo', 'hh'), (string) ($fields['name'] ?? ''));
+            self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
+            self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
+            self::assetDetail(__('Estado', 'hh'), Reports::dropdownName('glpi_states', (int) ($fields['states_id'] ?? 0)));
+            echo '</div></div></div>';
+            RepairWorkflow::renderAssetPanel($item);
+            echo '</div>';
             return true;
         }
 
@@ -109,6 +128,7 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($repairTracking['sent_at'] ?? null));
         self::assetDetail(__('Última guía de salida', 'hh'), (string)($repairTracking['guide_number'] ?? '—') ?: '—');
         echo "</div></div></div>";
+        RepairWorkflow::renderAssetPanel($item);
 
         $quotesUrl = '/plugins/hh/front/quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
         $historyUrl = '/plugins/hh/front/history.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
