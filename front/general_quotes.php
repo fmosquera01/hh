@@ -4,6 +4,7 @@ declare(strict_types=1);
 use GlpiPlugin\Hh\Rights;
 use GlpiPlugin\Hh\RepairWorkflow;
 use GlpiPlugin\Hh\Reports;
+use GlpiPlugin\Hh\RepairAlerts;
 
 include('../../../inc/includes.php');
 
@@ -30,6 +31,9 @@ if ($itemtype === 'Phone') {
     }
 }
 $assetName = (string) ($asset->fields['name'] ?? ($itemtype . ' #' . $itemsId));
+$policy = RepairAlerts::getPolicy();
+$purchaseValue = RepairAlerts::getPurchaseValue($itemtype, (int) $itemsId);
+$repeatWarning = RepairAlerts::getRepeatRepairWarning($itemtype, (int) $itemsId);
 $downloadId = filter_var($_GET['download'] ?? 0, FILTER_VALIDATE_INT);
 if ($downloadId !== false && $downloadId > 0) {
     if (!Rights::can(Rights::READ)) { Html::displayRightError(); }
@@ -325,6 +329,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
     <div class="gq-kpi pending"><div class="gq-kpi-label">Pendientes</div><div class="gq-kpi-value"><?= (int) $quoteStats['pending'] ?></div></div>
     <div class="gq-kpi approved"><div class="gq-kpi-label">Aprobadas</div><div class="gq-kpi-value"><?= (int) ($quoteStats['approved'] + $quoteStats['selected']) ?></div></div>
   </div>
+  <?php if ($repeatWarning !== null): ?><div class="alert alert-warning mb-2"><strong>Alerta de reparación recurrente:</strong> este activo regresó de una reparación hace <?= (int)$repeatWarning['days'] ?> día(s) (<?= $e($repeatWarning['returned_at']) ?>). Está dentro del período configurado de <?= (int)$repeatWarning['window'] ?> días. Revise diagnóstico, garantía y conveniencia antes de aprobar otra reparación.</div><?php endif; ?>
   <section class="card" id="gq-new" <?= $editingQuote ? '' : 'hidden' ?>>
     <div class="card-header"><h3><?= $editingQuote ? 'Editar cotización en borrador' : 'Nueva cotización · Proveedor' ?></h3></div>
     <div class="card-body">
@@ -343,6 +348,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
           <div class="col-6 col-md-3"><label>Subtotal antes de IVA (o calculado desde conceptos)</label><input class="form-control" id="gq-subtotal" name="total_amount" type="number" min="0.01" step="0.01" placeholder="0.00" value="<?= $e($editingQuote['subtotal'] ?? '') ?>"></div>
           <div class="col-6 col-md-3"><label>Descuento antes de IVA</label><input class="form-control" id="gq-discount" name="discount" type="number" min="0" step="0.01" value="<?= $e($editingQuote['discount'] ?? '0') ?>"></div>
           <div class="col-6 col-md-3"><label>Transporte / otros</label><input class="form-control" id="gq-transport" name="transport" type="number" min="0" step="0.01" value="<?= $e($editingQuote['transport'] ?? '0') ?>"></div>
+          <div class="col-12"><div id="gq-cost-ratio" class="small text-muted"></div><div id="gq-cost-warning" class="alert alert-warning mt-1" style="display:none">El costo cotizado alcanza o supera el umbral configurado del valor de compra. Se recomienda evaluar reemplazo.</div></div>
           <div class="col-12"><div class="hh-gq-totals" id="gq-live-total"><span>Subtotal menos descuento: <strong id="gq-live-base">$0.00</strong></span><span class="hh-gq-grand">Total cotizado: <strong id="gq-live-grand">$0.00</strong></span></div></div>
           <div class="col-12"><label>Observaciones y condiciones</label><textarea class="form-control" name="observations" rows="2"><?= $e($editingQuote['observations'] ?? '') ?></textarea></div>
           <div class="col-12"><label>Documento original (PDF, JPG o PNG; máximo 12 MB)</label><input class="form-control" type="file" name="quote_file" accept=".pdf,.jpg,.jpeg,.png"></div>
