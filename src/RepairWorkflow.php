@@ -8,8 +8,8 @@ use Session;
 
 /**
  * Synchronous repair workflow for native and GLPI 11 custom assets.
- * A dedicated ITIL category is required so ordinary support tickets never
- * change an asset's state by accident.
+ * The configured request origin identifies repair intake tickets so ordinary
+ * support tickets never change an asset's state by accident.
  */
 final class RepairWorkflow
 {
@@ -29,14 +29,14 @@ final class RepairWorkflow
         ]) as $row) {
             return $row;
         }
-        return ['id' => 1, 'itilcategories_id' => 0, 'enabled' => 0];
+        return ['id' => 1, 'requesttypes_id' => 0, 'enabled' => 0];
     }
 
-    public static function saveConfig(int $categoryId, bool $enabled): bool
+    public static function saveConfig(int $requestTypeId, bool $enabled): bool
     {
         global $DB;
         $data = [
-            'itilcategories_id' => max(0, $categoryId),
+            'requesttypes_id' => max(0, $requestTypeId),
             'enabled' => $enabled ? 1 : 0,
         ];
         if ($DB->update('glpi_plugin_hh_workflow_config', $data, ['id' => 1])) {
@@ -59,14 +59,14 @@ final class RepairWorkflow
         }
 
         $config = self::getConfig();
-        $categoryId = (int) ($config['itilcategories_id'] ?? 0);
-        if ((int) ($config['enabled'] ?? 0) !== 1 || $categoryId < 1) {
+        $requestTypeId = (int) ($config['requesttypes_id'] ?? 0);
+        if ((int) ($config['enabled'] ?? 0) !== 1 || $requestTypeId < 1) {
             return;
         }
 
         $ticket = new \Ticket();
         if (!$ticket->getFromDB($ticketId)
-            || (int) ($ticket->fields['itilcategories_id'] ?? 0) !== $categoryId) {
+            || (int) ($ticket->fields['requesttypes_id'] ?? 0) !== $requestTypeId) {
             return;
         }
 
