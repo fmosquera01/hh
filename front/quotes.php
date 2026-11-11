@@ -4,6 +4,7 @@ declare(strict_types=1);
 use GlpiPlugin\Hh\Dashboard;
 use GlpiPlugin\Hh\Rights;
 use GlpiPlugin\Hh\RepairAlerts;
+use GlpiPlugin\Hh\RepairWorkflow;
 
 include('../../../inc/includes.php');
 
@@ -191,7 +192,8 @@ foreach ([['type' => 'Computer', 'table' => 'glpi_computers', 'label' => 'Comput
     $assetClass = $assetConfig['type'];
     if (!Session::haveRight($assetClass::$rightname, READ)) continue;
     foreach (hhQRows($assetConfig['table'], $assetWhere, ['id', 'name', 'serial', 'otherserial'], ['name ASC']) as $assetRow) {
-        if (hhQRepairTicketForAsset($assetConfig['type'], (int)$assetRow['id']) === null) continue;
+        if (!RepairWorkflow::isInSupplierRepairState($assetConfig['type'], (int)$assetRow['id'])
+            || hhQRepairTicketForAsset($assetConfig['type'], (int)$assetRow['id']) === null) continue;
         $assetOptions[] = [
             'itemtype' => $assetConfig['type'],
             'id' => (int)$assetRow['id'],
@@ -249,6 +251,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($error === '' && $tracking === null) {
             $error = 'Este activo no tiene un ticket asociado con número de guía, fecha de envío y fecha de recepción por el proveedor. No se puede guardar la cotización.';
+        }
+        if ($error === '' && !RepairWorkflow::isInSupplierRepairState($itemtype, (int) $itemsId)) {
+            $error = 'El activo debe estar en estado REPARACIÓN Proveedor para crear o editar una cotización.';
         }
         if ($error === '' && $guideNumber !== '') {
             foreach (hhQRows('glpi_plugin_hh_quotes', ['guide_number' => $guideNumber], ['id'], ['id DESC']) as $sameGuideQuote) {
