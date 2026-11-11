@@ -125,7 +125,8 @@ final class RepairWorkflow
             return true;
         }
 
-        // Use the GLPI object API, not direct SQL, so native history is recorded.
+        // Use the GLPI object API and explicitly enable native history.
+        $asset->dohistory = true;
         if (!$asset->update(['id' => $itemsId, 'states_id' => $newStateId])) {
             return false;
         }
@@ -262,9 +263,12 @@ final class RepairWorkflow
 
         if ($canUpdate && $isRepair) {
             echo '<div class="d-flex flex-wrap gap-2 mb-3">';
-            self::actionForm($itemtype, $itemsId, 'send_supplier', 'Enviar a proveedor', 'btn btn-outline-primary');
-            self::actionForm($itemtype, $itemsId, 'return_systems', 'Regresó del proveedor', 'btn btn-outline-secondary');
-            self::actionForm($itemtype, $itemsId, 'finish', 'Finalizar reparación', 'btn btn-success');
+            if (self::normalize($stateName) === self::normalize(self::STATUS_SYSTEMS)) {
+                self::actionForm($itemtype, $itemsId, 'send_supplier', 'Enviar a proveedor', 'btn btn-outline-primary');
+                self::actionForm($itemtype, $itemsId, 'finish', 'Finalizar reparación', 'btn btn-success');
+            } elseif (self::normalize($stateName) === self::normalize(self::STATUS_SUPPLIER)) {
+                self::actionForm($itemtype, $itemsId, 'return_systems', 'Regresó del proveedor', 'btn btn-outline-secondary');
+            }
             echo '</div>';
         } elseif (!$canUpdate) {
             echo '<div class="text-muted small mb-3">Se requiere permiso de actualización del activo y del plugin para cambiar la etapa de reparación.</div>';
