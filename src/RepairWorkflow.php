@@ -277,7 +277,7 @@ final class RepairWorkflow
                 self::actionForm($itemtype, $itemsId, 'send_supplier', 'Enviar a proveedor', 'btn btn-outline-primary');
                 self::actionForm($itemtype, $itemsId, 'finish', 'Finalizar reparación', 'btn btn-success');
             } elseif (self::normalize($stateName) === self::normalize(self::STATUS_SUPPLIER)) {
-                self::actionForm($itemtype, $itemsId, 'return_systems', 'Regresó del proveedor', 'btn btn-outline-secondary');
+                self::actionForm($itemtype, $itemsId, 'return_free', 'Regresó del proveedor · LIBRE', 'btn btn-success');
             }
             echo '</div>';
         } elseif (!$canUpdate) {
@@ -333,11 +333,12 @@ final class RepairWorkflow
             }
             return $supplierState > 0 && self::changeAssetState($itemtype, $itemsId, $supplierState, $action, 0, 'Equipo enviado a proveedor');
         }
-        if ($action === 'return_systems') {
+        if ($action === 'return_free') {
             if ($supplierState < 1 || $currentState !== $supplierState) {
                 return false;
             }
-            return $systemsState > 0 && self::changeAssetState($itemtype, $itemsId, $systemsState, $action, 0, 'Equipo recibido del proveedor para validación');
+            $freeState = self::findStateId(self::STATUS_FREE);
+            return $freeState > 0 && self::changeAssetState($itemtype, $itemsId, $freeState, $action, 0, 'Equipo regresó del proveedor y quedó disponible en estado LIBRE');
         }
         if ($action === 'finish') {
             if ($systemsState < 1 || $currentState !== $systemsState) {
