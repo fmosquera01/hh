@@ -40,17 +40,79 @@ final class RepairTab extends CommonGLPI
             $fields = $item->fields ?? [];
             $itemType = $item::getType();
             $itemId = (int) $item->getID();
+            $native = self::loadGenericAssetInfo($item);
+            $warrantyStart = self::validDate($native['buy_date'] ?? null)
+                ? (string) $native['buy_date']
+                : (string) ($native['warranty_date'] ?? '');
+            $warrantyEnd = self::addMonths($warrantyStart, (int) ($native['warranty_duration'] ?? 0));
+            $today = date('Y-m-d');
+            $currentContracts = array_values(array_filter(
+                $native['contracts'],
+                static fn(array $contract): bool => self::isContractCurrent($contract, $today)
+            ));
+            $tracking = self::loadLatestRepairTracking($itemType, $itemId);
+
             echo "<div class='container-fluid hh-repairs'>";
-            echo "<style>.hh-repairs{font-size:12px;line-height:1.25;padding:.25rem}.hh-repairs .card-header{padding:.5rem .7rem}.hh-repairs .card-body{padding:.65rem .7rem}.hh-repairs .card-title{font-size:.95rem}.hh-repairs iframe{display:block;width:100%;border:0;min-height:900px;background:transparent}@media(max-width:600px){.hh-repairs iframe{min-height:1100px}}</style>";
-            echo "<div class='card mb-2'><div class='card-header'><h2 class='card-title'>Gestión de reparaciones</h2></div><div class='card-body'><div class='row g-2'>";
-            self::assetDetail(__('Activo', 'hh'), (string) ($fields['name'] ?? ''));
+            echo "<style>
+                .hh-repairs{font-size:12px;line-height:1.22;padding:.25rem}
+                .hh-repairs .hh-hero{border:0;border-radius:.55rem;background:linear-gradient(120deg,#17365d,#245b83);color:#fff}
+                .hh-repairs .hh-hero .card-body{padding:.45rem .55rem!important}
+                .hh-repairs .hh-hero h2{font-size:.92rem;line-height:1.1;margin:0 0 .3rem}
+                .hh-repairs .hh-asset-detail{height:100%;border:1px solid rgba(255,255,255,.18);border-radius:.3rem;padding:.2rem .32rem;background:rgba(255,255,255,.05)}
+                .hh-repairs .hh-detail-label{font-size:.6rem;line-height:1.05;color:#d8e6f2;margin-bottom:.04rem}
+                .hh-repairs .hh-asset-detail strong{font-size:.7rem;line-height:1.1;overflow-wrap:anywhere;white-space:normal}
+                .hh-repairs .row.g-2{--tblr-gutter-x:.3rem;--tblr-gutter-y:.3rem}
+                .hh-repairs .card{margin-bottom:.6rem}
+                .hh-repairs .card-header{padding:.5rem .7rem}
+                .hh-repairs .card-body{padding:.6rem .7rem}
+                .hh-repairs .hh-repair-tabs .hh-tab-radio{position:absolute;opacity:0;pointer-events:none}
+                .hh-repairs .hh-repair-tabs .hh-tab-label{display:inline-block;margin:0;padding:.32rem .65rem;border:1px solid var(--tblr-border-color,#dce1e7);background:var(--tblr-bg-surface-secondary,#f8fafc);color:var(--tblr-body-color,#334155);cursor:pointer;font-size:.82rem}
+                .hh-repairs .hh-repair-tabs .hh-tab-label:first-of-type{border-radius:.35rem 0 0 .35rem}
+                .hh-repairs .hh-repair-tabs .hh-tab-label:last-of-type{border-radius:0 .35rem .35rem 0;margin-left:-1px}
+                .hh-repairs .hh-repair-tabs .hh-tab-radio:checked + .hh-tab-label{background:var(--tblr-bg-surface,#fff);color:var(--tblr-primary,#206bc4);border-bottom-color:var(--tblr-bg-surface,#fff);font-weight:600;position:relative;z-index:1}
+                .hh-repairs .hh-repair-tabs .hh-tab-panel{display:none;padding-top:.55rem}
+                .hh-repairs .hh-repair-tabs input.hh-tab-radio:nth-of-type(1):checked ~ .hh-tab-panels [data-hh-panel='drafts'],
+                .hh-repairs .hh-repair-tabs input.hh-tab-radio:nth-of-type(2):checked ~ .hh-tab-panels [data-hh-panel='history']{display:block}
+                .hh-repairs iframe{display:block;width:100%;border:0;background:transparent}
+                @media(max-width:600px){.hh-repairs iframe{min-height:950px}}
+            </style>";
+            echo "<div class='card hh-hero mb-2'><div class='card-body'>";
+            echo "<h2>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h2>";
+            echo "<div class='row g-2'>";
+            self::assetDetail(__('Activo', 'hh'), (string) ($fields['name'] ?? ($itemType . ' #' . $itemId)));
             self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
             self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
-            self::assetDetail(__('Estado', 'hh'), Reports::dropdownName('glpi_states', (int) ($fields['states_id'] ?? 0)));
+            self::assetDetail(__('Fabricante', 'hh'), (string) ($native['manufacturer'] ?? ''));
+            self::assetDetail(__('Modelo', 'hh'), (string) ($native['model'] ?? ''));
+            self::assetDetail(__('Fecha de compra', 'hh'), self::displayDate($native['buy_date'] ?? null));
+            self::assetDetail(__('Valor de compra', 'hh'), self::displayMoney($native['purchase_value'] ?? null));
+            self::assetDetail(__('Fin de garantía del equipo', 'hh'), self::displayDate($warrantyEnd));
+            self::assetDetail(__('Estado', 'hh'), (string) ($native['status'] ?? ''));
+            self::assetDetail(__('Proveedor del contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_supplier'] ?? '') : '—');
+            self::assetDetail(__('Tipo de contrato', 'hh'), $currentContracts !== [] ? (string) ($currentContracts[0]['contract_type'] ?? '—') : '—');
+            self::assetDetail(__('Inicio de contrato', 'hh'), $currentContracts !== [] ? self::displayDate($currentContracts[0]['begin_date'] ?? null) : '—');
+            self::assetDetail(__('Fin de contrato', 'hh'), $currentContracts !== [] ? self::displayDate($currentContracts[0]['contract_end_date'] ?? null) : '—');
+            self::assetDetail(__('Fecha de última reparación', 'hh'), self::displayDate($tracking['returned_at'] ?? null));
+            self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($tracking['sent_at'] ?? null));
+            self::assetDetail(__('Última guía de salida', 'hh'), (string) ($tracking['guide_number'] ?? '—') ?: '—');
             echo "</div></div></div>";
             RepairWorkflow::renderAssetPanel($item);
-            $quotesUrl = '/plugins/hh/front/general_quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
-            echo "<div class='card mb-2'><div class='card-header'><h3 class='card-title'>Cotizaciones de reparación</h3></div><div class='card-body p-1'><iframe title='Cotizaciones generales del activo' src='" . self::e($quotesUrl) . "' loading='lazy'></iframe></div></div>";
+
+            $baseUrl = '/plugins/hh/front/general_quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
+            $draftsUrl = $baseUrl . '&view=drafts';
+            $historyUrl = $baseUrl . '&view=history';
+            $tabPrefix = 'hh-repair-' . strtolower($itemType) . '-' . $itemId;
+            $draftsTabId = $tabPrefix . '-drafts';
+            $historyTabId = $tabPrefix . '-history';
+            echo "<div class='card mb-2'><div class='card-body p-2'><div class='hh-repair-tabs'>";
+            echo "<input class='hh-tab-radio' type='radio' name='" . self::e($tabPrefix) . "' id='" . self::e($draftsTabId) . "' checked>";
+            echo "<label class='hh-tab-label' for='" . self::e($draftsTabId) . "'>Cotizaciones en borrador</label>";
+            echo "<input class='hh-tab-radio' type='radio' name='" . self::e($tabPrefix) . "' id='" . self::e($historyTabId) . "'>";
+            echo "<label class='hh-tab-label' for='" . self::e($historyTabId) . "'>Historial</label>";
+            echo "<div class='hh-tab-panels'>";
+            echo "<div class='hh-tab-panel' data-hh-panel='drafts'><iframe title='Cotizaciones en borrador del activo' src='" . self::e($draftsUrl) . "' style='height:850px' loading='lazy'></iframe></div>";
+            echo "<div class='hh-tab-panel' data-hh-panel='history'><iframe title='Historial de reparaciones del activo' src='" . self::e($historyUrl) . "' style='height:700px' loading='lazy'></iframe></div>";
+            echo "</div></div></div></div>";
             echo '</div>';
             return true;
         }
@@ -165,6 +227,90 @@ final class RepairTab extends CommonGLPI
         echo "<div class='hh-tab-panel' data-hh-panel='history'><iframe title='Historial de reparaciones de este activo' src='" . self::e($historyUrl) . "' style='height:650px' loading='lazy'></iframe></div>";
         echo "</div></div>";
         return true;
+    }
+
+    /** Generic native/Asset Definition metadata for the repair header. */
+    private static function loadGenericAssetInfo(CommonDBTM $item): array
+    {
+        global $DB;
+
+        $itemType = $item::getType();
+        $itemId = (int) $item->getID();
+        $fields = $item->fields ?? [];
+        $info = [
+            'buy_date' => null, 'warranty_date' => null, 'warranty_duration' => 0,
+            'purchase_value' => null, 'manufacturer' => '', 'model' => '',
+            'status' => '', 'contracts' => [],
+        ];
+
+        $info['manufacturer'] = self::lookupName('glpi_manufacturers', (int) ($fields['manufacturers_id'] ?? 0));
+        $info['status'] = Reports::dropdownName('glpi_states', (int) ($fields['states_id'] ?? 0));
+
+        // GLPI native and Asset Definition model dropdowns conventionally expose
+        // a field ending in "models_id". Resolve its matching dropdown table.
+        foreach ($fields as $fieldName => $fieldValue) {
+            if (!is_string($fieldName) || !preg_match('/models_id$/', $fieldName) || (int) $fieldValue < 1) {
+                continue;
+            }
+            $modelTable = 'glpi_' . substr($fieldName, 0, -3);
+            if (!$DB->tableExists($modelTable)) {
+                continue;
+            }
+            foreach ($DB->request([
+                'SELECT' => ['name'],
+                'FROM' => $modelTable,
+                'WHERE' => ['id' => (int) $fieldValue],
+                'LIMIT' => 1,
+            ]) as $modelRow) {
+                $info['model'] = (string) ($modelRow['name'] ?? '');
+                break 2;
+            }
+        }
+
+        foreach ($DB->request([
+            'SELECT' => ['buy_date', 'warranty_date', 'warranty_duration', 'value'],
+            'FROM' => 'glpi_infocoms',
+            'WHERE' => ['items_id' => $itemId, 'itemtype' => $itemType],
+            'LIMIT' => 1,
+        ]) as $infocom) {
+            $info['buy_date'] = $infocom['buy_date'] ?? null;
+            $info['warranty_date'] = $infocom['warranty_date'] ?? null;
+            $info['warranty_duration'] = (int) ($infocom['warranty_duration'] ?? 0);
+            $info['purchase_value'] = $infocom['value'] ?? null;
+            break;
+        }
+
+        foreach ($DB->request([
+            'SELECT' => ['contracts_id'],
+            'FROM' => 'glpi_contracts_items',
+            'WHERE' => ['itemtype' => $itemType, 'items_id' => $itemId],
+        ]) as $contractLink) {
+            $contractId = (int) ($contractLink['contracts_id'] ?? 0);
+            if ($contractId < 1) {
+                continue;
+            }
+            foreach ($DB->request([
+                'SELECT' => '*',
+                'FROM' => 'glpi_contracts',
+                'WHERE' => ['id' => $contractId, 'is_deleted' => 0, 'is_template' => 0],
+                'LIMIT' => 1,
+            ]) as $contract) {
+                $contract['contract_type'] = self::lookupName('glpi_contracttypes', (int) ($contract['contracttypes_id'] ?? 0));
+                $contract['contract_supplier'] = self::lookupContractSupplier($contractId);
+                $contract['contract_end_date'] = self::addMonths(
+                    (string) ($contract['begin_date'] ?? ''),
+                    (int) ($contract['duration'] ?? 0)
+                );
+                $info['contracts'][] = $contract;
+                break;
+            }
+        }
+        usort($info['contracts'], static fn(array $a, array $b): int => strcmp(
+            (string) ($b['begin_date'] ?? ''),
+            (string) ($a['begin_date'] ?? '')
+        ));
+
+        return $info;
     }
 
     /** Sum points from approved repair quotes for this asset only. */
