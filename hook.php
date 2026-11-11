@@ -218,13 +218,24 @@ function plugin_hh_install(): bool
 
     $migration->executeMigration();
 
-    // Keep one configuration row; existing workflow history is never reset.
+    // Create defaults only on first install; upgrades must preserve the admin's settings.
     if ($DB->tableExists('glpi_plugin_hh_workflow_config')) {
-        $DB->updateOrInsert(
-            'glpi_plugin_hh_workflow_config',
-            ['id' => 1, 'itilcategories_id' => 0, 'enabled' => 0],
-            ['id' => 1]
-        );
+        $hasConfig = false;
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM' => 'glpi_plugin_hh_workflow_config',
+            'WHERE' => ['id' => 1],
+            'LIMIT' => 1,
+        ]) as $unused) {
+            $hasConfig = true;
+        }
+        if (!$hasConfig) {
+            $DB->insert('glpi_plugin_hh_workflow_config', [
+                'id' => 1,
+                'itilcategories_id' => 0,
+                'enabled' => 0,
+            ]);
+        }
     }
 
     // Register the native GLPI profile right for every existing profile.
