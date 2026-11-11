@@ -12,11 +12,12 @@ require_once __DIR__ . '/src/Dashboard.php';
 require_once __DIR__ . '/src/RepairTab.php';
 require_once __DIR__ . '/src/Reports.php';
 require_once __DIR__ . '/src/RepairAnalytics.php';
+require_once __DIR__ . '/src/RepairAlerts.php';
 require_once __DIR__ . '/src/RepairWorkflow.php';
 require_once __DIR__ . '/src/Rights.php';
 require_once __DIR__ . '/src/Profile.php';
 
-define('PLUGIN_HH_VERSION', '0.5.30');
+define('PLUGIN_HH_VERSION', '0.5.31');
 define('PLUGIN_HH_MIN_GLPI', '11.0.0');
 define('PLUGIN_HH_MAX_GLPI', '11.99.99');
 
