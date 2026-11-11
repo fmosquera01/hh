@@ -9,7 +9,7 @@ final class Dashboard extends CommonGLPI
 {
     public static function getTypeName($nb = 0): string
     {
-        return __('Gestión de reparaciones', 'hh');
+        return __('Gestión de activos y reparaciones', 'hh');
     }
 
     public static function getMenuName($nb = 0): string
