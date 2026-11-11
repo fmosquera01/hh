@@ -115,3 +115,9 @@ Se amplía el dashboard con análisis visual de antigüedad del inventario, esta
 7. Pruebe el envío a proveedor, recepción desde proveedor y finalización. El último paso debe restaurar el estado previo a la recepción.
 
 La versión 0.5.18 ajusta la identificación del formulario de recepción para utilizar el origen de solicitud `FormularioReparacion` en lugar de una categoría ITIL. El flujo general debe validarse en una instancia de pruebas antes de producción. No ejecutar pruebas destructivas ni cambiar estados de activos productivos.
+
+
+## 0.5.26
+- Homologa la cabecera de Gestión de reparaciones para activos nativos y Asset Definitions, mostrando datos de compra, garantía, contrato y seguimiento cuando GLPI dispone de ellos.
+- Añade las pestañas Cotizaciones en borrador e Historial para las cotizaciones generales de activos no HH.
+- Exige seleccionar un proveedor previamente registrado en GLPI; elimina la captura manual de nombres de proveedor.
