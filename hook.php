@@ -140,6 +140,7 @@ function plugin_hh_install(): bool
             `subtotal` decimal(14,2) NOT NULL DEFAULT 0,
             `discount` decimal(14,2) NOT NULL DEFAULT 0,
             `tax` decimal(14,2) NOT NULL DEFAULT 0,
+            `iva_rate_snapshot` decimal(6,3) NOT NULL DEFAULT 15.000,
             `transport` decimal(14,2) NOT NULL DEFAULT 0,
             `total_amount` decimal(14,2) NOT NULL DEFAULT 0,
             `observations` text DEFAULT NULL,
@@ -260,6 +261,10 @@ function plugin_hh_install(): bool
                 $migration->addPostQuery($query);
             }
         }
+    }
+
+    if ($DB->tableExists('glpi_plugin_hh_general_quotes')) {
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_general_quotes` ADD COLUMN IF NOT EXISTS `iva_rate_snapshot` decimal(6,3) NOT NULL DEFAULT 15.000 AFTER `tax`");
     }
 
     // Convert legacy DATETIME columns to GLPI-preferred TIMESTAMP without losing stored values.
