@@ -382,6 +382,8 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
  const root=document.querySelector('.hh-gq'); if(!root)return;
  const subtotal=root.querySelector('#gq-subtotal'), discount=root.querySelector('#gq-discount'), transport=root.querySelector('#gq-transport');
  const baseOut=root.querySelector('#gq-live-base'), totalOut=root.querySelector('#gq-live-grand');
+ const purchaseValue=<?= json_encode($purchaseValue) ?>, costLimit=<?= json_encode((float)$policy['repair_cost_percent']) ?>;
+ const ratioOut=root.querySelector('#gq-cost-ratio'), costWarning=root.querySelector('#gq-cost-warning');
  const money=n=>'$'+(Number.isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
  function update(){
    let amount=parseFloat(subtotal?.value)||0;
@@ -397,6 +399,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
    }
    const total=Math.max(0,amount-(parseFloat(discount?.value)||0)+(parseFloat(transport?.value)||0));
    if(baseOut)baseOut.textContent=money(total);if(totalOut)totalOut.textContent=money(total);
+   if(ratioOut){if(purchaseValue!==null&&Number(purchaseValue)>0){const pct=total/Number(purchaseValue)*100;ratioOut.textContent='Costo cotizado: '+pct.toFixed(1)+' % del valor de compra ('+money(Number(purchaseValue))+')';if(costWarning)costWarning.style.display=pct>=costLimit?'block':'none';}else{ratioOut.textContent='Porcentaje del valor de compra no disponible: registre el valor en la ficha financiera del activo.';if(costWarning)costWarning.style.display='none';}}
  }
  root.addEventListener('input',update);update();
  // El iframe informa su altura al contenedor para evitar un segundo scroll vertical.
