@@ -73,8 +73,7 @@ final class RepairTab extends CommonGLPI
                 .hh-repairs .hh-repair-tabs .hh-tab-panel{display:none;padding-top:.55rem}
                 .hh-repairs .hh-repair-tabs input.hh-tab-radio:nth-of-type(1):checked ~ .hh-tab-panels [data-hh-panel='drafts'],
                 .hh-repairs .hh-repair-tabs input.hh-tab-radio:nth-of-type(2):checked ~ .hh-tab-panels [data-hh-panel='history']{display:block}
-                .hh-repairs iframe{display:block;width:100%;border:0;background:transparent}
-                @media(max-width:600px){.hh-repairs iframe{min-height:950px}}
+                .hh-repairs iframe{display:block;width:100%;border:0;background:transparent;overflow:hidden}
             </style>";
             echo "<div class='card hh-hero mb-2'><div class='card-body'>";
             echo "<h2>" . self::e(__('Gestión de reparaciones', 'hh')) . "</h2>";
@@ -96,8 +95,8 @@ final class RepairTab extends CommonGLPI
             self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($tracking['sent_at'] ?? null));
             self::assetDetail(__('Última guía de salida', 'hh'), (string) ($tracking['guide_number'] ?? '—') ?: '—');
             echo "</div></div></div>";
-            RepairWorkflow::renderAssetPanel($item);
-
+            // El seguimiento operativo permanece en el historial nativo de GLPI;
+            // esta vista general se concentra en las cotizaciones del activo.
             $baseUrl = '/plugins/hh/front/general_quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
             $draftsUrl = $baseUrl . '&view=drafts';
             $historyUrl = $baseUrl . '&view=history';
@@ -110,9 +109,24 @@ final class RepairTab extends CommonGLPI
             echo "<input class='hh-tab-radio' type='radio' name='" . self::e($tabPrefix) . "' id='" . self::e($historyTabId) . "'>";
             echo "<label class='hh-tab-label' for='" . self::e($historyTabId) . "'>Historial</label>";
             echo "<div class='hh-tab-panels'>";
-            echo "<div class='hh-tab-panel' data-hh-panel='drafts'><iframe title='Cotizaciones en borrador del activo' src='" . self::e($draftsUrl) . "' style='height:850px' loading='lazy'></iframe></div>";
-            echo "<div class='hh-tab-panel' data-hh-panel='history'><iframe title='Historial de reparaciones del activo' src='" . self::e($historyUrl) . "' style='height:700px' loading='lazy'></iframe></div>";
+            echo "<div class='hh-tab-panel' data-hh-panel='drafts'><iframe title='Cotizaciones en borrador del activo' src='" . self::e($draftsUrl) . "' scrolling='no' style='height:420px' loading='lazy'></iframe></div>";
+            echo "<div class='hh-tab-panel' data-hh-panel='history'><iframe title='Historial de reparaciones del activo' src='" . self::e($historyUrl) . "' scrolling='no' style='height:420px' loading='lazy'></iframe></div>";
             echo "</div></div></div></div>";
+            echo "<script>
+                (function(){
+                    const root=document.currentScript.closest('.hh-repairs');
+                    if(!root)return;
+                    window.addEventListener('message',function(event){
+                        if(event.origin!==window.location.origin||!event.data||event.data.type!=='hh-gq-resize')return;
+                        root.querySelectorAll('iframe').forEach(function(frame){
+                            if(frame.contentWindow===event.source){
+                                const height=Number(event.data.height);
+                                if(Number.isFinite(height)&&height>0)frame.style.height=Math.ceil(height)+'px';
+                            }
+                        });
+                    });
+                })();
+            </script>";
             echo '</div>';
             return true;
         }
