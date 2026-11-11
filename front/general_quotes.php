@@ -23,6 +23,31 @@ if (!$asset->getFromDB((int) $itemsId) || !$asset->can((int) $itemsId, READ)) {
     Html::displayRightError();
 }
 $assetName = (string) ($asset->fields['name'] ?? ($itemtype . ' #' . $itemsId));
+$downloadId = filter_var($_GET['download'] ?? 0, FILTER_VALIDATE_INT);
+if ($downloadId !== false && $downloadId > 0) {
+    if (!Rights::can(Rights::READ)) { Html::displayRightError(); }
+    $document = null;
+    foreach ($DB->request([
+        'SELECT' => ['attachment_path', 'attachment_name'],
+        'FROM' => 'glpi_plugin_hh_general_quotes',
+        'WHERE' => ['id' => (int) $downloadId, 'itemtype' => $itemtype, 'items_id' => (int) $itemsId],
+        'LIMIT' => 1,
+    ]) as $row) { $document = $row; break; }
+    if (!$document || empty($document['attachment_path'])) { Html::displayErrorAndDie('Documento no encontrado.'); }
+    $baseDirectory = realpath(GLPI_VAR_DIR . '/_plugins/hh/general_quotes');
+    $filePath = realpath(GLPI_VAR_DIR . '/' . ltrim((string) $document['attachment_path'], '/'));
+    if ($baseDirectory === false || $filePath === false || !str_starts_with($filePath, $baseDirectory . DIRECTORY_SEPARATOR) || !is_file($filePath)) {
+        Html::displayErrorAndDie('El documento no está disponible.');
+    }
+    $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    $mime = ['pdf' => 'application/pdf', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png'][$extension] ?? 'application/octet-stream';
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . (string) filesize($filePath));
+    header('Content-Disposition: inline; filename="' . rawurlencode((string) $document['attachment_name']) . '"');
+    readfile($filePath);
+    exit;
+}
+
 $backUrl = '/plugins/hh/front/general_quotes.php?embedded=1&itemtype=' . rawurlencode($itemtype) . '&items_id=' . (int) $itemsId;
 $e = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $money = static fn($value): string => '$' . number_format((float) $value, 2, '.', ',');
@@ -255,7 +280,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
   <?php foreach ($quotes as $q): ?>
     <article class="card quote-card"><div class="card-body">
       <div class="d-flex flex-wrap justify-content-between gap-2"><div><strong><?= $e($q['supplier_name_snapshot']) ?></strong> <span class="status"><?= $e(strtoupper((string) $q['status'])) ?></span><div class="text-muted small"><?= $e($q['quote_number'] ?: 'Sin número') ?> · <?= $e($q['quote_date']) ?> · <?= $e($q['description']) ?></div></div><div class="text-end"><strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong><div class="text-muted small"><?= $q['quote_mode'] === 'global' ? 'Importe global' : 'Detalle libre' ?></div></div></div>
-      <?php if (!empty($q['attachment_path'])): ?><div class="small mt-2"><a href="<?= $e('/files/' . ltrim((string) $q['attachment_path'], '/')) ?>" target="_blank" rel="noopener">Ver documento del proveedor: <?= $e($q['attachment_name']) ?></a></div><?php endif; ?>
+      <?php if (!empty($q['attachment_path'])): ?><div class="small mt-2"><a href="<?= $e($backUrl . '&download=' . (int) $q['id']) ?>" target="_blank" rel="noopener">Ver documento del proveedor: <?= $e($q['attachment_name']) ?></a></div><?php endif; ?>
       <?php if ($q['status'] === 'draft' && Rights::can(Rights::UPDATE)): ?><form method="post" class="mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><button class="btn btn-sm btn-outline-primary" name="action" value="submit">Enviar a aprobación</button></form><?php endif; ?>
       <?php if ($q['status'] === 'pending' && Rights::can(Rights::APPROVE)): ?><form method="post" class="d-flex flex-wrap gap-2 mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><input class="form-control form-control-sm" name="comment" placeholder="Comentario de aprobación / rechazo"><button class="btn btn-sm btn-success" name="action" value="approve">Aprobar</button><button class="btn btn-sm btn-outline-danger" name="action" value="reject">Rechazar</button></form><?php endif; ?>
       <?php if ($q['status'] === 'approved' && Rights::can(Rights::APPROVE)): ?><form method="post" class="mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><input class="form-control form-control-sm mb-1" name="comment" placeholder="Motivo de selección del proveedor" required><button class="btn btn-sm btn-primary" name="action" value="select">Seleccionar proveedor</button></form><?php endif; ?>
