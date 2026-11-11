@@ -665,10 +665,8 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    <?php if ($error !== ''): ?><div class="alert alert-danger"><?=hhQe($error)?></div><?php endif; ?>
    <?php $showQuoteForm = (bool)$editQuote || !empty($_GET['new']) || $error !== ''; ?>
    <?php if ($showQuoteForm): ?>
-   <?php if (!$isEligibleForQuote && $editAllowed): ?>
-    <div class="alert alert-warning">No se puede crear la cotización: el activo debe estar en estado REPARACIÓN Proveedor y el ticket debe tener guía de salida, fecha de salida y fecha de recepción del proveedor registradas.</div>
-   <?php elseif (!$isEligibleForQuote && $editQuote && (string)$editQuote['status'] === 'draft'): ?>
-    <div class="alert alert-warning">Este borrador ya no se puede editar porque el activo no cumple las condiciones actuales: estado REPARACIÓN Proveedor y guía, fecha de salida y fecha de recepción del proveedor en el ticket.</div>
+   <?php if (!$isEligibleForQuote): ?>
+    <div class="alert alert-warning">No se puede crear ni editar la cotización: el activo debe estar en estado REPARACIÓN Proveedor y el ticket debe tener guía de salida, fecha de salida y fecha de recepción del proveedor registradas.</div>
    <?php else: ?>
    <h3><?= $editQuote ? 'Editar cotización ' . hhQe((string)$editQuote['name']) : 'Nueva cotización' ?></h3>
    <?php if (!$editAllowed): ?>
@@ -749,6 +747,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     </div>
     <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId : '/plugins/hh/front/quotes.php' ?>"><?= $embedded ? 'Volver a borradores' : 'Cancelar' ?></a>
    </form>
+   <?php endif; ?>
    <?php endif; ?>
    <?php endif; ?>
    <?php if ($editQuote && (string)$editQuote['status']==='draft'): ?>
