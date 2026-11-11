@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use GlpiPlugin\Hh\Dashboard;
 use GlpiPlugin\Hh\Rights;
+use GlpiPlugin\Hh\RepairAlerts;
 
 include('../../../inc/includes.php');
 
@@ -13,6 +14,8 @@ $contextItemType = (string)($_GET['itemtype'] ?? '');
 $contextItemsId = (int)($_GET['items_id'] ?? 0);
 $contextAssetName = ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) ? hhQAssetLabel($contextItemType, $contextItemsId) : '';
 $purchaseValue = null;
+$policy = RepairAlerts::getPolicy();
+$repeatWarning = null;
 $purchaseItemType = $contextItemType;
 $purchaseItemsId = $contextItemsId;
 if (isset($_GET['edit']) && (int)$_GET['edit'] > 0) {
@@ -29,6 +32,7 @@ if (in_array($purchaseItemType, ['Computer', 'Phone'], true) && $purchaseItemsId
         break;
     }
 }
+$repeatWarning = RepairAlerts::getRepeatRepairWarning($purchaseItemType, $purchaseItemsId);
 
 Rights::require(Rights::READ);
 
@@ -726,7 +730,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
     <p class="text-muted small">Al seleccionar un artículo se cargan sus puntos actuales. Puedes ajustarlos en esta cotización; el valor queda guardado como histórico en sus líneas. La cotización queda como borrador hasta que se apruebe o rechace.</p>
     <div class="mt-2 mb-3 small">
       <div id="hh-repair-cost-ratio" class="fw-semibold">Costo de reparación: calculando porcentaje...</div>
-      <div id="hh-repair-cost-warning" class="alert alert-warning py-2 mt-2 mb-0" style="display:none">No se recomienda reparar: el costo es igual o superior al 40 % del valor de compra del equipo.</div>
+      <div id="hh-repair-cost-warning" class="alert alert-warning py-2 mt-2 mb-0" style="display:none">No se recomienda reparar: el costo es igual o superior al <?=number_format((float)$policy['repair_cost_percent'], 2)?> % del valor de compra del equipo.</div>
       <?php if ($purchaseValue !== null): ?><div class="text-muted">Valor de compra registrado en GLPI: $<?=number_format($purchaseValue, 2)?></div><?php else: ?><div class="text-muted">No se puede calcular el porcentaje porque el equipo no tiene un valor de compra válido registrado en GLPI.</div><?php endif; ?>
     </div>
     <button class="btn btn-primary" type="submit">Guardar borrador</button> <a class="btn btn-secondary" href="<?= $embedded ? '/plugins/hh/front/quotes.php?embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId : '/plugins/hh/front/quotes.php' ?>"><?= $embedded ? 'Volver a borradores' : 'Cancelar' ?></a>
@@ -744,7 +748,8 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
   </div>
  </div>
 
- <div class="card hh-section mb-4">
+ <?php if ($repeatWarning !== null): ?><div class="alert alert-warning"><strong>Alerta de reparación recurrente:</strong> este activo regresó de una reparación hace <?= (int)$repeatWarning['days'] ?> día(s) (<?=hhQe($repeatWarning['returned_at'])?>), dentro del período configurado de <?= (int)$repeatWarning['window'] ?> días. Revise garantía, diagnóstico y conveniencia antes de aprobar.</div><?php endif; ?>
+  <div class="card hh-section mb-4">
   <div class="hh-section-head d-flex flex-wrap justify-content-between align-items-center gap-2"><div><h3 class="card-title mb-0">Cotizaciones en borrador</h3><small class="text-muted">Cotizaciones pendientes de aprobación o rechazo. Las aprobadas y rechazadas se consultan en Historial.</small></div><?php if ($embedded): ?><a class="btn btn-sm btn-primary" href="/plugins/hh/front/quotes.php?embedded=1&itemtype=<?=rawurlencode($contextItemType)?>&items_id=<?=$contextItemsId?>&new=1">Nueva cotización</a><?php endif; ?></div>
   <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>N.º</th><th>Fecha</th><th>Activo</th><th>Proveedor</th><th class="text-end">Puntos</th><th class="text-end">Total USD</th><th>Acción</th></tr></thead><tbody>
   <?php $draftCount = 0; foreach ($allQuotes as $quote): if ((string)$quote['status'] !== 'draft') continue; $draftCount++; $label = hhQAssetLabel((string)$quote['itemtype'], (int)$quote['items_id']); ?>
@@ -836,7 +841,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
       if(purchaseValue!==null&&Number(purchaseValue)>0){
         const pct=(a/Number(purchaseValue))*100;
         ratio.textContent='Costo de reparación: '+pct.toFixed(1)+' % del valor de compra';
-        if(warning)warning.style.display=pct>=40?'block':'none';
+        if(warning)warning.style.display=pct>=<?= json_encode((float)$policy['repair_cost_percent']) ?>?'block':'none';
       }else{
         ratio.textContent='Porcentaje del valor de compra: no disponible';
         if(warning)warning.style.display='none';
