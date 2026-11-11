@@ -29,6 +29,15 @@ $reportsAllowed = Rights::can(Rights::REPORTS);
           </div>
         </div>
         <?php endif; ?>
+        <?php if (Rights::can(Rights::CATALOG)): ?>
+        <div class="col-sm-6 col-xl-4">
+          <div class="card card-body h-100">
+            <h3><i class="ti ti-settings me-2"></i>Flujo general de reparación</h3>
+            <p class="text-muted">Configure la categoría exclusiva del catálogo de servicios y active el cambio inmediato de estado.</p>
+            <a class="btn btn-primary mt-auto" href="/plugins/hh/front/config.php">Configurar flujo</a>
+          </div>
+        </div>
+        <?php endif; ?>
         <div class="col-sm-6 col-xl-4">
           <div class="card card-body h-100">
             <h3><i class="ti ti-package me-2"></i>Catálogo de repuestos y servicios</h3>
