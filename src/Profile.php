@@ -18,7 +18,7 @@ final class Profile extends \Profile
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
     {
         if ($item instanceof \Profile && (int) $item->getID() > 0) {
-            return self::createTabEntry(__('Gestión de reparaciones HH', 'hh'));
+            return self::createTabEntry(__('Gestión de activos y reparaciones', 'hh'));
         }
         return '';
     }
@@ -63,7 +63,7 @@ final class Profile extends \Profile
 
         $targetProfile->displayRightsChoiceMatrix($rights, [
             'canedit' => $canEdit,
-            'title'   => __('Derechos de Gestión de reparaciones HH', 'hh'),
+            'title'   => __('Derechos de Gestión de activos y reparaciones', 'hh'),
         ]);
 
         if ($canEdit) {
