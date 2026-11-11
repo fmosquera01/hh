@@ -34,7 +34,9 @@ final class RepairTab extends CommonGLPI
             return true;
         }
 
-        if (!$item instanceof Computer && !$item instanceof Phone) {
+        $isHandheld = $item instanceof Phone
+            && RepairWorkflow::normalize(Reports::dropdownName('glpi_phonetypes', (int) (($item->fields ?? [])['phonetypes_id'] ?? 0))) === 'handheld';
+        if (!$isHandheld) {
             $fields = $item->fields ?? [];
             $itemType = $item::getType();
             $itemId = (int) $item->getID();
