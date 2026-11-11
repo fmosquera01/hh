@@ -79,18 +79,20 @@ final class RepairWorkflow
 
         $targetState = self::findStateId(self::STATUS_SYSTEMS);
         if ($targetState < 1) {
-            Toolbox::logInFile('hh', 'No se cambió el estado del activo: no existe el estado "' . self::STATUS_SYSTEMS . '".');
+            \\Toolbox::logError('HH: No se cambió el estado del activo porque no existe el estado ' . self::STATUS_SYSTEMS . '.');
             return;
         }
 
-        self::changeAssetState(
+        if (!self::changeAssetState(
             $itemtype,
             $itemsId,
             $targetState,
             'receive_systems',
             $ticketId,
             'Recepción de equipo mediante catálogo de servicios'
-        );
+        )) {
+            \\Toolbox::logError('HH: Falló el cambio inmediato a REPARACIÓN Sistemas para ' . $itemtype . ' #' . $itemsId . ' desde el ticket #' . $ticketId . '.');
+        }
     }
 
     public static function changeAssetState(
