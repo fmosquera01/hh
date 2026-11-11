@@ -309,15 +309,26 @@ final class RepairWorkflow
             return false;
         }
 
+        $currentState = (int) ($asset->fields['states_id'] ?? 0);
+        $systemsState = self::findStateId(self::STATUS_SYSTEMS);
+        $supplierState = self::findStateId(self::STATUS_SUPPLIER);
+
         if ($action === 'send_supplier') {
-            $target = self::findStateId(self::STATUS_SUPPLIER);
-            return $target > 0 && self::changeAssetState($itemtype, $itemsId, $target, $action, 0, 'Equipo enviado a proveedor');
+            if ($systemsState < 1 || $currentState !== $systemsState) {
+                return false;
+            }
+            return $supplierState > 0 && self::changeAssetState($itemtype, $itemsId, $supplierState, $action, 0, 'Equipo enviado a proveedor');
         }
         if ($action === 'return_systems') {
-            $target = self::findStateId(self::STATUS_SYSTEMS);
-            return $target > 0 && self::changeAssetState($itemtype, $itemsId, $target, $action, 0, 'Equipo recibido del proveedor para validación');
+            if ($supplierState < 1 || $currentState !== $supplierState) {
+                return false;
+            }
+            return $systemsState > 0 && self::changeAssetState($itemtype, $itemsId, $systemsState, $action, 0, 'Equipo recibido del proveedor para validación');
         }
         if ($action === 'finish') {
+            if ($systemsState < 1 || $currentState !== $systemsState) {
+                return false;
+            }
             $target = self::getOriginalStateForOpenRepair($itemtype, $itemsId);
             if ($target < 1) {
                 return false;
