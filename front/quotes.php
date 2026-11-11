@@ -503,7 +503,7 @@ $defaultItemType = $editQuote !== null
 $defaultItemsId = $editQuote !== null
     ? (int) $editQuote['items_id']
     : (int) ($_GET['items_id'] ?? 0);
-$editAllowed = !$editQuote || (string)$editQuote['status'] === 'draft';
+$editAllowed = (!$editQuote || (string)$editQuote['status'] === 'draft') && $isEligibleForQuote;
 $initialLines = [];
 foreach ($editLines as $line) $initialLines[] = [
     'item_id' => (int)($line['plugin_hh_items_id'] ?? 0),
@@ -519,6 +519,9 @@ $currentRepairTracking = ($defaultItemType !== '' && $defaultItemsId > 0)
     ? hhQRepairTicketForAsset($defaultItemType, $defaultItemsId)
     : null;
 $currentSendValue = trim((string)($currentRepairTracking['sent_to_supplier_at'] ?? ''));
+$isEligibleForQuote = $defaultItemType !== '' && $defaultItemsId > 0
+    && RepairWorkflow::isInSupplierRepairState($defaultItemType, $defaultItemsId)
+    && $currentRepairTracking !== null;
 
 if ($defaultItemType !== '' && $defaultItemsId > 0 && $currentSendValue !== '') {
     try {
@@ -661,6 +664,11 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
    <?php if ($error !== ''): ?><div class="alert alert-danger"><?=hhQe($error)?></div><?php endif; ?>
    <?php $showQuoteForm = (bool)$editQuote || !empty($_GET['new']) || $error !== ''; ?>
    <?php if ($showQuoteForm): ?>
+   <?php if (!$isEligibleForQuote && $editAllowed): ?>
+    <div class="alert alert-warning">No se puede crear la cotización: el activo debe estar en estado REPARACIÓN Proveedor y el ticket debe tener guía de salida, fecha de salida y fecha de recepción del proveedor registradas.</div>
+   <?php elseif (!$isEligibleForQuote && $editQuote && (string)$editQuote['status'] === 'draft'): ?>
+    <div class="alert alert-warning">Este borrador ya no se puede editar porque el activo no cumple las condiciones actuales: estado REPARACIÓN Proveedor y guía, fecha de salida y fecha de recepción del proveedor en el ticket.</div>
+   <?php else: ?>
    <h3><?= $editQuote ? 'Editar cotización ' . hhQe((string)$editQuote['name']) : 'Nueva cotización' ?></h3>
    <?php if (!$editAllowed): ?>
     <div class="alert alert-info">Esta cotización está <?=hhQe($statuses[(string)$editQuote['status']] ?? (string)$editQuote['status'])?>. Se muestra en modo consulta y no se puede modificar.</div>
@@ -755,7 +763,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
 
  <?php if ($repeatWarning !== null): ?><div class="alert alert-warning"><strong>Alerta de reparación recurrente:</strong> este activo regresó de una reparación hace <?= (int)$repeatWarning['days'] ?> día(s) (<?=hhQe($repeatWarning['returned_at'])?>), dentro del período configurado de <?= (int)$repeatWarning['window'] ?> días. Revise garantía, diagnóstico y conveniencia antes de aprobar.</div><?php endif; ?>
   <div class="card hh-section mb-4">
-  <div class="hh-section-head d-flex flex-wrap justify-content-between align-items-center gap-2"><div><h3 class="card-title mb-0">Cotizaciones en borrador</h3><small class="text-muted">Cotizaciones pendientes de aprobación o rechazo. Las aprobadas y rechazadas se consultan en Historial.</small></div><?php if ($embedded): ?><a class="btn btn-sm btn-primary" href="/plugins/hh/front/quotes.php?embedded=1&itemtype=<?=rawurlencode($contextItemType)?>&items_id=<?=$contextItemsId?>&new=1">Nueva cotización</a><?php endif; ?></div>
+  <div class="hh-section-head d-flex flex-wrap justify-content-between align-items-center gap-2"><div><h3 class="card-title mb-0">Cotizaciones en borrador</h3><small class="text-muted">Cotizaciones pendientes de aprobación o rechazo. Las aprobadas y rechazadas se consultan en Historial.</small></div><?php if ($embedded && $isEligibleForQuote): ?><a class="btn btn-sm btn-primary" href="/plugins/hh/front/quotes.php?embedded=1&itemtype=<?=rawurlencode($contextItemType)?>&items_id=<?=$contextItemsId?>&new=1">Nueva cotización</a><?php endif; ?></div>
   <div class="table-responsive"><table class="table table-hover table-striped mb-0"><thead><tr><th>N.º</th><th>Fecha</th><th>Activo</th><th>Proveedor</th><th class="text-end">Puntos</th><th class="text-end">Total USD</th><th>Acción</th></tr></thead><tbody>
   <?php $draftCount = 0; foreach ($allQuotes as $quote): if ((string)$quote['status'] !== 'draft') continue; $draftCount++; $label = hhQAssetLabel((string)$quote['itemtype'], (int)$quote['items_id']); ?>
    <tr><td><strong><?=hhQe((string)$quote['name'])?></strong><div class="small text-muted">Borrador editable</div></td><td><?=hhQe((string)($quote['quote_date'] ?? ''))?></td><td><?=hhQe($allowedTypes[(string)$quote['itemtype']] ?? (string)$quote['itemtype'])?> #<?=(int)$quote['items_id']?><div class="small text-muted"><?=hhQe($label)?></div></td><td><?=hhQe((string)($quote['supplier_name_snapshot'] ?? '—'))?></td><td class="text-end"><?=number_format((float)$quote['total_points'],2)?></td><td class="text-end fw-bold">$<?=number_format((float)$quote['total_amount_snapshot'],2)?></td><td><a class="btn btn-sm btn-primary" href="/plugins/hh/front/quotes.php?<?= $embedded ? 'embedded=1&itemtype='.rawurlencode($contextItemType).'&items_id='.$contextItemsId.'&' : '' ?>edit=<?=(int)$quote['id']?>">Abrir / editar</a></td></tr>
