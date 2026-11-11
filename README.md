@@ -74,6 +74,14 @@ No se requiere modificar archivos del núcleo de GLPI. Validar en la instancia d
 Se amplía el dashboard con análisis visual de antigüedad del inventario, estado de garantía, modelos con más reparaciones, activos con mayor historial y alertas para priorizar renovación. El inventario y el detalle de repuestos se muestran bajo demanda para mantener limpia la vista ejecutiva. Las tablas incluyen desplazamiento horizontal táctil y una barra superior sincronizada. La impresión/PDF se aísla al contenido del informe, sin ocultar el contenedor principal de GLPI.
 
 
+## Presentación e IVA de cotizaciones generales (0.5.25)
+
+- La pantalla de cotizaciones generales utiliza una presentación autónoma y adaptable, con identidad visual azul Songa, tarjetas, estados diferenciados, resumen económico y formularios compactos. No depende de que el iframe cargue el CSS del shell de GLPI.
+- La tasa de IVA se administra en Gestión de activos y reparaciones → Configuración de IVA. El valor inicial es 15 % y requiere el permiso de administración del valor de puntos (POINT_VALUE).
+- El IVA se calcula en el servidor sobre la base imponible: subtotal menos descuento más transporte gravado. El formulario muestra una previsualización inmediata, pero el cálculo definitivo siempre se valida en el servidor.
+- Cada cotización guarda la tasa aplicada (iva_rate_snapshot) y el importe del IVA; los cambios futuros de la configuración no modifican cotizaciones históricas.
+- El detalle económico presenta subtotal, descuento, transporte, IVA y total.
+
 ## Cotizaciones generales para activos que no son Handheld (0.5.24)
 
 - El esquema de puntos y el flujo especializado permanecen exclusivos de los activos Phone cuyo tipo GLPI es HANDHELD.
