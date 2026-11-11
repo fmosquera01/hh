@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use GlpiPlugin\Hh\Rights;
 use GlpiPlugin\Hh\RepairWorkflow;
+use GlpiPlugin\Hh\Reports;
 
 include('../../../inc/includes.php');
 
