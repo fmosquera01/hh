@@ -121,6 +121,7 @@ function plugin_hh_install(): bool
         'glpi_plugin_hh_workflow_config' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_workflow_config` (
             `id` int unsigned NOT NULL,
             `itilcategories_id` int unsigned NOT NULL DEFAULT 0,
+            `requesttypes_id` int unsigned NOT NULL DEFAULT 0,
             `enabled` tinyint NOT NULL DEFAULT 0,
             PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
@@ -156,6 +157,11 @@ function plugin_hh_install(): bool
         if (!$DB->tableExists($table)) {
             $migration->addPostQuery($sql);
         }
+    }
+
+    // Add request origin while preserving the legacy category column and all settings.
+    if ($DB->tableExists('glpi_plugin_hh_workflow_config')) {
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_workflow_config` ADD COLUMN IF NOT EXISTS `requesttypes_id` int unsigned NOT NULL DEFAULT 0");
     }
 
     // Upgrade tables created by earlier HH versions without dropping existing data.
