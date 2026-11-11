@@ -29,7 +29,6 @@ if ((int) ($current['requesttypes_id'] ?? 0) < 1 && $repairRequestTypeId > 0) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    Session::checkCSRF($_POST);
     $requestTypeId = filter_var($_POST['requesttypes_id'] ?? 0, FILTER_VALIDATE_INT);
     $enabled = isset($_POST['enabled']);
     $selectedOrigin = '';
