@@ -503,7 +503,6 @@ $defaultItemType = $editQuote !== null
 $defaultItemsId = $editQuote !== null
     ? (int) $editQuote['items_id']
     : (int) ($_GET['items_id'] ?? 0);
-$editAllowed = (!$editQuote || (string)$editQuote['status'] === 'draft') && $isEligibleForQuote;
 $initialLines = [];
 foreach ($editLines as $line) $initialLines[] = [
     'item_id' => (int)($line['plugin_hh_items_id'] ?? 0),
@@ -523,6 +522,7 @@ $isEligibleForQuote = (!$embedded && ($defaultItemType === '' || $defaultItemsId
     || ($defaultItemType !== '' && $defaultItemsId > 0
         && RepairWorkflow::isInSupplierRepairState($defaultItemType, $defaultItemsId)
         && $currentRepairTracking !== null);
+$editAllowed = (!$editQuote || (string)$editQuote['status'] === 'draft') && $isEligibleForQuote;
 
 if ($defaultItemType !== '' && $defaultItemsId > 0 && $currentSendValue !== '') {
     try {
