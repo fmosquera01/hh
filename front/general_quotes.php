@@ -73,7 +73,6 @@ function hhGeneralQuoteHistory($quoteId, $old, $new, $comment = ''): void
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    Session::checkCSRF($_POST);
     $action = trim((string) ($_POST['action'] ?? ''));
     $quoteId = max(0, (int) ($_POST['quote_id'] ?? 0));
     $quote = null;
