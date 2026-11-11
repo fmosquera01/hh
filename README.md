@@ -28,12 +28,13 @@ La versión 0.5.16 establece por defecto el tipo interno HAND HELD al abrir el d
 - `hook.php`: tablas del plugin y migración aditiva del catálogo maestro, compatibilidad por tipo/modelo y cabecera/detalle de cotizaciones.
 - `src/Dashboard.php`: entrada del plugin en el menú.
 - `src/RepairTab.php`: experiencia visual dentro de la ficha de activo.
+- `front/general_quotes.php`: cotizaciones económicas flexibles para activos que no son Handheld.
 - `src/Reports.php`: consultas de inventario, reparaciones aprobadas y movimientos de puntos.
 - `src/RepairAnalytics.php`: análisis de reparaciones aprobadas con retorno registrado y detalle de repuestos.
 - `front/reports.php`: dashboard gerencial e inventario completo.
 - `front/index.php`: pantalla de entrada del plugin.
 
-Las tablas existentes con prefijo `glpi_plugin_hh_` se conservan. La estructura ahora contempla catálogo maestro de ítems (`glpi_plugin_hh_items`), asignación por tipo/modelo (`glpi_plugin_hh_itemtypes`), cabecera (`glpi_plugin_hh_quotes`) y detalle (`glpi_plugin_hh_quotedetails`). Las migraciones agregan columnas faltantes sin borrar los datos existentes. La interfaz especializada de HH conserva su flujo propio; el módulo general de cotizaciones se habilita para el resto de activos en 0.5.24.
+Las tablas existentes con prefijo `glpi_plugin_hh_` se conservan. La estructura contempla el catálogo maestro de ítems (`glpi_plugin_hh_items`), asignación por tipo/modelo (`glpi_plugin_hh_itemtypes`), cotizaciones especializadas HH (`glpi_plugin_hh_quotes` y `glpi_plugin_hh_quotedetails`) y cotizaciones generales independientes (`glpi_plugin_hh_general_quotes`, `glpi_plugin_hh_general_quotelines`, `glpi_plugin_hh_general_quotehistory`). Las migraciones agregan columnas faltantes sin borrar los datos existentes. La interfaz especializada de HH conserva su flujo propio; el módulo general de cotizaciones se habilita para el resto de activos en 0.5.24.
 
 ## Reportes gerenciales (0.5.23)
 
