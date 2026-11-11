@@ -9,7 +9,7 @@ HH es un **plugin nativo de GLPI 11**. La experiencia se trabaja dentro de la pe
 - Incorpora un flujo general de reparación sin esquema de puntos para el resto de activos.
 - Mantiene los datos operativos en tablas propias; los cambios de estado se realizan mediante la API de objetos de GLPI para conservar el historial nativo.
 
-## Estado actual — versión 0.5.24
+## Estado actual — versión 0.5.30
 
 La pestaña nativa consulta en modo lectura los datos de activos, compra, garantía y contratos asociados para **Handhelds** (Phone con tipo HANDHELD), utilizando la API de consultas de GLPI y sus relaciones `FKEY`. El tipo del contrato vigente es el valor que se muestra en **Tipo / información de garantía** y prevalece sobre la garantía propia del equipo para determinar la cobertura. La fecha de inicio de la garantía propia toma `warranty_date` y, si no está informada, usa `buy_date`.
 
@@ -103,9 +103,9 @@ Se amplía el dashboard con análisis visual de antigüedad del inventario, esta
 - El módulo general no utiliza puntos. El esquema de puntos, contratos, garantías, cotizaciones y catálogo HH continúa reservado exclusivamente a Handhelds.
 - La recepción del activo se detecta en el hook síncrono `ITEM_ADD` de `Ticket_Item`. El activo asociado al ticket cambia inmediatamente a **REPARACIÓN Sistemas**, sin Cron ni tarea programada, únicamente cuando el ticket tiene el origen de solicitud configurado como **FormularioReparacion** (`requesttypes_id`).
 - Para impedir que tickets ordinarios cambien estados por accidente, el hook solo actúa cuando el origen de solicitud del ticket coincide con **FormularioReparacion**, seleccionado en **Gestión de activos y reparaciones > Configurar flujo**. Asigne ese origen al formulario de recepción del catálogo de servicios.
-- Al enviar el equipo a proveedor, el técnico utiliza **Enviar a proveedor** y el estado cambia a **REPARACIÓN Proveedor**. Al recibirlo de vuelta, utiliza **Regresó del proveedor · LIBRE** para cambiarlo directamente a **LIBRE**.
-- Al finalizar, **Finalizar reparación** restaura el estado que el activo tenía antes de la recepción. La asignación del usuario no se modifica.
-- Cada transición se registra en `glpi_plugin_hh_asset_history` y se activa el historial nativo de GLPI en el cambio de estado.
+- El único cambio automático de estado realizado por HH es la recepción: al asociar el activo a un ticket cuyo origen sea **FormularioReparacion**, pasa a **REPARACIÓN Sistemas**.
+- El envío a proveedor, el regreso a Songa y cualquier cambio posterior de estado se realizan manualmente en GLPI, fuera de la automatización de HH.
+- HH registra el cambio automático de recepción en `glpi_plugin_hh_asset_history` y activa el historial nativo de GLPI.
 - El dashboard añade indicadores globales de **REPARACIÓN Sistemas**, **REPARACIÓN Proveedor**, **LIBRE** (backup), **DAÑADO** y **Asignados**. Los cinco indicadores se calculan sobre el inventario completo visible para el usuario, independientemente de los filtros de HH.
 - La migración agrega únicamente tablas propias del plugin y conserva las cotizaciones, puntos, catálogos y datos históricos existentes.
 
@@ -117,7 +117,7 @@ Se amplía el dashboard con análisis visual de antigüedad del inventario, esta
 4. Compruebe que existan los estados exactos **REPARACIÓN Sistemas**, **REPARACIÓN Proveedor** y **LIBRE**. Para los indicadores también se reconoce **DAÑADO**.
 5. Cree un ticket desde el formulario, seleccione un activo y verifique que su estado cambie antes de finalizar la respuesta de creación del ticket.
 6. Cree un ticket ordinario con otra categoría y confirme que el estado del activo no cambie.
-7. Pruebe el envío a proveedor y recepción desde proveedor. Al regresar, el activo debe quedar directamente en **LIBRE**. Para reparaciones internas sin envío a proveedor, **Finalizar reparación** conserva la restauración del estado previo.
+7. Compruebe que HH no cambie el estado automáticamente al editar o resolver el ticket ni al modificar manualmente el activo. El envío y regreso del proveedor se gestionan fuera de esta automatización.
 
 La versión 0.5.18 ajusta la identificación del formulario de recepción para utilizar el origen de solicitud `FormularioReparacion` en lugar de una categoría ITIL. El flujo general debe validarse en una instancia de pruebas antes de producción. No ejecutar pruebas destructivas ni cambiar estados de activos productivos.
 
@@ -133,3 +133,10 @@ La versión 0.5.18 ajusta la identificación del formulario de recepción para u
 - Corrige el hook de GLPI 11 para escuchar la clase de relación real `Item_Ticket` (tabla `glpi_items_tickets`); antes estaba registrado con el nombre incorrecto `Ticket_Item`, por lo que no se ejecutaba al asociar el activo al ticket.
 - Al confirmar el regreso del proveedor, el activo pasa directamente de **REPARACIÓN Proveedor** a **LIBRE**.
 - La configuración valida que exista también el estado **LIBRE**, necesario para completar el retorno.
+
+
+## Ajuste de alcance del flujo (0.5.30)
+
+- HH automatiza exclusivamente el cambio a **REPARACIÓN Sistemas** cuando se crea un ticket desde el origen configurado y queda asociado el activo.
+- Se retiraron de la ficha del activo los botones HH para enviar a proveedor, registrar el regreso y finalizar reparación. Esos cambios se gestionan manualmente en GLPI.
+- El panel HH conserva la consulta del historial de recepción automática; no ejecuta transiciones posteriores.
