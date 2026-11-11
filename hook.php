@@ -118,6 +118,58 @@ function plugin_hh_install(): bool
             PRIMARY KEY (`id`),
             KEY `idx_hh_quotedetails_quote` (`plugin_hh_quotes_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_general_quotes' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_general_quotes` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `itemtype` varchar(100) NOT NULL,
+            `items_id` int unsigned NOT NULL,
+            `quote_number` varchar(100) DEFAULT NULL,
+            `suppliers_id` int unsigned DEFAULT NULL,
+            `supplier_name_snapshot` varchar(180) NOT NULL,
+            `quote_date` date NOT NULL,
+            `valid_until` date DEFAULT NULL,
+            `currency` char(3) NOT NULL DEFAULT 'USD',
+            `quote_mode` varchar(20) NOT NULL DEFAULT 'global',
+            `description` varchar(255) NOT NULL,
+            `subtotal` decimal(14,2) NOT NULL DEFAULT 0,
+            `discount` decimal(14,2) NOT NULL DEFAULT 0,
+            `tax` decimal(14,2) NOT NULL DEFAULT 0,
+            `transport` decimal(14,2) NOT NULL DEFAULT 0,
+            `total_amount` decimal(14,2) NOT NULL DEFAULT 0,
+            `observations` text DEFAULT NULL,
+            `status` varchar(20) NOT NULL DEFAULT 'draft',
+            `selection_reason` text DEFAULT NULL,
+            `attachment_path` varchar(255) DEFAULT NULL,
+            `attachment_name` varchar(255) DEFAULT NULL,
+            `approved_by` int unsigned DEFAULT NULL,
+            `approved_at` datetime DEFAULT NULL,
+            `users_id` int unsigned NOT NULL,
+            `date_creation` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `date_mod` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_hh_general_quote_asset` (`itemtype`, `items_id`),
+            KEY `idx_hh_general_quote_status` (`status`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_general_quotelines' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_general_quotelines` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `general_quotes_id` int unsigned NOT NULL,
+            `description` varchar(255) NOT NULL,
+            `quantity` decimal(10,2) NOT NULL DEFAULT 1,
+            `unit_price` decimal(14,2) DEFAULT NULL,
+            `line_total` decimal(14,2) DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_hh_general_quotelines_quote` (`general_quotes_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_general_quotehistory' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_general_quotehistory` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `general_quotes_id` int unsigned NOT NULL,
+            `old_status` varchar(20) DEFAULT NULL,
+            `new_status` varchar(20) NOT NULL,
+            `users_id` int unsigned NOT NULL,
+            `comment` text DEFAULT NULL,
+            `date_creation` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_hh_general_quotehistory_quote` (`general_quotes_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
         'glpi_plugin_hh_workflow_config' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_workflow_config` (
             `id` int unsigned NOT NULL,
             `itilcategories_id` int unsigned NOT NULL DEFAULT 0,
@@ -290,6 +342,9 @@ function plugin_hh_uninstall(): bool
     // Uninstalling HH intentionally resets all plugin-owned data.
     // GLPI core tables and asset/ticket records are never dropped.
     $tables = [
+        'glpi_plugin_hh_general_quotelines',
+        'glpi_plugin_hh_general_quotehistory',
+        'glpi_plugin_hh_general_quotes',
         'glpi_plugin_hh_pointmovements',
         'glpi_plugin_hh_quotedetails',
         'glpi_plugin_hh_asset_history',
