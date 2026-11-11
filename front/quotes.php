@@ -519,9 +519,10 @@ $currentRepairTracking = ($defaultItemType !== '' && $defaultItemsId > 0)
     ? hhQRepairTicketForAsset($defaultItemType, $defaultItemsId)
     : null;
 $currentSendValue = trim((string)($currentRepairTracking['sent_to_supplier_at'] ?? ''));
-$isEligibleForQuote = $defaultItemType !== '' && $defaultItemsId > 0
-    && RepairWorkflow::isInSupplierRepairState($defaultItemType, $defaultItemsId)
-    && $currentRepairTracking !== null;
+$isEligibleForQuote = (!$embedded && ($defaultItemType === '' || $defaultItemsId < 1))
+    || ($defaultItemType !== '' && $defaultItemsId > 0
+        && RepairWorkflow::isInSupplierRepairState($defaultItemType, $defaultItemsId)
+        && $currentRepairTracking !== null);
 
 if ($defaultItemType !== '' && $defaultItemsId > 0 && $currentSendValue !== '') {
     try {
