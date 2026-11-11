@@ -35,7 +35,7 @@ La versión 0.5.16 establece por defecto el tipo interno HAND HELD al abrir el d
 
 Las tablas existentes con prefijo `glpi_plugin_hh_` se conservan. La estructura ahora contempla catálogo maestro de ítems (`glpi_plugin_hh_items`), asignación por tipo/modelo (`glpi_plugin_hh_itemtypes`), cabecera (`glpi_plugin_hh_quotes`) y detalle (`glpi_plugin_hh_quotedetails`). Las migraciones agregan columnas faltantes sin borrar los datos existentes. La interfaz todavía no guarda cotizaciones.
 
-## Reportes gerenciales (0.5.16)
+## Reportes gerenciales (0.5.23)
 
 La versión 0.5.16 mejora el desplazamiento horizontal del inventario y los repuestos: añade manejo explícito de gestos laterales en pantallas táctiles, soporte de rueda horizontal de touchpad y mantiene sincronizada la barra superior. El CSV protege los campos de texto frente a fórmulas de hoja de cálculo. La impresión/PDF conserva el contenido del dashboard y las tablas se pueden desplegar bajo demanda. Además, el análisis de reparaciones y sus fechas de retorno se consulta por lotes, reduciendo las consultas repetidas por cotización; las consultas de activos, compras, cotizaciones y tickets se limitan a los elementos visibles del inventario; los nombres de fabricantes, tipos y modelos se almacenan en caché durante la carga del informe. Las consultas directas de inventario respetan las entidades activas del usuario en GLPI. Se añadió una validación automática de sintaxis PHP para las ramas main y las solicitudes de cambio (PHP 8.2 y 8.3).
 
@@ -48,7 +48,7 @@ La versión 0.5.16 mejora el desplazamiento horizontal del inventario y los repu
 - Las cotizaciones `approved` se contabilizan como aprobadas, pero solo se consideran reparaciones con retorno confirmado cuando `returned_at` contiene una fecha válida.
 - El detalle de repuestos instalados se toma de `glpi_plugin_hh_quotedetails` y solo incluye líneas de categoría `part` de cotizaciones aprobadas con retorno registrado. Los borradores, rechazados y aprobados sin retorno no se presentan como piezas instaladas.
 - El comparativo mensual separa compras y consumos registrados en `glpi_plugin_hh_pointmovements`, calcula el neto mensual y muestra la variación del consumo frente al mes anterior.
-- El análisis inicial de antigüedad está disponible; quedan pendientes la política configurable de renovación, exportación XLSX nativa y generación PDF en servidor. Las consultas de cotizaciones e historial filtran los activos por las entidades activas y los permisos de lectura nativos del usuario; los accesos directos por ID validan que la cotización pertenezca al activo visible.
+- El análisis inicial de antigüedad está disponible; quedan pendientes la política configurable de renovación, exportación XLSX nativa con hojas de inventario, resumen mensual, repuestos y filtros aplicados; generación PDF en servidor sigue pendiente. Las consultas de cotizaciones e historial filtran los activos por las entidades activas y los permisos de lectura nativos del usuario; los accesos directos por ID validan que la cotización pertenezca al activo visible.
 
 ## Instalar en entorno de pruebas
 
