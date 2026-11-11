@@ -41,7 +41,7 @@ final class RepairTab extends CommonGLPI
             $itemType = $item::getType();
             $itemId = (int) $item->getID();
             echo "<div class='container-fluid hh-repairs'>";
-            echo "<style>.hh-repairs{font-size:12px;line-height:1.25;padding:.25rem}.hh-repairs .card-header{padding:.5rem .7rem}.hh-repairs .card-body{padding:.65rem .7rem}.hh-repairs .card-title{font-size:.95rem}.hh-repairs iframe{display:block;width:100%;border:0;min-height:650px}@media(max-width:600px){.hh-repairs iframe{min-height:900px}}</style>";
+            echo "<style>.hh-repairs{font-size:12px;line-height:1.25;padding:.25rem}.hh-repairs .card-header{padding:.5rem .7rem}.hh-repairs .card-body{padding:.65rem .7rem}.hh-repairs .card-title{font-size:.95rem}.hh-repairs iframe{display:block;width:100%;border:0;min-height:900px;background:transparent}@media(max-width:600px){.hh-repairs iframe{min-height:1100px}}</style>";
             echo "<div class='card mb-2'><div class='card-header'><h2 class='card-title'>Gestión de reparaciones</h2></div><div class='card-body'><div class='row g-2'>";
             self::assetDetail(__('Activo', 'hh'), (string) ($fields['name'] ?? ''));
             self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
