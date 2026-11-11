@@ -74,6 +74,11 @@ No se requiere modificar archivos del núcleo de GLPI. Validar en la instancia d
 Se amplía el dashboard con análisis visual de antigüedad del inventario, estado de garantía, modelos con más reparaciones, activos con mayor historial y alertas para priorizar renovación. El inventario y el detalle de repuestos se muestran bajo demanda para mantener limpia la vista ejecutiva. Las tablas incluyen desplazamiento horizontal táctil y una barra superior sincronizada. La impresión/PDF se aísla al contenido del informe, sin ocultar el contenedor principal de GLPI.
 
 
+## Cotizaciones generales sin IVA y vista integrada (0.5.27)
+- Las cotizaciones generales se registran sin IVA; los impuestos se calculan en el proceso posterior de compra/facturación. Las columnas históricas se mantienen por compatibilidad y las nuevas cotizaciones guardan impuesto cero.
+- Se retiró de la ficha genérica el bloque de seguimiento operativo duplicado; el seguimiento permanece en el historial nativo de GLPI.
+- Los iframes de cotizaciones e historial ajustan su altura al contenido y desactivan el desplazamiento interno, dejando un único desplazamiento vertical en la ficha del activo.
+
 ## Presentación e IVA de cotizaciones generales (0.5.25)
 
 - La pantalla de cotizaciones generales utiliza una presentación autónoma y adaptable, con identidad visual azul Songa, tarjetas, estados diferenciados, resumen económico y formularios compactos. No depende de que el iframe cargue el CSS del shell de GLPI.
