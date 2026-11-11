@@ -36,14 +36,19 @@ final class RepairTab extends CommonGLPI
 
         if (!$item instanceof Computer && !$item instanceof Phone) {
             $fields = $item->fields ?? [];
-            echo "<div class='container-fluid hh-repairs'><div class='card mb-3'><div class='card-header'><h2 class='card-title'>Gestión de reparaciones</h2></div><div class='card-body'>";
-            echo '<div class="row g-3">';
+            $itemType = $item::getType();
+            $itemId = (int) $item->getID();
+            echo "<div class='container-fluid hh-repairs'>";
+            echo "<style>.hh-repairs{font-size:12px;line-height:1.25;padding:.25rem}.hh-repairs .card-header{padding:.5rem .7rem}.hh-repairs .card-body{padding:.65rem .7rem}.hh-repairs .card-title{font-size:.95rem}.hh-repairs iframe{display:block;width:100%;border:0;min-height:650px}@media(max-width:600px){.hh-repairs iframe{min-height:900px}}</style>";
+            echo "<div class='card mb-2'><div class='card-header'><h2 class='card-title'>Gestión de reparaciones</h2></div><div class='card-body'><div class='row g-2'>";
             self::assetDetail(__('Activo', 'hh'), (string) ($fields['name'] ?? ''));
             self::assetDetail(__('Número de activo fijo', 'hh'), (string) ($fields['otherserial'] ?? ''));
             self::assetDetail(__('Número de serie', 'hh'), (string) ($fields['serial'] ?? ''));
             self::assetDetail(__('Estado', 'hh'), Reports::dropdownName('glpi_states', (int) ($fields['states_id'] ?? 0)));
-            echo '</div></div></div>';
+            echo "</div></div></div>";
             RepairWorkflow::renderAssetPanel($item);
+            $quotesUrl = '/plugins/hh/front/general_quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
+            echo "<div class='card mb-2'><div class='card-header'><h3 class='card-title'>Cotizaciones de reparación</h3></div><div class='card-body p-1'><iframe title='Cotizaciones generales del activo' src='" . self::e($quotesUrl) . "' loading='lazy'></iframe></div></div>";
             echo '</div>';
             return true;
         }
