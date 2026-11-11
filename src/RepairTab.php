@@ -109,19 +109,23 @@ final class RepairTab extends CommonGLPI
             echo "<input class='hh-tab-radio' type='radio' name='" . self::e($tabPrefix) . "' id='" . self::e($historyTabId) . "'>";
             echo "<label class='hh-tab-label' for='" . self::e($historyTabId) . "'>Historial</label>";
             echo "<div class='hh-tab-panels'>";
-            echo "<div class='hh-tab-panel' data-hh-panel='drafts'><iframe title='Cotizaciones en borrador del activo' src='" . self::e($draftsUrl) . "' scrolling='no' style='height:420px' loading='lazy'></iframe></div>";
-            echo "<div class='hh-tab-panel' data-hh-panel='history'><iframe title='Historial de reparaciones del activo' src='" . self::e($historyUrl) . "' scrolling='no' style='height:420px' loading='lazy'></iframe></div>";
+            echo "<div class='hh-tab-panel' data-hh-panel='drafts'><iframe title='Cotizaciones en borrador del activo' src='" . self::e($draftsUrl) . "' scrolling='no' style='height:600px' loading='eager'></iframe></div>";
+            echo "<div class='hh-tab-panel' data-hh-panel='history'><iframe title='Historial de reparaciones del activo' src='" . self::e($historyUrl) . "' scrolling='no' style='height:600px' loading='lazy'></iframe></div>";
             echo "</div></div></div></div>";
             echo "<script>
                 (function(){
-                    const root=document.currentScript.closest('.hh-repairs');
+                    // Este script se imprime después del cierre del contenedor .hh-repairs;
+                    // por eso se obtiene desde el documento y no desde currentScript.
+                    const root=document.querySelector('.hh-repairs');
                     if(!root)return;
                     window.addEventListener('message',function(event){
                         if(event.origin!==window.location.origin||!event.data||event.data.type!=='hh-gq-resize')return;
                         root.querySelectorAll('iframe').forEach(function(frame){
                             if(frame.contentWindow===event.source){
                                 const height=Number(event.data.height);
-                                if(Number.isFinite(height)&&height>0)frame.style.height=Math.ceil(height)+'px';
+                                if(Number.isFinite(height)&&height>0){
+                                    frame.style.height=Math.max(520,Math.ceil(height))+'px';
+                                }
                             }
                         });
                     });
