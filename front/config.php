@@ -16,15 +16,15 @@ $current = RepairWorkflow::getConfig();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Session::checkCSRF($_POST);
-    $categoryId = filter_var($_POST['itilcategories_id'] ?? 0, FILTER_VALIDATE_INT);
+    $requestTypeId = filter_var($_POST['requesttypes_id'] ?? 0, FILTER_VALIDATE_INT);
     $enabled = isset($_POST['enabled']);
-    if ($categoryId === false || $categoryId < 1) {
-        $error = 'Seleccione una categoría exclusiva para los tickets de recepción de equipos.';
+    if ($requestTypeId === false || $requestTypeId < 1) {
+        $error = 'Seleccione el origen de solicitud FormularioReparacion.';
     } elseif (RepairWorkflow::findStateId(RepairWorkflow::STATUS_SYSTEMS) < 1
         || RepairWorkflow::findStateId(RepairWorkflow::STATUS_SUPPLIER) < 1) {
         $error = 'No se encontraron los estados REPARACIÓN Sistemas y/o REPARACIÓN Proveedor en los estados de GLPI.';
     } else {
-        RepairWorkflow::saveConfig((int) $categoryId, $enabled);
+        RepairWorkflow::saveConfig((int) $requestTypeId, $enabled);
         $current = RepairWorkflow::getConfig();
         $message = 'Configuración guardada. La recepción se procesará en tiempo real al asociar el activo al ticket.';
     }
@@ -39,14 +39,14 @@ Html::header(__('Configuración del flujo de reparación', 'hh'), $_SERVER['PHP_
       <?php if ($message !== ''): ?><div class="alert alert-success"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
       <?php if ($error !== ''): ?><div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
       <div class="alert alert-warning">
-        Para evitar que un ticket ordinario de soporte cambie el estado de un equipo, seleccione una categoría exclusiva y asígnela al formulario del catálogo de servicios que recibe equipos para reparación.
+        La automatización se ejecutará únicamente cuando el ticket tenga el origen de solicitud configurado como FormularioReparacion. Los tickets con otros orígenes no cambiarán el estado del activo.
       </div>
       <form method="post">
         <input type="hidden" name="_glpi_csrf_token" value="<?= htmlspecialchars(Session::getNewCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
         <div class="mb-3">
-          <label class="form-label">Categoría de ticket utilizada por el formulario de recepción</label>
-          <?php Dropdown::show('ITILCategory', ['name' => 'itilcategories_id', 'value' => (int) ($current['itilcategories_id'] ?? 0), 'display_emptychoice' => true]); ?>
-          <div class="form-hint">Esta categoría debe ser exclusiva del formulario de recepción de equipos para reparación.</div>
+          <label class="form-label">Origen de la solicitud utilizado por el formulario de recepción</label>
+          <?php Dropdown::show('RequestType', ['name' => 'requesttypes_id', 'value' => (int) ($current['requesttypes_id'] ?? 0), 'display_emptychoice' => true]); ?>
+          <div class="form-hint">Seleccione el registro FormularioReparacion creado en Configuración > Desplegables > Origen de la solicitud.</div>
         </div>
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="enabled" name="enabled" value="1" <?= (int) ($current['enabled'] ?? 0) === 1 ? 'checked' : '' ?>>
