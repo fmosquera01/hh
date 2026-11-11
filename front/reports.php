@@ -6,6 +6,7 @@ use GlpiPlugin\Hh\Reports;
 use GlpiPlugin\Hh\RepairAnalytics;
 use GlpiPlugin\Hh\Rights;
 use GlpiPlugin\Hh\RepairWorkflow;
+use GlpiPlugin\Hh\RepairAlerts;
 
 include('../../../inc/includes.php');
 
@@ -101,6 +102,8 @@ unset($asset);
 // Asset age is calculated from the GLPI purchase date. Five years is a review threshold,
 // not an automatic replacement rule; assets without a purchase date remain unclassified.
 $today = new \DateTimeImmutable('today');
+$repairPolicy = RepairAlerts::getPolicy();
+$renewalYears = (int) $repairPolicy['renewal_years'];
 $assetsFiveYearsOrOlder = 0;
 $assetsWithPurchaseDate = 0;
 foreach ($inventory as &$asset) {
@@ -115,7 +118,7 @@ foreach ($inventory as &$asset) {
                 $asset['age_years'] = $age->y + ($age->m / 12) + ($age->d / 365.25);
                 $asset['age_label'] = number_format($asset['age_years'], 1) . ' años';
                 $assetsWithPurchaseDate++;
-                if ($asset['age_years'] >= 5) {
+                if ($asset['age_years'] >= $renewalYears) {
                     $assetsFiveYearsOrOlder++;
                     $asset['age_label'] .= ' · Revisar renovación';
                 }
@@ -505,7 +508,7 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
  <div class="row g-3 mb-3">
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">HH con guía pendiente de retorno</div><div class="kpi-value"><?=number_format($totalAssetsInRepair)?></div><div class="text-muted small">Seguimiento histórico de proveedores HH</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos en inventario</div><div class="kpi-value"><?=number_format($totalAssets)?></div><div class="text-muted small">Con filtros de tipo, modelo y búsqueda aplicados</div></div></div>
-  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con 5+ años</div><div class="kpi-value"><?=number_format($assetsFiveYearsOrOlder)?></div><div class="text-muted small">Revisar renovación · <?=$assetsWithPurchaseDate?> con fecha de compra</div></div></div>
+  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con <?=$renewalYears?>+ años</div><div class="kpi-value"><?=number_format($assetsFiveYearsOrOlder)?></div><div class="text-muted small">Umbral <?=$renewalYears?> años · <?=$assetsWithPurchaseDate?> con fecha de compra</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con reparaciones aprobadas</div><div class="kpi-value"><?=number_format($repairedAssets)?></div><div class="text-muted small">Dentro del inventario filtrado</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Reparaciones aprobadas</div><div class="kpi-value"><?=number_format($totalRepairs)?></div><div class="text-muted small">Histórico HH</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Puntos asociados a reparaciones</div><div class="kpi-value"><?=number_format($totalPoints,2)?></div><div class="text-muted small">Suma de cotizaciones aprobadas</div></div></div>
