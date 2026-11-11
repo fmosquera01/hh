@@ -118,6 +118,27 @@ function plugin_hh_install(): bool
             PRIMARY KEY (`id`),
             KEY `idx_hh_quotedetails_quote` (`plugin_hh_quotes_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_workflow_config' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_workflow_config` (
+            `id` int unsigned NOT NULL,
+            `itilcategories_id` int unsigned NOT NULL DEFAULT 0,
+            `enabled` tinyint NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_asset_history' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_asset_history` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `itemtype` varchar(100) NOT NULL,
+            `items_id` int unsigned NOT NULL,
+            `tickets_id` int unsigned DEFAULT NULL,
+            `old_states_id` int unsigned NOT NULL DEFAULT 0,
+            `new_states_id` int unsigned NOT NULL DEFAULT 0,
+            `action` varchar(40) NOT NULL,
+            `notes` text DEFAULT NULL,
+            `users_id` int unsigned NOT NULL DEFAULT 0,
+            `date_creation` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_hh_asset_history_asset` (`itemtype`, `items_id`),
+            KEY `idx_hh_asset_history_ticket` (`tickets_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
         'glpi_plugin_hh_quotehistory' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_quotehistory` (
             `id` int unsigned NOT NULL AUTO_INCREMENT,
             `plugin_hh_quotes_id` int unsigned NOT NULL,
@@ -197,6 +218,15 @@ function plugin_hh_install(): bool
 
     $migration->executeMigration();
 
+    // Keep one configuration row; existing workflow history is never reset.
+    if ($DB->tableExists('glpi_plugin_hh_workflow_config')) {
+        $DB->insertOrUpdate(
+            'glpi_plugin_hh_workflow_config',
+            ['id' => 1, 'itilcategories_id' => 0, 'enabled' => 0],
+            ['id' => 1]
+        );
+    }
+
     // Register the native GLPI profile right for every existing profile.
     // Keep existing bitmasks unchanged; never grant HH access automatically.
     $rightName = 'plugin_hh';
@@ -244,6 +274,8 @@ function plugin_hh_uninstall(): bool
     $tables = [
         'glpi_plugin_hh_pointmovements',
         'glpi_plugin_hh_quotedetails',
+        'glpi_plugin_hh_asset_history',
+        'glpi_plugin_hh_workflow_config',
         'glpi_plugin_hh_quotehistory',
         'glpi_plugin_hh_quotes',
         'glpi_plugin_hh_itemtypes',
