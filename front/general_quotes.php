@@ -152,16 +152,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Session::addMessageAfterRedirect('Ingrese el total de la cotización. Si el proveedor no desglosa los valores, utilice modalidad Importe global.', false, ERROR);
             Html::redirect($backUrl);
         }
+        // La cotización del proveedor se registra sin IVA; los impuestos se calculan
+        // posteriormente en el proceso de compra/facturación.
         $taxableBase = round(max(0, $subtotal - $discount + $transport), 2);
-        $tax = round($taxableBase * ($ivaRate / 100), 2);
-        $total = round($taxableBase + $tax, 2);
+        $tax = 0.0;
+        $total = $taxableBase;
         $data = [
             'itemtype' => $itemtype, 'items_id' => (int) $itemsId, 'quote_number' => $quoteNumber ?: null,
             'suppliers_id' => $supplierId ?: null, 'supplier_name_snapshot' => mb_substr($supplierName, 0, 180),
             'quote_date' => $quoteDate, 'valid_until' => $validUntil ?: null, 'currency' => $currency,
             'quote_mode' => $mode, 'description' => mb_substr($description, 0, 255),
             'subtotal' => round($subtotal, 2),
-            'discount' => $discount, 'tax' => $tax, 'iva_rate_snapshot' => $ivaRate, 'transport' => $transport, 'total_amount' => $total,
+            'discount' => $discount, 'tax' => 0, 'iva_rate_snapshot' => 0, 'transport' => $transport, 'total_amount' => $total,
             'observations' => $notes,
         ];
         if ($isNew) {
@@ -340,20 +342,19 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
           <div class="col-12" id="gq-lines" <?= ($editingQuote['quote_mode'] ?? '') === 'detailed' ? '' : 'hidden' ?>><label>Conceptos (no requiere catálogo ni códigos)</label><div id="gq-line-list"><?php if ($editingLines): foreach ($editingLines as $line): ?><div class="line-row"><input class="form-control line-description" name="line_description[]" placeholder="Concepto o trabajo" value="<?= $e($line['description']) ?>"><input class="form-control" name="line_quantity[]" type="number" min="0.01" step="0.01" value="<?= $e($line['quantity']) ?>" placeholder="Cant."><input class="form-control" name="line_price[]" type="number" min="0" step="0.01" placeholder="Precio unitario (opcional)" value="<?= $line['unit_price'] !== null ? $e($line['unit_price']) : '' ?>"><span></span></div><?php endforeach; else: ?><div class="line-row"><input class="form-control line-description" name="line_description[]" placeholder="Concepto o trabajo"><input class="form-control" name="line_quantity[]" type="number" min="0.01" step="0.01" value="1" placeholder="Cant."><input class="form-control" name="line_price[]" type="number" min="0" step="0.01" placeholder="Precio unitario (opcional)"><span></span></div><?php endif; ?></div><button class="btn btn-outline-secondary" type="button" onclick="const n=document.querySelector('.line-row').cloneNode(true);n.querySelectorAll('input').forEach(i=>i.value='');document.getElementById('gq-line-list').appendChild(n)">Agregar concepto</button></div>
           <div class="col-6 col-md-3"><label>Subtotal antes de IVA (o calculado desde conceptos)</label><input class="form-control" id="gq-subtotal" name="total_amount" type="number" min="0.01" step="0.01" placeholder="0.00" value="<?= $e($editingQuote['subtotal'] ?? '') ?>"></div>
           <div class="col-6 col-md-3"><label>Descuento antes de IVA</label><input class="form-control" id="gq-discount" name="discount" type="number" min="0" step="0.01" value="<?= $e($editingQuote['discount'] ?? '0') ?>"></div>
-          <div class="col-6 col-md-3"><label>IVA (<?= number_format($ivaRate, 2) ?> %)</label><input class="form-control" value="Calculado automáticamente" readonly></div>
-          <div class="col-6 col-md-3"><label>Transporte / otros (gravados)</label><input class="form-control" id="gq-transport" name="transport" type="number" min="0" step="0.01" value="<?= $e($editingQuote['transport'] ?? '0') ?>"></div>
-          <div class="col-12"><div class="hh-gq-totals" id="gq-live-total"><span>Base imponible: <strong id="gq-live-base">$0.00</strong></span><span>IVA <?= number_format($ivaRate, 2) ?> %: <strong id="gq-live-iva">$0.00</strong></span><span class="hh-gq-grand">Total estimado: <strong id="gq-live-grand">$0.00</strong></span></div></div>
+          <div class="col-6 col-md-3"><label>Transporte / otros</label><input class="form-control" id="gq-transport" name="transport" type="number" min="0" step="0.01" value="<?= $e($editingQuote['transport'] ?? '0') ?>"></div>
+          <div class="col-12"><div class="hh-gq-totals" id="gq-live-total"><span>Subtotal menos descuento: <strong id="gq-live-base">$0.00</strong></span><span class="hh-gq-grand">Total cotizado: <strong id="gq-live-grand">$0.00</strong></span></div></div>
           <div class="col-12"><label>Observaciones y condiciones</label><textarea class="form-control" name="observations" rows="2"><?= $e($editingQuote['observations'] ?? '') ?></textarea></div>
           <div class="col-12"><label>Documento original (PDF, JPG o PNG; máximo 12 MB)</label><input class="form-control" type="file" name="quote_file" accept=".pdf,.jpg,.jpeg,.png"></div>
         </div>
-        <div class="alert alert-info small mt-2 mb-0">El sistema calcula IVA <?= number_format($ivaRate, 2) ?> % sobre subtotal menos descuento más transporte. La tasa se configura desde Gestión de activos → Configuración de IVA.</div><div class="d-flex gap-2 mt-3"><button class="btn btn-primary" type="submit"><?= $editingQuote ? 'Guardar cambios' : 'Guardar borrador' ?></button><button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('gq-new').hidden=true">Cancelar</button></div>
+        <div class="alert alert-info small mt-2 mb-0">Registre el importe de la cotización del proveedor sin IVA. Los impuestos se calcularán posteriormente en el proceso de compra o facturación.</div><div class="d-flex gap-2 mt-3"><button class="btn btn-primary" type="submit"><?= $editingQuote ? 'Guardar cambios' : 'Guardar borrador' ?></button><button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('gq-new').hidden=true">Cancelar</button></div>
       </form>
     </div>
   </section>
   <?php if (!$quotes): ?><div class="alert alert-light border small"><?php if ($view === 'drafts'): ?>No hay cotizaciones en borrador para este activo.<?php elseif ($view === 'history'): ?>Todavía no hay cotizaciones en el historial de este activo.<?php else: ?>Todavía no hay cotizaciones para este activo. Puedes registrar una aunque no exista ticket ni esté en estado de reparación.<?php endif; ?></div><?php endif; ?>
   <?php foreach ($quotes as $q): ?>
     <article class="card quote-card status-<?= $e($q['status']) ?>"><div class="card-body">
-      <div class="d-flex flex-wrap justify-content-between gap-2"><div><strong><?= $e($q['supplier_name_snapshot']) ?></strong> <span class="status status-<?= $e($q['status']) ?>"><?= $e(strtoupper((string) $q['status'])) ?></span><div class="text-muted small"><?= $e($q['quote_number'] ?: 'Sin número') ?> · <?= $e($q['quote_date']) ?> · <?= $e($q['description']) ?></div></div><div class="text-end"><strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong><div class="text-muted small"><?= $q['quote_mode'] === 'global' ? 'Importe global' : 'Detalle libre' ?> · IVA <?= number_format((float) ($q['iva_rate_snapshot'] ?? 15), 2) ?> %</div></div></div>
+      <div class="d-flex flex-wrap justify-content-between gap-2"><div><strong><?= $e($q['supplier_name_snapshot']) ?></strong> <span class="status status-<?= $e($q['status']) ?>"><?= $e(strtoupper((string) $q['status'])) ?></span><div class="text-muted small"><?= $e($q['quote_number'] ?: 'Sin número') ?> · <?= $e($q['quote_date']) ?> · <?= $e($q['description']) ?></div></div><div class="text-end"><strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong><div class="text-muted small"><?= $q['quote_mode'] === 'global' ? 'Importe global' : 'Detalle libre' ?> · Sin IVA</div></div></div>
       <?php if (!empty($q['attachment_path'])): ?><div class="small mt-2"><a href="<?= $e($backUrl . '&download=' . (int) $q['id']) ?>" target="_blank" rel="noopener">Ver documento del proveedor: <?= $e($q['attachment_name']) ?></a></div><?php endif; ?>
       <?php
         $quoteLines = [];
@@ -361,7 +362,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
         $quoteEvents = [];
         foreach ($DB->request(['SELECT' => '*', 'FROM' => 'glpi_plugin_hh_general_quotehistory', 'WHERE' => ['general_quotes_id' => (int) $q['id']], 'ORDER' => ['date_creation DESC', 'id DESC']]) as $event) { $quoteEvents[] = $event; }
       ?>
-      <div class="hh-gq-totals small mt-2"><span>Subtotal: <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['subtotal'], 2) ?></strong></span><span>Descuento: <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['discount'], 2) ?></strong></span><span>Transporte: <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['transport'], 2) ?></strong></span><span>IVA (<?= number_format((float) ($q['iva_rate_snapshot'] ?? 15), 2) ?> %): <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['tax'], 2) ?></strong></span><span class="hh-gq-grand">Total: <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong></span></div><?php if ($quoteLines): ?><div class="table-responsive mt-2"><table class="table table-sm table-bordered mb-1"><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unitario</th><th>Total línea</th></tr></thead><tbody><?php foreach ($quoteLines as $line): ?><tr><td><?= $e($line['description']) ?></td><td><?= number_format((float) $line['quantity'], 2) ?></td><td><?= $line['unit_price'] !== null ? $e($q['currency']) . ' ' . number_format((float) $line['unit_price'], 2) : 'No desglosado' ?></td><td><?= $line['line_total'] !== null ? $e($q['currency']) . ' ' . number_format((float) $line['line_total'], 2) : 'No desglosado' ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
+      <div class="hh-gq-totals small mt-2"><span>Subtotal: <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['subtotal'], 2) ?></strong></span><span>Descuento: <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['discount'], 2) ?></strong></span><span>Transporte / otros: <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['transport'], 2) ?></strong></span><span class="hh-gq-grand">Total cotizado (sin IVA): <strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong></span></div><?php if ($quoteLines): ?><div class="table-responsive mt-2"><table class="table table-sm table-bordered mb-1"><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unitario</th><th>Total línea</th></tr></thead><tbody><?php foreach ($quoteLines as $line): ?><tr><td><?= $e($line['description']) ?></td><td><?= number_format((float) $line['quantity'], 2) ?></td><td><?= $line['unit_price'] !== null ? $e($q['currency']) . ' ' . number_format((float) $line['unit_price'], 2) : 'No desglosado' ?></td><td><?= $line['line_total'] !== null ? $e($q['currency']) . ' ' . number_format((float) $line['line_total'], 2) : 'No desglosado' ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
       <?php if ($quoteEvents): ?><details class="small mt-2"><summary>Historial de decisiones (<?= count($quoteEvents) ?>)</summary><ul class="mb-0 mt-1"><?php foreach ($quoteEvents as $event): ?><li><?= $e($event['date_creation']) ?> · <?= $e($event['old_status'] ?: 'Nueva') ?> → <?= $e($event['new_status']) ?> · <?= $e($event['comment'] ?? '') ?></li><?php endforeach; ?></ul></details><?php endif; ?>
       <?php if ($q['status'] === 'draft' && Rights::can(Rights::UPDATE)): ?><a class="btn btn-sm btn-outline-secondary mt-2" href="<?= $e($backUrl . '&edit=' . (int) $q['id']) ?>">Editar borrador</a><form method="post" class="mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><button class="btn btn-sm btn-outline-primary" name="action" value="submit">Enviar a aprobación</button></form><?php endif; ?>
       <?php if ($q['status'] === 'pending' && Rights::can(Rights::APPROVE)): ?><form method="post" class="d-flex flex-wrap gap-2 mt-2"><input type="hidden" name="_glpi_csrf_token" value="<?= $e(Session::getNewCSRFToken()) ?>"><input type="hidden" name="itemtype" value="<?= $e($itemtype) ?>"><input type="hidden" name="items_id" value="<?= (int) $itemsId ?>"><input type="hidden" name="quote_id" value="<?= (int) $q['id'] ?>"><input class="form-control form-control-sm" name="comment" placeholder="Comentario de aprobación / rechazo"><button class="btn btn-sm btn-success" name="action" value="approve">Aprobar</button><button class="btn btn-sm btn-outline-danger" name="action" value="reject">Rechazar</button></form><?php endif; ?>
@@ -373,9 +374,8 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
 <script>
 (function(){
  const root=document.querySelector('.hh-gq'); if(!root)return;
- const rate=<?= json_encode($ivaRate) ?>;
  const subtotal=root.querySelector('#gq-subtotal'), discount=root.querySelector('#gq-discount'), transport=root.querySelector('#gq-transport');
- const baseOut=root.querySelector('#gq-live-base'), ivaOut=root.querySelector('#gq-live-iva'), totalOut=root.querySelector('#gq-live-grand');
+ const baseOut=root.querySelector('#gq-live-base'), totalOut=root.querySelector('#gq-live-grand');
  const money=n=>'$'+(Number.isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
  function update(){
    let amount=parseFloat(subtotal?.value)||0;
@@ -389,11 +389,13 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
      });
      if(hasLines&&!allPriced)amount=0;
    }
-   const base=Math.max(0,amount-(parseFloat(discount?.value)||0)+(parseFloat(transport?.value)||0));
-   const iva=Math.round(base*rate)/100;
-   if(baseOut)baseOut.textContent=money(base);if(ivaOut)ivaOut.textContent=money(iva);if(totalOut)totalOut.textContent=money(base+iva);
+   const total=Math.max(0,amount-(parseFloat(discount?.value)||0)+(parseFloat(transport?.value)||0));
+   if(baseOut)baseOut.textContent=money(total);if(totalOut)totalOut.textContent=money(total);
  }
  root.addEventListener('input',update);update();
+ // El iframe informa su altura al contenedor para evitar un segundo scroll vertical.
+ const notifyParent=()=>{const height=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight);window.parent.postMessage({type:'hh-gq-resize',height:height+8},window.location.origin);};
+ if(window.parent!==window){notifyParent();if('ResizeObserver' in window){new ResizeObserver(notifyParent).observe(document.body);}window.addEventListener('load',notifyParent);window.addEventListener('resize',notifyParent);new MutationObserver(notifyParent).observe(root,{childList:true,subtree:true,attributes:true});}
 })();
 </script>
 
