@@ -64,9 +64,9 @@ No se requiere modificar archivos del núcleo de GLPI. Validar en la instancia d
 ## Reglas de negocio consideradas en el diseño
 
 - Cada cotización conservará una copia del valor por punto aplicado para no alterar importes históricos.
-- La evaluación futura advertirá si existe una reparación repetida dentro de 60 días.
-- La evaluación futura comparará el importe de reparación con el 40% del valor de compra del activo.
-- Las reglas se deben confirmar y configurar antes de implementar los cálculos funcionales.
+- Las alertas de reparación recurrente comparan la fecha de último retorno confirmado con una nueva cotización; el período inicial es de 60 días y se puede configurar.
+- Las cotizaciones HH y generales muestran una advertencia cuando alcanzan el porcentaje configurado del valor de compra (40 % inicial). La advertencia no bloquea la cotización.
+- La antigüedad para revisar renovación usa un umbral configurable (5 años iniciales); es un indicador y no una orden de reemplazo.
 
 
 ## Reportes gerenciales 0.5.16
@@ -140,3 +140,11 @@ La versión 0.5.18 ajusta la identificación del formulario de recepción para u
 - HH automatiza exclusivamente el cambio a **REPARACIÓN Sistemas** cuando se crea un ticket desde el origen configurado y queda asociado el activo.
 - Se retiraron de la ficha del activo los botones HH para enviar a proveedor, registrar el regreso y finalizar reparación. Esos cambios se gestionan manualmente en GLPI.
 - El panel HH conserva la consulta del historial de recepción automática; no ejecuta transiciones posteriores.
+
+
+## Política de alertas y renovación (0.5.31)
+
+- La configuración de criterios permite ajustar los días para detectar una reparación recurrente (60 por defecto), el porcentaje del costo cotizado respecto del valor de compra (40 % por defecto) y la antigüedad para revisar renovación (5 años por defecto).
+- Las alertas de reparación recurrente se muestran al preparar una nueva cotización, utilizando la última fecha de retorno confirmada en cotizaciones aprobadas y/o en los campos de recepción del ticket (Fields, contenedor de reparación).
+- El porcentaje de costo se calcula en tiempo real en cotizaciones generales para cualquier clase de activo con valor de compra registrado en GLPI. En HH se mantiene el cálculo basado en el valor de los puntos.
+- Los umbrales son avisos consultivos; no bloquean cotizaciones, no cambian estados de activos y no ejecutan reemplazos.
