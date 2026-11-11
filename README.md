@@ -73,7 +73,7 @@ No se requiere modificar archivos del núcleo de GLPI. Validar en la instancia d
 Se amplía el dashboard con análisis visual de antigüedad del inventario, estado de garantía, modelos con más reparaciones, activos con mayor historial y alertas para priorizar renovación. El inventario y el detalle de repuestos se muestran bajo demanda para mantener limpia la vista ejecutiva. Las tablas incluyen desplazamiento horizontal táctil y una barra superior sincronizada. La impresión/PDF se aísla al contenido del informe, sin ocultar el contenedor principal de GLPI.
 
 
-## Flujo general de activos y reparaciones (0.5.17)
+## Flujo general de activos y reparaciones (0.5.18)
 
 - La pestaña de Gestión de reparaciones se registra dinámicamente para todos los tipos de activo de `$CFG_GLPI['asset_types']`, incluyendo clases nativas y clases creadas mediante Asset Definitions.
 - El módulo general no utiliza puntos. El esquema de puntos, contratos, garantías, cotizaciones y catálogo HH continúa reservado al flujo especializado de Handhelds y a la experiencia existente de Computadoras/Teléfonos.
@@ -95,4 +95,4 @@ Se amplía el dashboard con análisis visual de antigüedad del inventario, esta
 6. Cree un ticket ordinario con otra categoría y confirme que el estado del activo no cambie.
 7. Pruebe el envío a proveedor, recepción desde proveedor y finalización. El último paso debe restaurar el estado previo a la recepción.
 
-La versión 0.5.18 es una primera entrega funcional del flujo general y debe validarse en una instancia de pruebas antes de producción. No ejecutar pruebas destructivas ni cambiar estados de activos productivos.
+La versión 0.5.18 ajusta la identificación del formulario de recepción para utilizar el origen de solicitud `FormularioReparacion` en lugar de una categoría ITIL. El flujo general debe validarse en una instancia de pruebas antes de producción. No ejecutar pruebas destructivas ni cambiar estados de activos productivos.
