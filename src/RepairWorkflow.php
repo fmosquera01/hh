@@ -184,7 +184,13 @@ final class RepairWorkflow
             'free' => 0,
             'damaged' => 0,
             'assigned' => 0,
+            'other' => 0,
             'total' => 0,
+        ];
+        $assignedStates = [
+            self::normalize('ASIGNADO'),
+            self::normalize('PRESTAMO'),
+            self::normalize('RESERVADO'),
         ];
         foreach ($assets as $asset) {
             $counts['total']++;
@@ -197,8 +203,10 @@ final class RepairWorkflow
                 $counts['free']++;
             } elseif ($status === self::normalize(self::STATUS_DAMAGED)) {
                 $counts['damaged']++;
-            } else {
+            } elseif (in_array($status, $assignedStates, true)) {
                 $counts['assigned']++;
+            } else {
+                $counts['other']++;
             }
         }
         return $counts;
