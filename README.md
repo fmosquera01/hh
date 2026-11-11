@@ -5,13 +5,13 @@ HH es un **plugin nativo de GLPI 11**. La experiencia se trabaja dentro de la pe
 ## Integración con activos
 
 - Añade **Gestión de activos y reparaciones** a todos los tipos registrados en `$CFG_GLPI['asset_types']`, incluidos los activos personalizados de Asset Definitions de GLPI 11.
-- Conserva la vista especializada de garantía, contratos, cotizaciones y puntos para **Computadoras** y **Teléfonos**.
+- Conserva el flujo especializado de garantía, contratos, cotizaciones y puntos exclusivamente para **Teléfonos cuyo tipo sea HANDHELD**; Computadoras y demás activos usan el módulo general sin puntos.
 - Incorpora un flujo general de reparación sin esquema de puntos para el resto de activos.
 - Mantiene los datos operativos en tablas propias; los cambios de estado se realizan mediante la API de objetos de GLPI para conservar el historial nativo.
 
 ## Estado actual — versión 0.5.24
 
-La pestaña nativa consulta en modo lectura los datos de activos, compra, garantía y contratos asociados para **Computadoras** y **Teléfonos**, utilizando la API de consultas de GLPI y sus relaciones `FKEY`. El tipo del contrato vigente es el valor que se muestra en **Tipo / información de garantía** y prevalece sobre la garantía propia del equipo para determinar la cobertura. La fecha de inicio de la garantía propia toma `warranty_date` y, si no está informada, usa `buy_date`.
+La pestaña nativa consulta en modo lectura los datos de activos, compra, garantía y contratos asociados para **Handhelds** (Phone con tipo HANDHELD), utilizando la API de consultas de GLPI y sus relaciones `FKEY`. El tipo del contrato vigente es el valor que se muestra en **Tipo / información de garantía** y prevalece sobre la garantía propia del equipo para determinar la cobertura. La fecha de inicio de la garantía propia toma `warranty_date` y, si no está informada, usa `buy_date`.
 
 Reglas de cobertura:
 - **Platinum:** cubre todo tipo de daño; objetivo de atención de 2 días.
@@ -86,7 +86,7 @@ Se amplía el dashboard con análisis visual de antigüedad del inventario, esta
 ## Flujo general de activos y reparaciones (0.5.18)
 
 - La pestaña de Gestión de reparaciones se registra dinámicamente para todos los tipos de activo de `$CFG_GLPI['asset_types']`, incluyendo clases nativas y clases creadas mediante Asset Definitions.
-- El módulo general no utiliza puntos. El esquema de puntos, contratos, garantías, cotizaciones y catálogo HH continúa reservado al flujo especializado de Handhelds y a la experiencia existente de Computadoras/Teléfonos.
+- El módulo general no utiliza puntos. El esquema de puntos, contratos, garantías, cotizaciones y catálogo HH continúa reservado exclusivamente a Handhelds.
 - La recepción del activo se detecta en el hook síncrono `ITEM_ADD` de `Ticket_Item`. El activo asociado al ticket cambia inmediatamente a **REPARACIÓN Sistemas**, sin Cron ni tarea programada, únicamente cuando el ticket tiene el origen de solicitud configurado como **FormularioReparacion** (`requesttypes_id`).
 - Para impedir que tickets ordinarios cambien estados por accidente, el hook solo actúa cuando el origen de solicitud del ticket coincide con **FormularioReparacion**, seleccionado en **Gestión de activos y reparaciones > Configurar flujo**. Asigne ese origen al formulario de recepción del catálogo de servicios.
 - Al enviar el equipo a proveedor, el técnico utiliza **Enviar a proveedor** y el estado cambia a **REPARACIÓN Proveedor**. Al recibirlo de vuelta, utiliza **Regresó del proveedor** para devolverlo a **REPARACIÓN Sistemas**.
