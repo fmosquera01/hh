@@ -15,12 +15,18 @@ $embedded = (int) ($_REQUEST['embedded'] ?? 0) === 1;
 $allowedTypes = $CFG_GLPI['asset_types'] ?? [];
 
 if ($itemsId === false || $itemsId < 1 || !in_array($itemtype, $allowedTypes, true)
-    || !class_exists($itemtype) || in_array($itemtype, ['Computer', 'Phone'], true)) {
+    || !class_exists($itemtype)) {
     Html::displayErrorAndDie('Activo no válido para cotización general.');
 }
 $asset = new $itemtype();
 if (!$asset->getFromDB((int) $itemsId) || !$asset->can((int) $itemsId, READ)) {
     Html::displayRightError();
+}
+if ($itemtype === 'Phone') {
+    $phoneTypeId = (int) ($asset->fields['phonetypes_id'] ?? 0);
+    if (RepairWorkflow::normalize(Reports::dropdownName('glpi_phonetypes', $phoneTypeId)) === 'handheld') {
+        Html::displayErrorAndDie('Los Handheld utilizan el flujo especializado de puntos y no admiten cotizaciones generales.');
+    }
 }
 $assetName = (string) ($asset->fields['name'] ?? ($itemtype . ' #' . $itemsId));
 $downloadId = filter_var($_GET['download'] ?? 0, FILTER_VALIDATE_INT);
