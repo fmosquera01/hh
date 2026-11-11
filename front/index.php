@@ -33,7 +33,7 @@ $reportsAllowed = Rights::can(Rights::REPORTS);
         <div class="col-sm-6 col-xl-4">
           <div class="card card-body h-100">
             <h3><i class="ti ti-settings me-2"></i>Flujo general de reparación</h3>
-            <p class="text-muted">Configure la categoría exclusiva del catálogo de servicios y active el cambio inmediato de estado.</p>
+            <p class="text-muted">Seleccione el origen FormularioReparacion y active el cambio inmediato de estado.</p>
             <a class="btn btn-primary mt-auto" href="/plugins/hh/front/config.php">Configurar flujo</a>
           </div>
         </div>
