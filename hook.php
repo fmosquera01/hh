@@ -118,6 +118,13 @@ function plugin_hh_install(): bool
             PRIMARY KEY (`id`),
             KEY `idx_hh_quotedetails_quote` (`plugin_hh_quotes_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_general_quote_config' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_general_quote_config` (
+            `id` int unsigned NOT NULL,
+            `iva_rate` decimal(6,3) NOT NULL DEFAULT 15.000,
+            `users_id` int unsigned NOT NULL DEFAULT 0,
+            `date_mod` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
         'glpi_plugin_hh_general_quotes' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_general_quotes` (
             `id` int unsigned NOT NULL AUTO_INCREMENT,
             `itemtype` varchar(100) NOT NULL,
@@ -294,6 +301,17 @@ function plugin_hh_install(): bool
                 'requesttypes_id' => 0,
                 'enabled' => 0,
             ]);
+        }
+    }
+
+    // Default Ecuador VAT for general supplier quotations; preserve admin changes on upgrades.
+    if ($DB->tableExists('glpi_plugin_hh_general_quote_config')) {
+        $hasIvaConfig = false;
+        foreach ($DB->request(['SELECT' => ['id'], 'FROM' => 'glpi_plugin_hh_general_quote_config', 'WHERE' => ['id' => 1], 'LIMIT' => 1]) as $unused) {
+            $hasIvaConfig = true;
+        }
+        if (!$hasIvaConfig) {
+            $DB->insert('glpi_plugin_hh_general_quote_config', ['id' => 1, 'iva_rate' => 15.000, 'users_id' => 0]);
         }
     }
 
