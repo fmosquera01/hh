@@ -220,7 +220,7 @@ function plugin_hh_install(): bool
 
     // Keep one configuration row; existing workflow history is never reset.
     if ($DB->tableExists('glpi_plugin_hh_workflow_config')) {
-        $DB->insertOrUpdate(
+        $DB->updateOrInsert(
             'glpi_plugin_hh_workflow_config',
             ['id' => 1, 'itilcategories_id' => 0, 'enabled' => 0],
             ['id' => 1]
