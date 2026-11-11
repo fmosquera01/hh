@@ -16,7 +16,7 @@ require_once __DIR__ . '/src/RepairWorkflow.php';
 require_once __DIR__ . '/src/Rights.php';
 require_once __DIR__ . '/src/Profile.php';
 
-define('PLUGIN_HH_VERSION', '0.5.28');
+define('PLUGIN_HH_VERSION', '0.5.29');
 define('PLUGIN_HH_MIN_GLPI', '11.0.0');
 define('PLUGIN_HH_MAX_GLPI', '11.99.99');
 
@@ -28,10 +28,10 @@ function plugin_init_hh(): void
         'plugins' => Dashboard::class,
     ];
 
-    // Ticket_Item is created after the ticket. This hook therefore sees the
-    // real itemtype/items_id relation and changes only the selected asset.
+    // Item_Ticket is the GLPI 11 relation class for glpi_items_tickets.
+    // This hook sees the real itemtype/items_id relation after association.
     $PLUGIN_HOOKS[Hooks::ITEM_ADD]['hh'] = [
-        Ticket_Item::class => [RepairWorkflow::class, 'onTicketItemAdded'],
+        Item_Ticket::class => [RepairWorkflow::class, 'onTicketItemAdded'],
     ];
 
     Plugin::registerClass(HhProfile::class, ['addtabon' => Profile::class]);
