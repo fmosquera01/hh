@@ -5,6 +5,7 @@ use GlpiPlugin\Hh\Dashboard;
 use GlpiPlugin\Hh\Reports;
 use GlpiPlugin\Hh\RepairAnalytics;
 use GlpiPlugin\Hh\Rights;
+use GlpiPlugin\Hh\RepairWorkflow;
 
 include('../../../inc/includes.php');
 
@@ -24,6 +25,8 @@ if (!array_key_exists('itemtype', $_GET) && in_array('Phone', $assetTypes, true)
     $typeFilter = 'Phone';
 }
 $baseInventory = Reports::getInventory($search, $typeFilter !== '' ? $typeFilter : null);
+// Operational indicators cover all visible asset classes, independently of the HH filters.
+$workflowCounts = RepairWorkflow::getDashboardCounts(Reports::getInventory(null, null));
 // Apply the class constraint independently of the inventory query.
 if ($typeFilter !== '') {
     $baseInventory = array_values(array_filter(
@@ -182,7 +185,7 @@ if (($_GET['export'] ?? '') === 'excel') {
                 hhCsvSafe((string)$asset['type_name']), hhCsvSafe((string)$asset['subtype_name']), hhCsvSafe((string)$asset['model_name']), hhCsvSafe((string)$asset['name']),
                 hhCsvSafe((string)$asset['otherserial']), hhCsvSafe((string)$asset['serial']), hhCsvSafe((string)$asset['manufacturer']), $asset['purchase_date'],
                 $asset['age_years'] === null ? '' : number_format((float)$asset['age_years'], 2, '.', ''),
-                $asset['warranty_end'], $asset['currently_in_repair'] ? 'En reparación' : 'En inventario',
+                $asset['warranty_end'], hhCsvSafe((string) ($asset['status_name'] ?? '')),
                 hhCsvSafe((string)$asset['active_repair_guide']), $asset['repair_count'], $asset['completed_repairs'],
                 number_format((float)$asset['parts_units'], 2, '.', ''), $asset['last_returned_at'],
                 number_format((float)$asset['points_consumed'], 2, '.', ''),
@@ -296,6 +299,11 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
   </div>
  </form>
  <div class="row g-3 mb-3">
+  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Reparación Sistemas</div><div class="kpi-value"><?=number_format($workflowCounts['systems'])?></div><div class="text-muted small">Equipos en reparación interna</div></div></div>
+  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Reparación Proveedor</div><div class="kpi-value"><?=number_format($workflowCounts['supplier'])?></div><div class="text-muted small">Equipos enviados a proveedor</div></div></div>
+  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Equipos de backup · LIBRE</div><div class="kpi-value"><?=number_format($workflowCounts['free'])?></div><div class="text-muted small">Disponibles para asignación</div></div></div>
+  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Equipos dañados</div><div class="kpi-value"><?=number_format($workflowCounts['damaged'])?></div><div class="text-muted small">Estado DAÑADO</div></div></div>
+  <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Equipos asignados</div><div class="kpi-value"><?=number_format($workflowCounts['assigned'])?></div><div class="text-muted small">Resto de activos inventariados</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Equipos actualmente en reparación</div><div class="kpi-value"><?=number_format($totalAssetsInRepair)?></div><div class="text-muted small">En proveedor, sin fecha de retorno</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos en inventario</div><div class="kpi-value"><?=number_format($totalAssets)?></div><div class="text-muted small">Con filtros aplicados</div></div></div>
   <div class="col-6 col-xl-3"><div class="kpi"><div class="kpi-label">Activos con 5+ años</div><div class="kpi-value"><?=number_format($assetsFiveYearsOrOlder)?></div><div class="text-muted small">Revisar renovación · <?=$assetsWithPurchaseDate?> con fecha de compra</div></div></div>
