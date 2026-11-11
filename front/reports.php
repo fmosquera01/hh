@@ -230,7 +230,7 @@ function hhCsvSafe(string $value): string
     return preg_match('/^[\\t\\r ]*[=+\\-@]/', $value) === 1 ? "'" . $value : $value;
 }
 
-Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
+Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 ?>
 <style>
 .hh-reports{font-size:13px}.hh-reports .kpi{border:1px solid var(--tblr-border-color);border-radius:9px;padding:16px;height:100%;background:var(--tblr-bg-surface)}.hh-reports .kpi-label{color:var(--tblr-muted);font-size:12px}.hh-reports .kpi-value{font-size:1.65rem;font-weight:700;line-height:1.3}.hh-reports .chart-bars{display:grid;grid-template-columns:repeat(12,minmax(22px,1fr));gap:8px;align-items:end;height:190px;padding:10px 4px 0}.hh-reports .chart-col{display:flex;flex-direction:column;align-items:center;justify-content:end;height:100%;gap:5px}.hh-reports .chart-pair{display:flex;align-items:end;justify-content:center;gap:3px;height:145px;width:100%}.hh-reports .chart-bar{width:12px;min-height:2px;border-radius:4px 4px 0 0}.hh-reports .chart-bar.purchase{background:var(--tblr-success)}.hh-reports .chart-bar.consumption{background:var(--tblr-danger)}.hh-reports .chart-month{font-size:10px;color:var(--tblr-muted)}.hh-reports .table{font-size:12px}.hh-reports .table th,.hh-reports .table td{vertical-align:middle;white-space:nowrap}
@@ -281,7 +281,7 @@ Html::header(__('Dashboard gerencial HH', 'hh'), $_SERVER['PHP_SELF'], 'plugins'
 </style>
 <div class="container-fluid hh-reports">
  <div class="hh-hero d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
-  <div><h2 class="mb-1">Dashboard gerencial HH</h2><div class="hh-reports-subtitle">Visión ejecutiva del inventario, reparaciones, garantías y consumo de puntos</div></div>
+  <div><h2 class="mb-1">Dashboard gerencial de activos y reparaciones</h2><div class="hh-reports-subtitle">Visión ejecutiva del inventario, disponibilidad, reparaciones y módulo especializado HH</div></div>
   <div class="d-flex gap-2 flex-wrap hh-no-print">
    <a class="btn btn-outline-success" href="?<?=hhReportEscape(http_build_query(array_merge($_GET, ['export' => 'excel'])))?>">Exportar Excel (CSV)</a>
    <button class="btn btn-outline-danger" type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
