@@ -9,7 +9,7 @@ HH es un **plugin nativo de GLPI 11**. La experiencia se trabaja dentro de la pe
 - Incorpora un flujo general de reparación sin esquema de puntos para el resto de activos.
 - Mantiene los datos operativos en tablas propias; los cambios de estado se realizan mediante la API de objetos de GLPI para conservar el historial nativo.
 
-## Estado actual — versión 0.5.18
+## Estado actual — versión 0.5.24
 
 La pestaña nativa consulta en modo lectura los datos de activos, compra, garantía y contratos asociados para **Computadoras** y **Teléfonos**, utilizando la API de consultas de GLPI y sus relaciones `FKEY`. El tipo del contrato vigente es el valor que se muestra en **Tipo / información de garantía** y prevalece sobre la garantía propia del equipo para determinar la cobertura. La fecha de inicio de la garantía propia toma `warranty_date` y, si no está informada, usa `buy_date`.
 
@@ -33,7 +33,7 @@ La versión 0.5.16 establece por defecto el tipo interno HAND HELD al abrir el d
 - `front/reports.php`: dashboard gerencial e inventario completo.
 - `front/index.php`: pantalla de entrada del plugin.
 
-Las tablas existentes con prefijo `glpi_plugin_hh_` se conservan. La estructura ahora contempla catálogo maestro de ítems (`glpi_plugin_hh_items`), asignación por tipo/modelo (`glpi_plugin_hh_itemtypes`), cabecera (`glpi_plugin_hh_quotes`) y detalle (`glpi_plugin_hh_quotedetails`). Las migraciones agregan columnas faltantes sin borrar los datos existentes. La interfaz todavía no guarda cotizaciones.
+Las tablas existentes con prefijo `glpi_plugin_hh_` se conservan. La estructura ahora contempla catálogo maestro de ítems (`glpi_plugin_hh_items`), asignación por tipo/modelo (`glpi_plugin_hh_itemtypes`), cabecera (`glpi_plugin_hh_quotes`) y detalle (`glpi_plugin_hh_quotedetails`). Las migraciones agregan columnas faltantes sin borrar los datos existentes. La interfaz especializada de HH conserva su flujo propio; el módulo general de cotizaciones se habilita para el resto de activos en 0.5.24.
 
 ## Reportes gerenciales (0.5.23)
 
@@ -72,6 +72,16 @@ No se requiere modificar archivos del núcleo de GLPI. Validar en la instancia d
 
 Se amplía el dashboard con análisis visual de antigüedad del inventario, estado de garantía, modelos con más reparaciones, activos con mayor historial y alertas para priorizar renovación. El inventario y el detalle de repuestos se muestran bajo demanda para mantener limpia la vista ejecutiva. Las tablas incluyen desplazamiento horizontal táctil y una barra superior sincronizada. La impresión/PDF se aísla al contenido del informe, sin ocultar el contenedor principal de GLPI.
 
+
+## Cotizaciones generales para activos que no son Handheld (0.5.24)
+
+- El esquema de puntos y el flujo especializado permanecen exclusivos de los activos Phone cuyo tipo GLPI es HANDHELD.
+- Computadoras, monitores, impresoras, cámaras, NVR, balanzas, activos personalizados y teléfonos que no sean HANDHELD utilizan cotizaciones generales en moneda, sin catálogo obligatorio ni puntos.
+- Desde la ficha del activo se pueden registrar cotizaciones aunque no exista ticket asociado ni el activo esté en estado REPARACIÓN Sistemas. El ticket y los estados continúan controlando el proceso operativo, no bloquean el registro de una oferta.
+- Cada cotización registra proveedor (catálogo GLPI o texto libre), número y fechas, vigencia, moneda, descripción, modalidad global o detalle libre, importes, observaciones y documento adjunto PDF/JPG/PNG.
+- La modalidad global conserva el total informado por el proveedor sin inventar un desglose. La modalidad detallada admite conceptos y cantidades libres; los precios por línea son opcionales cuando el proveedor no los informa.
+- Los borradores pueden editarse; luego se envían a aprobación, se aprueban o rechazan y se puede seleccionar una oferta aprobada indicando el motivo. Las decisiones quedan en historial.
+- Las cotizaciones generales se almacenan en tablas independientes y no alteran las tablas de puntos, catálogo ni cotizaciones HH.
 
 ## Flujo general de activos y reparaciones (0.5.18)
 
