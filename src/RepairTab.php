@@ -95,7 +95,6 @@ final class RepairTab extends CommonGLPI
             self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($tracking['sent_at'] ?? null));
             self::assetDetail(__('Última guía de salida', 'hh'), (string) ($tracking['guide_number'] ?? '—') ?: '—');
             echo "</div></div></div>";
-            RepairWorkflow::renderAssetActions($item);
             // El seguimiento operativo permanece en el historial nativo de GLPI;
             // esta vista general se concentra en las cotizaciones del activo.
             $baseUrl = '/plugins/hh/front/general_quotes.php?embedded=1&itemtype=' . rawurlencode($itemType) . '&items_id=' . $itemId;
