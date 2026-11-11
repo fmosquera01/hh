@@ -31,6 +31,11 @@ if ($itemtype === 'Phone') {
     }
 }
 $assetName = (string) ($asset->fields['name'] ?? ($itemtype . ' #' . $itemsId));
+$isEligibleForQuote = RepairWorkflow::isInSupplierRepairState($itemtype, (int) $itemsId)
+    && RepairWorkflow::getSupplierTrackingForAsset($itemtype, (int) $itemsId, false) !== null;
+$eligibilityMessage = !$isEligibleForQuote
+    ? 'No se puede crear ni editar una cotización: el activo debe estar en estado REPARACIÓN Proveedor y tener un ticket asociado con guía de salida y fecha de salida registradas.'
+    : '';
 $policy = RepairAlerts::getPolicy();
 $purchaseValue = RepairAlerts::getPurchaseValue($itemtype, (int) $itemsId);
 $repeatWarning = RepairAlerts::getRepeatRepairWarning($itemtype, (int) $itemsId);
@@ -95,6 +100,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'save') {
+        // Revalidate on the server for both new quotes and draft edits.
+        if (!$isEligibleForQuote) {
+            Session::addMessageAfterRedirect($eligibilityMessage, false, ERROR);
+            Html::redirect($backUrl);
+        }
         $isNew = $quoteId === 0;
         if (($isNew && !Rights::can(Rights::CREATE)) || (!$isNew && (!Rights::can(Rights::UPDATE) || ($quote['status'] ?? '') !== 'draft'))) {
             Html::displayRightError();
@@ -321,8 +331,9 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
 </style>
 <div class="hh-gq">
   <div class="card gq-hero mb-2"><div class="card-body d-flex justify-content-between align-items-center gap-2"><div><div class="gq-subtitle">SONGA · GESTIÓN DE REPARACIONES</div><h3>Cotizaciones de reparación</h3><div class="text-muted small"><?= $e($assetName) ?> · <?= $e($itemtype) ?> #<?= (int) $itemsId ?></div><div class="gq-subtitle mt-1">Comparación de proveedores, costos e historial de decisiones</div></div>
-    <?php if (Rights::can(Rights::CREATE) && $view !== 'history'): ?><button class="btn btn-light" type="button" onclick="document.getElementById('gq-new').hidden=false;this.hidden=true">+ Nueva cotización</button><?php endif; ?>
+    <?php if (Rights::can(Rights::CREATE) && $view !== 'history' && $isEligibleForQuote): ?><button class="btn btn-light" type="button" onclick="document.getElementById('gq-new').hidden=false;this.hidden=true">+ Nueva cotización</button><?php endif; ?>
   </div></div>
+  <?php if (!$isEligibleForQuote): ?><div class="alert alert-warning mb-2"><strong>Cotización no habilitada.</strong> <?= $e($eligibilityMessage) ?> Registre primero la salida al proveedor en el ticket y cambie el estado del activo a REPARACIÓN Proveedor.</div><?php endif; ?>
   <div class="gq-kpi-grid">
     <div class="gq-kpi"><div class="gq-kpi-label">Cotizaciones</div><div class="gq-kpi-value"><?= (int) $quoteStats['total'] ?></div></div>
     <div class="gq-kpi"><div class="gq-kpi-label">Borradores</div><div class="gq-kpi-value"><?= (int) $quoteStats['draft'] ?></div></div>
@@ -357,7 +368,7 @@ if (!$embedded) { Html::header('Cotizaciones de reparación', $_SERVER['PHP_SELF
       </form>
     </div>
   </section>
-  <?php if (!$quotes): ?><div class="alert alert-light border small"><?php if ($view === 'drafts'): ?>No hay cotizaciones en borrador para este activo.<?php elseif ($view === 'history'): ?>Todavía no hay cotizaciones en el historial de este activo.<?php else: ?>Todavía no hay cotizaciones para este activo. Puedes registrar una aunque no exista ticket ni esté en estado de reparación.<?php endif; ?></div><?php endif; ?>
+  <?php if (!$quotes): ?><div class="alert alert-light border small"><?php if ($view === 'drafts'): ?>No hay cotizaciones en borrador para este activo.<?php elseif ($view === 'history'): ?>Todavía no hay cotizaciones en el historial de este activo.<?php else: ?>Todavía no hay cotizaciones para este activo.<?php endif; ?></div><?php endif; ?>
   <?php foreach ($quotes as $q): ?>
     <article class="card quote-card status-<?= $e($q['status']) ?>"><div class="card-body">
       <div class="d-flex flex-wrap justify-content-between gap-2"><div><strong><?= $e($q['supplier_name_snapshot']) ?></strong> <span class="status status-<?= $e($q['status']) ?>"><?= $e(strtoupper((string) $q['status'])) ?></span><div class="text-muted small"><?= $e($q['quote_number'] ?: 'Sin número') ?> · <?= $e($q['quote_date']) ?> · <?= $e($q['description']) ?></div></div><div class="text-end"><strong><?= $e($q['currency']) ?> <?= number_format((float) $q['total_amount'], 2) ?></strong><div class="text-muted small"><?= $q['quote_mode'] === 'global' ? 'Importe global' : 'Detalle libre' ?> · Sin IVA</div></div></div>
