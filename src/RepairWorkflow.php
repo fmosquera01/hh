@@ -45,7 +45,7 @@ final class RepairWorkflow
         return false;
     }
 
-    /** Called immediately after GLPI creates a Ticket_Item relation. */
+    /** Called immediately after GLPI creates an Item_Ticket relation. */
     public static function onTicketItemAdded(CommonDBTM $relation): void
     {
         global $DB, $CFG_GLPI;
@@ -300,6 +300,33 @@ final class RepairWorkflow
             echo '</tbody></table></div>';
         }
         echo '</div></div>';
+    }
+
+    /** Compact repair actions for non-Handheld assets; no duplicate movement history. */
+    public static function renderAssetActions(CommonDBTM $asset): void
+    {
+        $itemtype = $asset::getType();
+        $itemsId = (int) $asset->getID();
+        $stateName = Reports::dropdownName('glpi_states', (int) (($asset->fields ?? [])['states_id'] ?? 0));
+        $normalizedState = self::normalize($stateName);
+        $isSystems = $normalizedState === self::normalize(self::STATUS_SYSTEMS);
+        $isSupplier = $normalizedState === self::normalize(self::STATUS_SUPPLIER);
+        if (!$isSystems && !$isSupplier) {
+            return;
+        }
+
+        $canUpdate = Rights::can(Rights::UPDATE) && $asset->can($itemsId, UPDATE);
+        echo '<div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 border rounded">';
+        echo '<strong>Reparación:</strong> <span class="badge ' . ($isSupplier ? 'bg-orange' : 'bg-blue') . '">' . htmlspecialchars($stateName, ENT_QUOTES, 'UTF-8') . '</span>';
+        if ($canUpdate) {
+            if ($isSystems) {
+                self::actionForm($itemtype, $itemsId, 'send_supplier', 'Enviar a proveedor', 'btn btn-sm btn-outline-primary');
+                self::actionForm($itemtype, $itemsId, 'finish', 'Finalizar reparación', 'btn btn-sm btn-success');
+            } else {
+                self::actionForm($itemtype, $itemsId, 'return_free', 'Regresó del proveedor · LIBRE', 'btn btn-sm btn-success');
+            }
+        }
+        echo '</div>';
     }
 
     private static function actionForm(string $itemtype, int $itemsId, string $action, string $label, string $class): void
