@@ -167,7 +167,184 @@ $mostRepairedAssets = array_slice($mostRepairedAssets, 0, 8);
 $maxAgeBucket = max(1, ...array_values($ageBuckets));
 $maxWarrantyBucket = max(1, ...array_values($warrantyBuckets));
 
-if (($_GET['export'] ?? '') === 'excel') {
+
+/** Build a dependency-free Office Open XML workbook using PHP's ZipArchive extension. */
+function hhXlsxColumnName(int $number): string
+{
+    $name = '';
+    while ($number > 0) {
+        $number--;
+        $name = chr(65 + ($number % 26)) . $name;
+        $number = intdiv($number, 26);
+    }
+    return $name;
+}
+
+function hhXlsxSheetXml(array $rows): string
+{
+    $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    $xml .= '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+    $xml .= '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+    $xml .= '<sheetFormatPr defaultRowHeight="16"/><sheetData>';
+    $lastColumn = 1;
+    foreach ($rows as $rowIndex => $row) {
+        $excelRow = $rowIndex + 1;
+        $xml .= '<row r="' . $excelRow . '">';
+        foreach (array_values($row) as $columnIndex => $value) {
+            $column = $columnIndex + 1;
+            $lastColumn = max($lastColumn, $column);
+            $reference = hhXlsxColumnName($column) . $excelRow;
+            if ($rowIndex === 0) {
+                $style = ' s="1"';
+            } else {
+                $style = '';
+            }
+            if (is_int($value) || is_float($value)) {
+                $number = is_finite((float)$value) ? (string)$value : '0';
+                $xml .= '<c r="' . $reference . '"' . $style . '><v>' . $number . '</v></c>';
+            } else {
+                $text = htmlspecialchars((string)$value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                $xml .= '<c r="' . $reference . '" t="inlineStr"' . $style . '><is><t xml:space="preserve">' . $text . '</t></is></c>';
+            }
+        }
+        $xml .= '</row>';
+    }
+    $xml .= '</sheetData>';
+    if (count($rows) > 0) {
+        $xml .= '<autoFilter ref="A1:' . hhXlsxColumnName($lastColumn) . count($rows) . '"/>';
+    }
+    $xml .= '</worksheet>';
+    return $xml;
+}
+
+function hhDownloadXlsx(string $filename, array $sheets): void
+{
+    if (!class_exists(ZipArchive::class)) {
+        http_response_code(500);
+        exit('No se puede generar el archivo XLSX: la extensión PHP ZipArchive no está habilitada en este servidor.');
+    }
+    $temporaryFile = tempnam(sys_get_temp_dir(), 'hhxlsx_');
+    if ($temporaryFile === false) {
+        http_response_code(500);
+        exit('No se pudo preparar el archivo XLSX.');
+    }
+    $zip = new ZipArchive();
+    $opened = $zip->open($temporaryFile, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    if ($opened !== true) {
+        @unlink($temporaryFile);
+        http_response_code(500);
+        exit('No se pudo crear el libro de Excel.');
+    }
+
+    $contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        . '<Default Extension="xml" ContentType="application/xml"/>'
+        . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+    foreach (array_keys($sheets) as $index => $unused) {
+        $contentTypes .= '<Override PartName="/xl/worksheets/sheet' . ($index + 1) . '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+    }
+    $contentTypes .= '</Types>';
+    $zip->addFromString('[Content_Types].xml', $contentTypes);
+    $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        . '</Relationships>');
+
+    $workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
+    $relationships = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+    foreach (array_keys($sheets) as $index => $sheetName) {
+        $number = $index + 1;
+        $safeName = htmlspecialchars((string)$sheetName, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $workbook .= '<sheet name="' . $safeName . '" sheetId="' . $number . '" r:id="rId' . $number . '"/>';
+        $relationships .= '<Relationship Id="rId' . $number . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' . $number . '.xml"/>';
+        $zip->addFromString('xl/worksheets/sheet' . $number . '.xml', hhXlsxSheetXml($sheets[$sheetName]));
+    }
+    $workbook .= '</sheets></workbook>';
+    $relationships .= '<Relationship Id="rId' . (count($sheets) + 1) . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+    $zip->addFromString('xl/workbook.xml', $workbook);
+    $zip->addFromString('xl/_rels/workbook.xml.rels', $relationships);
+    $zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<fonts count="2"><font><sz val="11"/><name val="Aptos"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Aptos"/></font></fonts>'
+        . '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF174A73"/><bgColor indexed="64"/></patternFill></fill></fills>'
+        . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+        . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        . '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>'
+        . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
+    $zip->close();
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . (string)filesize($temporaryFile));
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    readfile($temporaryFile);
+    @unlink($temporaryFile);
+    exit;
+}
+
+
+if (($_GET['export'] ?? '') === 'xlsx') {
+    $monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    $inventoryRows = [[
+        'Tipo elemento GLPI', 'Tipo de activo', 'Modelo', 'Activo', 'Activo fijo', 'Serie', 'Fabricante',
+        'Fecha compra', 'Antigüedad (años)', 'Fin garantía', 'Estado actual', 'Guía proveedor',
+        'Reparaciones aprobadas', 'Retornos confirmados', 'Repuestos (unidades)', 'Último retorno', 'Puntos consumidos'
+    ]];
+    foreach ($inventory as $asset) {
+        $inventoryRows[] = [
+            (string)$asset['type_name'], (string)$asset['subtype_name'], (string)$asset['model_name'],
+            (string)$asset['name'], (string)$asset['otherserial'], (string)$asset['serial'],
+            (string)$asset['manufacturer'], (string)$asset['purchase_date'],
+            $asset['age_years'] === null ? '' : round((float)$asset['age_years'], 2),
+            (string)$asset['warranty_end'], (string)($asset['status_name'] ?? ''),
+            (string)$asset['active_repair_guide'], (int)$asset['repair_count'],
+            (int)$asset['completed_repairs'], round((float)$asset['parts_units'], 2),
+            (string)$asset['last_returned_at'], round((float)$asset['points_consumed'], 2),
+        ];
+    }
+    $monthlyRows = [['Mes', 'Puntos comprados', 'Puntos consumidos', 'Balance', 'Reparaciones finalizadas']];
+    foreach ($months as $index => $month) {
+        $monthlyRows[] = [
+            $monthLabels[$index], round((float)$month['purchased'], 2),
+            round((float)$month['consumed'], 2),
+            round((float)$month['purchased'] - (float)$month['consumed'], 2),
+            (int)($monthlyRepairs[$index] ?? 0),
+        ];
+    }
+    $partsRows = [['Tipo GLPI', 'ID activo', 'Cotización', 'Fecha retorno', 'Código repuesto', 'Repuesto', 'Cantidad', 'Puntos']];
+    foreach ($partHistory as $line) {
+        $partsRows[] = [
+            (string)$line['itemtype'], (int)$line['items_id'], (string)$line['quote_name'],
+            (string)$line['returned_at'], (string)$line['code'], (string)$line['description'],
+            round((float)$line['quantity'], 2), round((float)$line['points'], 2),
+        ];
+    }
+    $filterRows = [
+        ['Parámetro', 'Valor'],
+        ['Año de análisis', $year],
+        ['Tipo de elemento GLPI', $typeFilter !== '' ? $typeFilter : 'Todos'],
+        ['Tipo de activo', $subtypeFilter !== '' ? ($subtypeOptions[$subtypeFilter] ?? $subtypeFilter) : 'Todos'],
+        ['Modelo', $modelFilter !== '' ? ($modelOptions[$modelFilter] ?? $modelFilter) : 'Todos'],
+        ['Búsqueda', $search !== '' ? $search : 'Sin filtro'],
+        ['Activos incluidos', count($inventory)],
+        ['Reparación Sistemas', (int)$workflowCounts['systems']],
+        ['Reparación Proveedor', (int)$workflowCounts['supplier']],
+        ['Equipos de backup', (int)$workflowCounts['free']],
+        ['Equipos dañados', (int)$workflowCounts['damaged']],
+        ['Asignados / en uso', (int)$workflowCounts['assigned']],
+        ['Otros / sin estado reconocido', (int)$workflowCounts['other']],
+    ];
+    hhDownloadXlsx(
+        'Songa_inventario_' . $year . '_' . date('Ymd_His') . '.xlsx',
+        ['Inventario' => $inventoryRows, 'Resumen mensual' => $monthlyRows, 'Repuestos' => $partsRows, 'Filtros y estado' => $filterRows]
+    );
+}
+
+if (($_GET['export'] ?? '') === 'csv') {
     $filename = 'HH_inventario_' . $year . '_' . date('Ymd_His') . '.csv';
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -299,7 +476,8 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
  <div class="hh-hero d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
   <div><h2 class="mb-1">Control de activos Songa</h2><div class="hh-reports-subtitle">Inventario, disponibilidad y reparaciones según los filtros seleccionados</div></div>
   <div class="d-flex gap-2 flex-wrap hh-no-print">
-   <a class="btn btn-outline-success" href="?<?=hhReportEscape(http_build_query(array_merge($_GET, ['export' => 'excel'])))?>">Exportar Excel (CSV)</a>
+   <a class="btn btn-outline-success" href="?<?=hhReportEscape(http_build_query(array_merge($_GET, ['export' => 'xlsx'])))?>">Exportar Excel (.xlsx)</a>
+   <a class="btn btn-outline-secondary" href="?<?=hhReportEscape(http_build_query(array_merge($_GET, ['export' => 'csv'])))?>">CSV</a>
    <button class="btn btn-outline-danger" type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
    <a class="btn btn-outline-secondary" href="/plugins/hh/front/index.php">Volver a HH</a>
   </div>
@@ -394,7 +572,7 @@ Html::header(__('Dashboard gerencial de activos y reparaciones', 'hh'), $_SERVER
   </tbody></table></div></div>
  </div>
  <div class="card mt-3"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title mb-0">Repuestos registrados en reparaciones con retorno confirmado</h3><span class="text-muted small"><?=number_format(count($partHistory))?> líneas</span></div><div class="hh-table-toolbar hh-no-print"><span class="hh-table-hint">Detalle de repuestos instalados según retornos confirmados.</span><button class="btn btn-outline-primary btn-sm hh-section-toggle" type="button" id="hh-toggle-parts" aria-expanded="false" aria-controls="hh-parts-content"><span id="hh-toggle-parts-icon">＋</span><span id="hh-toggle-parts-label">Visualizar repuestos</span></button></div><div id="hh-parts-content" hidden><div class="hh-scroll-top hh-no-print" id="hh-parts-scroll-top" aria-label="Desplazamiento horizontal de repuestos"><div class="hh-scroll-top-inner" id="hh-parts-scroll-inner"></div></div><div class="table-responsive hh-touch-scroll" id="hh-parts-scroll"><table class="table table-hover table-striped mb-0"><thead><tr><th>Activo</th><th>Cotización</th><th>Fecha retorno</th><th>Código</th><th>Repuesto</th><th class="text-end">Cantidad</th><th class="text-end">Puntos</th></tr></thead><tbody><?php foreach($partHistory as $line): $assetLabel=$line['itemtype'].' #'.$line['items_id']; foreach($inventory as $candidate){if($candidate['itemtype']===$line['itemtype']&&(int)$candidate['id']===(int)$line['items_id']){$assetLabel=$candidate['name'];break;}} ?><tr><td><?=hhReportEscape($assetLabel)?></td><td><?=hhReportEscape($line['quote_name'])?></td><td><?=hhReportEscape($line['returned_at'])?></td><td><?=hhReportEscape($line['code'])?></td><td><?=hhReportEscape($line['description'])?></td><td class="text-end"><?=number_format((float)$line['quantity'],2)?></td><td class="text-end"><?=number_format((float)$line['points'],2)?></td></tr><?php endforeach; ?><?php if($partHistory===[]): ?><tr><td colspan="7" class="text-center text-muted p-4">Todavía no hay repuestos asociados a reparaciones aprobadas con fecha de retorno registrada.</td></tr><?php endif; ?></tbody></table></div></div></div>
- <div class="alert alert-info mt-3 mb-0"><strong>Criterio de ejecución:</strong> una cotización aprobada se considera reparación con retorno confirmado solo cuando tiene fecha de retorno registrada. Los repuestos se contabilizan desde el detalle de esa cotización; los borradores, rechazados y aprobados sin retorno no se presentan como piezas instaladas. El inventario se puede exportar en CSV compatible con Excel y el informe completo se puede imprimir o guardar como PDF desde el navegador.</div>
+ <div class="alert alert-info mt-3 mb-0"><strong>Criterio de ejecución:</strong> una cotización aprobada se considera reparación con retorno confirmado solo cuando tiene fecha de retorno registrada. Los repuestos se contabilizan desde el detalle de esa cotización; los borradores, rechazados y aprobados sin retorno no se presentan como piezas instaladas. El libro Excel incluye hojas separadas de inventario, resumen mensual, repuestos y filtros aplicados. También está disponible la exportación CSV y la impresión del informe en PDF desde el navegador.</div>
 <script>
 (function(){
  const toggleSection=(buttonId,contentId,labelId,iconId,openText,closeText)=>{
