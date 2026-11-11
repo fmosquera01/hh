@@ -121,6 +121,8 @@ final class Reports
                         'name' => (string) ($row['name'] ?? ''),
                         'serial' => (string) ($row['serial'] ?? ''),
                         'otherserial' => (string) ($row['otherserial'] ?? ''),
+                        'status_id' => (int) ($row['states_id'] ?? 0),
+                        'status_name' => self::dropdownName('glpi_states', (int) ($row['states_id'] ?? 0)),
                         'manufacturer' => self::dropdownName('glpi_manufacturers', (int) ($row['manufacturers_id'] ?? 0)),
                         'purchase_date' => '',
                         'purchase_value' => null,
