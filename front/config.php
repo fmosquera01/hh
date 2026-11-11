@@ -13,13 +13,36 @@ Rights::require(Rights::CATALOG);
 $message = '';
 $error = '';
 $current = RepairWorkflow::getConfig();
+$repairRequestTypeId = 0;
+foreach ($DB->request([
+    'SELECT' => ['id'],
+    'FROM' => 'glpi_requesttypes',
+    'WHERE' => ['name' => 'FormularioReparacion'],
+    'LIMIT' => 1,
+]) as $requestType) {
+    $repairRequestTypeId = (int) $requestType['id'];
+}
+if ((int) ($current['requesttypes_id'] ?? 0) < 1 && $repairRequestTypeId > 0) {
+    $current['requesttypes_id'] = $repairRequestTypeId;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Session::checkCSRF($_POST);
     $requestTypeId = filter_var($_POST['requesttypes_id'] ?? 0, FILTER_VALIDATE_INT);
     $enabled = isset($_POST['enabled']);
-    if ($requestTypeId === false || $requestTypeId < 1) {
-        $error = 'Seleccione el origen de solicitud FormularioReparacion.';
+    $selectedOrigin = '';
+    if ($requestTypeId !== false && $requestTypeId > 0) {
+        foreach ($DB->request([
+            'SELECT' => ['name'],
+            'FROM' => 'glpi_requesttypes',
+            'WHERE' => ['id' => (int) $requestTypeId],
+            'LIMIT' => 1,
+        ]) as $requestType) {
+            $selectedOrigin = trim((string) ($requestType['name'] ?? ''));
+        }
+    }
+    if ($requestTypeId === false || $requestTypeId < 1 || mb_strtolower($selectedOrigin) !== 'formularioreparacion') {
+        $error = 'Seleccione exactamente el origen de solicitud FormularioReparacion en GLPI.';
     } elseif (RepairWorkflow::findStateId(RepairWorkflow::STATUS_SYSTEMS) < 1
         || RepairWorkflow::findStateId(RepairWorkflow::STATUS_SUPPLIER) < 1) {
         $error = 'No se encontraron los estados REPARACIÓN Sistemas y/o REPARACIÓN Proveedor en los estados de GLPI.';
@@ -46,7 +69,7 @@ Html::header(__('Configuración del flujo de reparación', 'hh'), $_SERVER['PHP_
         <div class="mb-3">
           <label class="form-label">Origen de la solicitud utilizado por el formulario de recepción</label>
           <?php Dropdown::show('RequestType', ['name' => 'requesttypes_id', 'value' => (int) ($current['requesttypes_id'] ?? 0), 'display_emptychoice' => true]); ?>
-          <div class="form-hint">Seleccione el registro FormularioReparacion creado en Configuración > Desplegables > Origen de la solicitud.</div>
+          <div class="form-hint">Debe existir un origen llamado exactamente FormularioReparacion en Configuración > Desplegables > Origen de la solicitud. La configuración no permite seleccionar otro origen.</div>
         </div>
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="enabled" name="enabled" value="1" <?= (int) ($current['enabled'] ?? 0) === 1 ? 'checked' : '' ?>>
