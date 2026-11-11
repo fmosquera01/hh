@@ -45,6 +45,15 @@ $reportsAllowed = Rights::can(Rights::REPORTS);
             <div class="mt-auto"><a class="btn btn-primary" href="<?= htmlspecialchars($catalogUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">Administrar catálogo</a></div>
           </div>
         </div>
+        <?php if (Rights::can(Rights::POINT_VALUE)): ?>
+        <div class="col-sm-6 col-xl-4">
+          <div class="card card-body h-100">
+            <h3><i class="ti ti-percentage me-2"></i>Configuración de IVA</h3>
+            <p class="text-muted">Defina la tasa tributaria que se calcula automáticamente en las cotizaciones generales. Valor inicial: 15 %.</p>
+            <a class="btn btn-primary mt-auto" href="/plugins/hh/front/general_quote_config.php">Configurar IVA</a>
+          </div>
+        </div>
+        <?php endif; ?>
         <div class="col-sm-6 col-xl-4">
           <div class="card card-body h-100">
             <h3><i class="ti ti-file-invoice me-2"></i>Cotizaciones</h3>
