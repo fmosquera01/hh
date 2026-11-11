@@ -266,6 +266,12 @@ function plugin_hh_install(): bool
     if ($DB->tableExists('glpi_plugin_hh_general_quotes')) {
         $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_general_quotes` ADD COLUMN IF NOT EXISTS `iva_rate_snapshot` decimal(6,3) NOT NULL DEFAULT 15.000 AFTER `tax`");
     }
+    // Configurable repair risk and lifecycle policy; preserve values on future upgrades.
+    if ($DB->tableExists('glpi_plugin_hh_general_quote_config')) {
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_general_quote_config` ADD COLUMN IF NOT EXISTS `repair_repeat_days` int unsigned NOT NULL DEFAULT 60");
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_general_quote_config` ADD COLUMN IF NOT EXISTS `repair_cost_percent` decimal(6,2) NOT NULL DEFAULT 40.00");
+        $migration->addPostQuery("ALTER TABLE `glpi_plugin_hh_general_quote_config` ADD COLUMN IF NOT EXISTS `renewal_years` int unsigned NOT NULL DEFAULT 5");
+    }
 
     // Convert legacy DATETIME columns to GLPI-preferred TIMESTAMP without losing stored values.
     // These fields represent operational dates and are expected to remain within TIMESTAMP's supported range.
