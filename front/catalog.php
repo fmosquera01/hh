@@ -14,7 +14,7 @@ if (!Rights::can(Rights::CATALOG) && !Rights::can(Rights::POINT_VALUE)) {
 global $DB;
 $message = '';
 $error = '';
-$allowedTypes = ['Computer' => 'Computadoras', 'Phone' => 'Teléfonos'];
+$allowedTypes = ['Phone' => 'Teléfonos'];
 
 function hhCatalogEscape(string $value): string
 {
@@ -89,7 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = trim((string) ($_POST['name'] ?? ''));
         $description = trim((string) ($_POST['description'] ?? ''));
         $category = (string) ($_POST['category'] ?? 'part');
-        $itemtype = (string) ($_POST['itemtype'] ?? '');
+        // HH repair catalog is exclusively for GLPI Phone assets.
+        $itemtype = 'Phone';
         $modelsIdRaw = (string) ($_POST['models_id'] ?? '');
         $modelsId = $modelsIdRaw !== '' ? filter_var($modelsIdRaw, FILTER_VALIDATE_INT) : null;
         $points = filter_var($_POST['points_each'] ?? '0', FILTER_VALIDATE_FLOAT);
@@ -104,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             || $warrantyDays === false || $warrantyDays < 0 || $warrantyDays > 3650) {
             $error = 'Revise el nombre, categoría, tipo/modelo de activo y puntos ingresados.';
         } else {
-            $modelTable = $itemtype === 'Computer' ? 'glpi_computermodels' : 'glpi_phonemodels';
+            $modelTable = 'glpi_phonemodels';
             if ($modelsId !== null) {
                 $modelFound = false;
                 foreach ($DB->request(['SELECT' => ['id'], 'FROM' => $modelTable, 'WHERE' => ['id' => (int) $modelsId], 'LIMIT' => 1]) as $unused) {
@@ -192,7 +193,6 @@ foreach ($DB->request(['SELECT' => '*', 'FROM' => 'glpi_plugin_hh_items', 'ORDER
     $items[] = $row;
 }
 
-$computerModels = hhCatalogModels('Computer');
 $phoneModels = hhCatalogModels('Phone');
 Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'], 'plugins', Dashboard::class);
 ?>
@@ -217,14 +217,14 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
           </form>
         </div>
       </div>
-      <p class="text-muted">El código se genera automáticamente al guardar. Elija el tipo de activo y, opcionalmente, un modelo específico. Si deja el modelo vacío, el artículo aplica a todos los modelos de ese tipo.</p>
+      <p class="text-muted">El código se genera automáticamente al guardar. Los artículos del catálogo HH aplican a teléfonos. Puede seleccionar un modelo específico o dejarlo vacío para que aplique a todos los modelos.</p>
       <form method="post" class="mb-4">
         <input type="hidden" name="_glpi_csrf_token" value="<?= hhCatalogEscape(Session::getNewCSRFToken()) ?>">
         <input type="hidden" name="action" value="save_item">
         <div class="row g-3">
           <div class="col-md-4"><label class="form-label">Nombre del artículo</label><input class="form-control" name="name" maxlength="180" required></div>
           <div class="col-md-2"><label class="form-label">Categoría</label><select class="form-select" name="category"><option value="part">Repuesto</option><option value="labor">Mano de obra</option><option value="service">Servicio</option><option value="other">Otro</option></select></div>
-          <div class="col-md-3"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-itemtype" required><option value="">Seleccione...</option><option value="Computer">Computadoras</option><option value="Phone">Teléfonos</option></select></div>
+          <div class="col-md-3"><label class="form-label">Tipo de activo</label><input class="form-control" value="Teléfonos" readonly><input type="hidden" name="itemtype" id="hh-itemtype" value="Phone"></div>
           <div class="col-md-3"><label class="form-label">Modelo (opcional)</label><select class="form-select" name="models_id" id="hh-model"><option value="">Todos los modelos del tipo seleccionado</option></select></div>
           <div class="col-md-3"><label class="form-label">Puntos por unidad</label><input class="form-control" type="number" name="points_each" min="0" step="0.01" value="0" required></div>
           <div class="col-md-3"><label class="form-label">Garantía del repuesto (días)</label><input class="form-control" type="number" name="warranty_days" min="0" max="3650" step="1" value="60" required><small class="text-muted">0 = sin garantía</small></div>
@@ -258,14 +258,13 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
   const type = document.getElementById('hh-itemtype');
   const model = document.getElementById('hh-model');
   const models = {
-    Computer: <?= json_encode($computerModels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>,
     Phone: <?= json_encode($phoneModels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>
   };
   function refreshModels() {
     model.replaceChildren();
     const all = document.createElement('option');
     all.value = '';
-    all.textContent = type.value ? 'Todos los modelos del tipo seleccionado' : 'Seleccione primero el tipo de activo';
+    all.textContent = 'Todos los modelos de teléfono';
     model.appendChild(all);
     (models[type.value] || []).forEach((entry) => {
       const option = document.createElement('option');
@@ -273,9 +272,8 @@ Html::header(__('Catálogo de repuestos y servicios', 'hh'), $_SERVER['PHP_SELF'
       option.textContent = entry.name;
       model.appendChild(option);
     });
-    model.disabled = !type.value;
+    model.disabled = false;
   }
-  type.addEventListener('change', refreshModels);
   refreshModels();
 })();
 </script>
