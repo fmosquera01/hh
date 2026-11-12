@@ -13,7 +13,7 @@ global $DB;
 $embedded = (($_GET['embedded'] ?? '') === '1');
 $contextItemType = (string)($_GET['itemtype'] ?? '');
 $contextItemsId = (int)($_GET['items_id'] ?? 0);
-$contextAssetName = ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) ? hhQAssetLabel($contextItemType, $contextItemsId) : '';
+$contextAssetName = ($embedded && $contextItemType === 'Phone' && $contextItemsId > 0) ? hhQAssetLabel('Phone', $contextItemsId) : '';
 $purchaseValue = null;
 $policy = RepairAlerts::getPolicy();
 $repeatWarning = null;
@@ -26,7 +26,7 @@ if (isset($_GET['edit']) && (int)$_GET['edit'] > 0) {
         break;
     }
 }
-if (in_array($purchaseItemType, ['Computer', 'Phone'], true) && $purchaseItemsId > 0
+if ($purchaseItemType === 'Phone' && $purchaseItemsId > 0
     && hhQAssetLabel($purchaseItemType, $purchaseItemsId) !== '') {
     foreach (hhQRows('glpi_infocoms', ['items_id' => $purchaseItemsId, 'itemtype' => $purchaseItemType], ['value'], []) as $info) {
         if (is_numeric($info['value'] ?? null) && (float)$info['value'] > 0) $purchaseValue = (float)$info['value'];
@@ -113,14 +113,14 @@ function hhQRepairTrackingForTicket(int $ticketId, string $itemtype = '', int $i
 
 function hhQRepairTicketForAsset(string $type, int $id): ?array
 {
-    if (!in_array($type, ['Computer', 'Phone'], true) || $id < 1) return null;
+    if ($type !== 'Phone' || $id < 1) return null;
     return RepairWorkflow::getSupplierTrackingForAsset($type, $id, true);
 }
 
 function hhQHasActivePlatinumContract(string $type, int $id): bool
 {
     global $DB;
-    if (!in_array($type, ['Computer', 'Phone'], true) || $id < 1) return false;
+    if ($type !== 'Phone' || $id < 1) return false;
 
     $today = date('Y-m-d');
     foreach ($DB->request([
@@ -182,9 +182,9 @@ $notice = '';
 $error = '';
 $refreshParentAfterDecision = false;
 $point = hhQCurrentPointValue();
-$allowedTypes = ['Computer' => 'Computadora', 'Phone' => 'Teléfono'];
+$allowedTypes = ['Phone' => 'Teléfono'];
 $assetOptions = [];
-foreach ([['type' => 'Computer', 'table' => 'glpi_computers', 'label' => 'Computadora'], ['type' => 'Phone', 'table' => 'glpi_phones', 'label' => 'Teléfono']] as $assetConfig) {
+foreach ([['type' => 'Phone', 'table' => 'glpi_phones', 'label' => 'Teléfono']] as $assetConfig) {
     $assetWhere = ['is_deleted' => 0];
     if ($DB->fieldExists($assetConfig['table'], 'entities_id')) $assetWhere['entities_id'] = Session::getActiveEntities();
     $assetClass = $assetConfig['type'];
@@ -205,7 +205,7 @@ $categories = ['part' => 'Repuesto', 'labor' => 'Mano de obra', 'service' => 'Se
 $statuses = ['draft' => 'Borrador', 'approved' => 'Aprobada', 'rejected' => 'Rechazada'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) {
+    if ($embedded && $contextItemType === 'Phone' && $contextItemsId > 0) {
         $_POST['itemtype'] = $contextItemType;
         $_POST['items_id'] = (string)$contextItemsId;
     }
@@ -492,7 +492,7 @@ if ($editId !== false && $editId > 0) {
     if ($editQuote && (hhQAssetLabel((string)$editQuote['itemtype'], (int)$editQuote['items_id']) === '' || ($embedded && ((string)$editQuote['itemtype'] !== $contextItemType || (int)$editQuote['items_id'] !== $contextItemsId)))) $editQuote = null;
     if ($editQuote) $editLines = hhQRows('glpi_plugin_hh_quotedetails', ['plugin_hh_quotes_id' => (int)$editId], ['*'], ['id ASC']);
 }
-$quoteCriteria = ($embedded && in_array($contextItemType, ['Computer', 'Phone'], true) && $contextItemsId > 0) ? ['itemtype' => $contextItemType, 'items_id' => $contextItemsId] : [];
+$quoteCriteria = ($embedded && $contextItemType === 'Phone' && $contextItemsId > 0) ? ['itemtype' => 'Phone', 'items_id' => $contextItemsId] : [];
 $allQuotes = hhQRows('glpi_plugin_hh_quotes', $quoteCriteria, ['*'], ['date_mod DESC', 'id DESC']);
 $allQuotes = array_values(array_filter($allQuotes, static fn(array $quote): bool =>
     hhQAssetLabel((string)($quote['itemtype'] ?? ''), (int)($quote['items_id'] ?? 0)) !== ''
@@ -512,7 +512,7 @@ if ($editQuote !== null) {
 }
 $defaultItemType = $editQuote !== null
     ? (string) $editQuote['itemtype']
-    : (string) ($_GET['itemtype'] ?? '');
+    : 'Phone';
 $defaultItemsId = $editQuote !== null
     ? (int) $editQuote['items_id']
     : (int) ($_GET['items_id'] ?? 0);
@@ -740,7 +740,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
      <?php if ($embedded && $contextAssetName !== ''): ?>
      <div class="col-md-4"><label class="form-label">Activo</label><input class="form-control" value="<?=hhQe($contextAssetName)?>" readonly><input type="hidden" name="itemtype" id="hh-asset-type" value="<?=hhQe($contextItemType)?>"><input type="hidden" name="items_id" value="<?=$contextItemsId?>"></div>
      <?php else: ?>
-     <div class="col-md-4"><label class="form-label">Tipo de activo</label><select class="form-select" name="itemtype" id="hh-asset-type" required><option value="">Seleccione...</option><option value="Computer" <?=$defaultItemType==='Computer'?'selected':''?>>Computadora</option><option value="Phone" <?=$defaultItemType==='Phone'?'selected':''?>>Teléfono</option></select></div>
+     <div class="col-md-4"><label class="form-label">Tipo de activo</label><input class="form-control" value="Teléfono" readonly><input type="hidden" name="itemtype" id="hh-asset-type" value="Phone"></div>
      <div class="col-md-4"><label class="form-label">ID del activo GLPI</label><input class="form-control" type="number" min="1" name="items_id" value="<?=$defaultItemsId > 0 ? $defaultItemsId : ''?>" required><small class="text-muted">ID numérico de la ficha del activo.</small></div>
      <?php endif; ?>
      <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="quote_date" value="<?=hhQe((string)($editQuote['quote_date'] ?? date('Y-m-d')))?>" required></div>
