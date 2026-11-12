@@ -8,17 +8,10 @@ use Session;
 
 final class Reports
 {
-    /** Discover native and GLPI 11 custom asset classes registered by GLPI. */
+    /** Discover native assets and dynamically generated Asset Definitions. */
     public static function getAssetTypes(): array
     {
-        global $CFG_GLPI;
-        $types = [];
-        foreach (($CFG_GLPI['asset_types'] ?? []) as $type) {
-            if (is_string($type) && class_exists($type) && is_a($type, CommonDBTM::class, true)) {
-                $types[] = $type;
-            }
-        }
-        return array_values(array_unique($types));
+        return AssetTypeRegistry::getItemtypes();
     }
 
     /**
