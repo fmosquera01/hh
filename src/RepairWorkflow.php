@@ -73,8 +73,7 @@ final class RepairWorkflow
             'WHERE' => ['id' => $requestTypeId],
             'LIMIT' => 1,
         ]) as $requestType) {
-            return self::normalize((string) ($requestType['name'] ?? ''))
-                === self::normalize('FormularioReparacion');
+            return trim((string) ($requestType['name'] ?? '')) === 'FormularioReparacion';
         }
 
         return false;
