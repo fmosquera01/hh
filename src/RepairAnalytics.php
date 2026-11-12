@@ -32,6 +32,7 @@ final class RepairAnalytics
             $assetIds[$itemsId] = $itemsId;
             $itemTypes[$itemtype] = $itemtype;
             $byAsset[$key] = [
+                'repair_count' => 0,
                 'completed_repairs' => 0,
                 'parts_units' => 0.0,
                 'parts_lines' => 0,
@@ -39,7 +40,30 @@ final class RepairAnalytics
             ];
         }
 
-        if ($assetKeys === [] || !$DB->tableExists('glpi_plugin_hh_quotes')
+        if ($assetKeys === []) {
+            return ['by_asset' => $byAsset, 'part_history' => []];
+        }
+
+        // Count only repair-ledger entries whose ticket still has the exact repair request origin.
+        if ($DB->tableExists('glpi_plugin_hh_repair_records')) {
+            foreach ($DB->request([
+                'SELECT' => ['tickets_id', 'itemtype', 'items_id', 'requesttypes_id'],
+                'FROM' => 'glpi_plugin_hh_repair_records',
+                'WHERE' => [
+                    'itemtype' => array_values($itemTypes),
+                    'items_id' => array_values($assetIds),
+                ],
+            ]) as $record) {
+                $key = (string)($record['itemtype'] ?? '') . ':' . (int)($record['items_id'] ?? 0);
+                $ticketId = (int)($record['tickets_id'] ?? 0);
+                $requestTypeId = (int)($record['requesttypes_id'] ?? 0);
+                if (isset($byAsset[$key]) && RepairWorkflow::isRepairTicket($ticketId, $requestTypeId)) {
+                    $byAsset[$key]['repair_count']++;
+                }
+            }
+        }
+
+        if (!$DB->tableExists('glpi_plugin_hh_quotes')
             || !$DB->tableExists('glpi_plugin_hh_quotedetails')) {
             return ['by_asset' => $byAsset, 'part_history' => []];
         }
@@ -213,7 +237,10 @@ final class RepairAnalytics
             rsort($linkedTickets);
             foreach ($linkedTickets as $ticketId) {
                 $status = $ticketStatuses[$ticketId] ?? null;
+                [$itemtype, $itemsId] = explode(':', $assetKey, 2);
                 if ($status === null || in_array($status, [5, 6], true)
+                    || !RepairWorkflow::isRepairTicket($ticketId)
+                    || !RepairWorkflow::ensureRepairRecord($ticketId, $itemtype, (int)$itemsId)
                     || !isset($fieldsByTicket[$ticketId])) {
                     continue;
                 }
@@ -325,19 +352,23 @@ final class RepairAnalytics
         $ticketIds = [];
         foreach ($quotes as $quote) {
             $quoteId = (int)($quote['id'] ?? 0);
-            $returnedAt = trim((string)($quote['returned_at'] ?? ''));
-            if ($quoteId < 1) {
+            $ticketId = (int)($quote['tickets_id'] ?? 0);
+            $itemtype = (string)($quote['itemtype'] ?? '');
+            $itemsId = (int)($quote['items_id'] ?? 0);
+            if ($quoteId < 1 || $ticketId < 1 || $itemtype === '' || $itemsId < 1
+                || !RepairWorkflow::isRepairTicket($ticketId)
+                || !RepairWorkflow::ensureRepairRecord($ticketId, $itemtype, $itemsId)) {
                 continue;
             }
+
+            // A cached quote date is not trusted until its linked ticket passes origin validation.
+            $quoteTickets[$quoteId] = $ticketId;
+            $returnedAt = trim((string)($quote['returned_at'] ?? ''));
             if ($returnedAt !== '' && !str_starts_with($returnedAt, '0000-00-00')) {
                 $dates[$quoteId] = $returnedAt;
                 continue;
             }
-            $ticketId = (int)($quote['tickets_id'] ?? 0);
-            if ($ticketId > 0) {
-                $quoteTickets[$quoteId] = $ticketId;
-                $ticketIds[$ticketId] = $ticketId;
-            }
+            $ticketIds[$ticketId] = $ticketId;
         }
 
         $table = 'glpi_plugin_fields_ticketreparacions';
