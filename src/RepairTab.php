@@ -346,28 +346,27 @@ final class RepairTab extends CommonGLPI
         return $total;
     }
 
-    /** Count unique repair-ledger entries after revalidating the live ticket origin. */
+    /** Count distinct, currently linked tickets whose live request origin is FormularioReparacion. */
     private static function countRepairRecords(string $itemType, int $itemId): int
     {
         global $DB;
 
-        if ($itemId < 1 || !$DB->tableExists('glpi_plugin_hh_repair_records')) {
+        if ($itemId < 1 || !$DB->tableExists('glpi_items_tickets')) {
             return 0;
         }
 
         $tickets = [];
         foreach ($DB->request([
-            'SELECT' => ['tickets_id', 'requesttypes_id'],
-            'FROM' => 'glpi_plugin_hh_repair_records',
+            'SELECT' => ['tickets_id'],
+            'FROM' => 'glpi_items_tickets',
             'WHERE' => [
                 'itemtype' => $itemType,
                 'items_id' => $itemId,
             ],
-        ]) as $record) {
-            $ticketId = (int) ($record['tickets_id'] ?? 0);
-            $requestTypeId = (int) ($record['requesttypes_id'] ?? 0);
+        ]) as $link) {
+            $ticketId = (int) ($link['tickets_id'] ?? 0);
             if ($ticketId > 0 && !isset($tickets[$ticketId])
-                && RepairWorkflow::isRepairTicket($ticketId, $requestTypeId)) {
+                && RepairWorkflow::isRepairTicket($ticketId)) {
                 $tickets[$ticketId] = true;
             }
         }
