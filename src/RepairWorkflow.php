@@ -45,6 +45,77 @@ final class RepairWorkflow
         return false;
     }
 
+    /**
+     * Accept only tickets whose real request type is exactly FormularioReparacion.
+     * A configured numeric ID alone is not sufficient validation.
+     */
+    public static function isRepairTicket(int $ticketId, ?int $expectedRequestTypeId = null): bool
+    {
+        global $DB;
+        if ($ticketId < 1 || !$DB->tableExists('glpi_requesttypes')) {
+            return false;
+        }
+
+        $ticket = new \Ticket();
+        if (!$ticket->getFromDB($ticketId)) {
+            return false;
+        }
+
+        $requestTypeId = (int) ($ticket->fields['requesttypes_id'] ?? 0);
+        if ($requestTypeId < 1
+            || ($expectedRequestTypeId !== null && $requestTypeId !== $expectedRequestTypeId)) {
+            return false;
+        }
+
+        foreach ($DB->request([
+            'SELECT' => ['name'],
+            'FROM' => 'glpi_requesttypes',
+            'WHERE' => ['id' => $requestTypeId],
+            'LIMIT' => 1,
+        ]) as $requestType) {
+            return self::normalize((string) ($requestType['name'] ?? ''))
+                === self::normalize('FormularioReparacion');
+        }
+
+        return false;
+    }
+
+    /** Ensure that a validated repair ticket/asset pair exists in the persistent ledger. */
+    public static function ensureRepairRecord(int $ticketId, string $itemtype, int $itemsId): bool
+    {
+        global $DB;
+        if ($ticketId < 1 || $itemsId < 1 || $itemtype === ''
+            || !$DB->tableExists('glpi_plugin_hh_repair_records')
+            || !self::isRepairTicket($ticketId)) {
+            return false;
+        }
+
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM' => 'glpi_plugin_hh_repair_records',
+            'WHERE' => [
+                'tickets_id' => $ticketId,
+                'itemtype' => $itemtype,
+                'items_id' => $itemsId,
+            ],
+            'LIMIT' => 1,
+        ]) as $existing) {
+            return true;
+        }
+
+        $ticket = new \Ticket();
+        if (!$ticket->getFromDB($ticketId)) {
+            return false;
+        }
+        return (bool) $DB->insert('glpi_plugin_hh_repair_records', [
+            'tickets_id' => $ticketId,
+            'itemtype' => $itemtype,
+            'items_id' => $itemsId,
+            'requesttypes_id' => (int) ($ticket->fields['requesttypes_id'] ?? 0),
+            'status' => 'pending',
+        ]);
+    }
+
     /** Called immediately after GLPI creates an Item_Ticket relation. */
     public static function onTicketItemAdded(CommonDBTM $relation): void
     {
@@ -64,38 +135,12 @@ final class RepairWorkflow
             return;
         }
 
-        $ticket = new \Ticket();
-        if (!$ticket->getFromDB($ticketId)
-            || (int) ($ticket->fields['requesttypes_id'] ?? 0) !== $requestTypeId) {
+        if (!self::isRepairTicket($ticketId, $requestTypeId)) {
             return;
         }
 
-        // Persist the repair intake independently from quotations.
-        // Repeated relation hooks must never reset a later approval/rejection.
-        if ($DB->tableExists('glpi_plugin_hh_repair_records')) {
-            $alreadyRegistered = false;
-            foreach ($DB->request([
-                'SELECT' => ['id'],
-                'FROM' => 'glpi_plugin_hh_repair_records',
-                'WHERE' => [
-                    'tickets_id' => $ticketId,
-                    'itemtype' => $itemtype,
-                    'items_id' => $itemsId,
-                ],
-                'LIMIT' => 1,
-            ]) as $existingRecord) {
-                $alreadyRegistered = true;
-            }
-            if (!$alreadyRegistered) {
-                $DB->insert('glpi_plugin_hh_repair_records', [
-                    'tickets_id' => $ticketId,
-                    'itemtype' => $itemtype,
-                    'items_id' => $itemsId,
-                    'requesttypes_id' => $requestTypeId,
-                    'status' => 'pending',
-                ]);
-            }
-        }
+        // Persist only genuine FormularioReparacion ticket/asset associations.
+        self::ensureRepairRecord($ticketId, $itemtype, $itemsId);
 
         $assetTypes = $CFG_GLPI['asset_types'] ?? [];
         if (!in_array($itemtype, $assetTypes, true)
@@ -163,9 +208,12 @@ final class RepairWorkflow
             'ORDER' => ['tickets_id DESC'],
         ]) as $link) {
             $ticketId = (int) ($link['tickets_id'] ?? 0);
-            if ($ticketId < 1) continue;
+            if ($ticketId < 1 || !self::isRepairTicket($ticketId)
+                || !self::ensureRepairRecord($ticketId, $itemtype, $itemsId)) {
+                continue;
+            }
             foreach ($DB->request([
-                'SELECT' => $required,
+                'SELECT' => array_merge($required, ['fecharecepcionguiafieldtwo']),
                 'FROM' => 'glpi_plugin_fields_ticketreparacions',
                 'WHERE' => ['items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 15],
                 'LIMIT' => 1,
@@ -183,6 +231,7 @@ final class RepairWorkflow
                         'guide_number' => $guide,
                         'sent_to_supplier_at' => $sent,
                         'supplier_received_at' => $received,
+                        'returned_at' => trim((string) ($fields['fecharecepcionguiafieldtwo'] ?? '')),
                     ];
                 }
             }
