@@ -32,8 +32,9 @@ final class RepairAlerts
     public static function getLastReturnDate(string $itemtype, int $itemsId): ?string
     {
         global $DB;
-        if ($itemtype === '' || $itemsId < 1
+        if ($itemtype !== 'Phone' || $itemsId < 1
             || !$DB->tableExists('glpi_plugin_hh_repair_records')
+            || !$DB->tableExists('glpi_plugin_hh_quotes')
             || !$DB->tableExists('glpi_plugin_fields_ticketreparacions')) {
             return null;
         }
@@ -73,6 +74,27 @@ final class RepairAlerts
                 continue;
             }
 
+            // A return date alone is not a completed repair. Require an approved HH quote
+            // for this exact repair ticket and Phone asset before showing a repeat-repair alert.
+            $hasApprovedQuote = false;
+            foreach ($DB->request([
+                'SELECT' => ['id'],
+                'FROM' => 'glpi_plugin_hh_quotes',
+                'WHERE' => [
+                    'tickets_id' => $ticketId,
+                    'itemtype' => $itemtype,
+                    'items_id' => $itemsId,
+                    'status' => 'approved',
+                ],
+                'LIMIT' => 1,
+            ]) as $approvedQuote) {
+                $hasApprovedQuote = true;
+                break;
+            }
+            if (!$hasApprovedQuote) {
+                continue;
+            }
+
             $dateValue = trim((string) ($record['returned_at'] ?? ''));
             if ($dateValue === '') {
                 foreach ($DB->request([
@@ -94,7 +116,6 @@ final class RepairAlerts
                 // Store the verified return date in HH's persistent repair ledger.
                 $DB->update('glpi_plugin_hh_repair_records', [
                     'returned_at' => $date,
-                    'status' => 'completed',
                 ], [
                     'tickets_id' => $ticketId,
                     'itemtype' => $itemtype,
