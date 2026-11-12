@@ -33,6 +33,7 @@ final class RepairAnalytics
             $itemTypes[$itemtype] = $itemtype;
             $byAsset[$key] = [
                 'repair_count' => 0,
+                'approved_quote_count' => 0,
                 'completed_repairs' => 0,
                 'parts_units' => 0.0,
                 'parts_lines' => 0,
@@ -81,8 +82,12 @@ final class RepairAnalytics
             'ORDER' => ['returned_at DESC', 'id DESC'],
         ]) as $quote) {
             $key = (string)($quote['itemtype'] ?? '') . ':' . (int)($quote['items_id'] ?? 0);
-            if (isset($assetKeys[$key])) {
+            $ticketId = (int)($quote['tickets_id'] ?? 0);
+            if (isset($assetKeys[$key]) && $ticketId > 0
+                && RepairWorkflow::isRepairTicket($ticketId)
+                && self::hasCurrentAssetTicketLink($ticketId, (string)$quote['itemtype'], (int)$quote['items_id'])) {
                 $candidateQuotes[] = $quote;
+                $byAsset[$key]['approved_quote_count']++;
             }
         }
 
@@ -338,6 +343,34 @@ final class RepairAnalytics
     }
 
     /**
+     * A quote belongs to an asset only while its repair ticket is linked to that exact asset.
+     */
+    private static function hasCurrentAssetTicketLink(int $ticketId, string $itemtype, int $itemsId): bool
+    {
+        global $DB;
+
+        if ($ticketId < 1 || $itemtype === '' || $itemsId < 1
+            || !$DB->tableExists('glpi_items_tickets')) {
+            return false;
+        }
+
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM' => 'glpi_items_tickets',
+            'WHERE' => [
+                'tickets_id' => $ticketId,
+                'itemtype' => $itemtype,
+                'items_id' => $itemsId,
+            ],
+            'LIMIT' => 1,
+        ]) as $link) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Resolve quote return dates in two queries at most, rather than one query per quote.
      *
      * @param array<int, array<string, mixed>> $quotes
@@ -357,6 +390,7 @@ final class RepairAnalytics
             $itemsId = (int)($quote['items_id'] ?? 0);
             if ($quoteId < 1 || $ticketId < 1 || $itemtype === '' || $itemsId < 1
                 || !RepairWorkflow::isRepairTicket($ticketId)
+                || !self::hasCurrentAssetTicketLink($ticketId, $itemtype, $itemsId)
                 || !RepairWorkflow::ensureRepairRecord($ticketId, $itemtype, $itemsId)) {
                 continue;
             }
