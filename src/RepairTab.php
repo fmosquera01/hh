@@ -346,32 +346,47 @@ final class RepairTab extends CommonGLPI
         return $total;
     }
 
-    /** Count distinct, currently linked tickets whose live request origin is FormularioReparacion. */
+    /** Count approved repair quotes linked to this exact asset and valid repair tickets. */
     private static function countRepairRecords(string $itemType, int $itemId): int
     {
         global $DB;
 
-        if ($itemId < 1 || !$DB->tableExists('glpi_items_tickets')) {
+        if ($itemId < 1 || !$DB->tableExists('glpi_plugin_hh_quotes')
+            || !$DB->tableExists('glpi_items_tickets')) {
             return 0;
         }
 
-        $tickets = [];
+        $count = 0;
         foreach ($DB->request([
             'SELECT' => ['tickets_id'],
-            'FROM' => 'glpi_items_tickets',
+            'FROM' => 'glpi_plugin_hh_quotes',
             'WHERE' => [
                 'itemtype' => $itemType,
                 'items_id' => $itemId,
+                'status' => 'approved',
             ],
-        ]) as $link) {
-            $ticketId = (int) ($link['tickets_id'] ?? 0);
-            if ($ticketId > 0 && !isset($tickets[$ticketId])
-                && RepairWorkflow::isRepairTicket($ticketId)) {
-                $tickets[$ticketId] = true;
+        ]) as $quote) {
+            $ticketId = (int)($quote['tickets_id'] ?? 0);
+            if ($ticketId < 1 || !RepairWorkflow::isRepairTicket($ticketId)) {
+                continue;
+            }
+
+            foreach ($DB->request([
+                'SELECT' => ['id'],
+                'FROM' => 'glpi_items_tickets',
+                'WHERE' => [
+                    'tickets_id' => $ticketId,
+                    'itemtype' => $itemType,
+                    'items_id' => $itemId,
+                ],
+                'LIMIT' => 1,
+            ]) as $link) {
+                $count++;
+                break;
             }
         }
 
-        return count($tickets);
+        return $count;
     }
 
     /** Latest guide, supplier-send date and confirmed return for this asset from its linked ticket Fields. */
