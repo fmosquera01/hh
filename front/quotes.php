@@ -543,9 +543,15 @@ if ($defaultItemType !== '' && $defaultItemsId > 0 && $currentSendValue !== '') 
         $currentSendDate = new DateTimeImmutable($currentSendValue);
         foreach (hhQRows('glpi_plugin_hh_quotes', ['itemtype' => $defaultItemType, 'items_id' => $defaultItemsId, 'status' => 'approved'], ['id', 'tickets_id', 'returned_at'], ['id DESC']) as $priorQuote) {
             if ((int)($priorQuote['id'] ?? 0) === (int)($editQuote['id'] ?? 0)) continue;
+            $priorTicketId = (int)($priorQuote['tickets_id'] ?? 0);
+            if ($priorTicketId < 1
+                || !RepairWorkflow::isRepairTicket($priorTicketId)
+                || !RepairWorkflow::ensureRepairRecord($priorTicketId, $defaultItemType, $defaultItemsId)) {
+                continue;
+            }
             $returnValue = trim((string)($priorQuote['returned_at'] ?? ''));
-            if ($returnValue === '' && (int)($priorQuote['tickets_id'] ?? 0) > 0) {
-                $tracking = hhQRepairTrackingForTicket((int)$priorQuote['tickets_id'], $defaultItemType, $defaultItemsId);
+            if ($returnValue === '') {
+                $tracking = hhQRepairTrackingForTicket($priorTicketId, $defaultItemType, $defaultItemsId);
                 $returnValue = trim((string)($tracking['returned_at'] ?? ''));
             }
             if ($returnValue === '') continue;
