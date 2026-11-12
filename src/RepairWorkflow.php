@@ -70,6 +70,33 @@ final class RepairWorkflow
             return;
         }
 
+        // Persist the repair intake independently from quotations.
+        // Repeated relation hooks must never reset a later approval/rejection.
+        if ($DB->tableExists('glpi_plugin_hh_repair_records')) {
+            $alreadyRegistered = false;
+            foreach ($DB->request([
+                'SELECT' => ['id'],
+                'FROM' => 'glpi_plugin_hh_repair_records',
+                'WHERE' => [
+                    'tickets_id' => $ticketId,
+                    'itemtype' => $itemtype,
+                    'items_id' => $itemsId,
+                ],
+                'LIMIT' => 1,
+            ]) as $existingRecord) {
+                $alreadyRegistered = true;
+            }
+            if (!$alreadyRegistered) {
+                $DB->insert('glpi_plugin_hh_repair_records', [
+                    'tickets_id' => $ticketId,
+                    'itemtype' => $itemtype,
+                    'items_id' => $itemsId,
+                    'requesttypes_id' => $requestTypeId,
+                    'status' => 'pending',
+                ]);
+            }
+        }
+
         $assetTypes = $CFG_GLPI['asset_types'] ?? [];
         if (!in_array($itemtype, $assetTypes, true)
             || !class_exists($itemtype)
