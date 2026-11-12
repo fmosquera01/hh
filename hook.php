@@ -200,6 +200,21 @@ function plugin_hh_install(): bool
             KEY `idx_hh_asset_history_asset` (`itemtype`, `items_id`),
             KEY `idx_hh_asset_history_ticket` (`tickets_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
+        'glpi_plugin_hh_repair_records' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_repair_records` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `tickets_id` int unsigned NOT NULL,
+            `itemtype` varchar(100) NOT NULL,
+            `items_id` int unsigned NOT NULL,
+            `requesttypes_id` int unsigned NOT NULL,
+            `status` varchar(20) NOT NULL DEFAULT 'pending',
+            `returned_at` datetime DEFAULT NULL,
+            `date_creation` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `date_mod` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `unicity_repair_ticket_asset` (`tickets_id`, `itemtype`, `items_id`),
+            KEY `idx_hh_repair_records_asset` (`itemtype`, `items_id`),
+            KEY `idx_hh_repair_records_status` (`status`)
+        ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}",
         'glpi_plugin_hh_quotehistory' => "CREATE TABLE IF NOT EXISTS `glpi_plugin_hh_quotehistory` (
             `id` int unsigned NOT NULL AUTO_INCREMENT,
             `plugin_hh_quotes_id` int unsigned NOT NULL,
@@ -368,8 +383,8 @@ function plugin_hh_uninstall(): bool
     ProfileRight::deleteProfileRights(['plugin_hh']);
 
     // Drop dependent/detail tables first, then their parent tables.
-    // Uninstalling HH intentionally resets all plugin-owned data.
-    // GLPI core tables and asset/ticket records are never dropped.
+    // The repair intake ledger is retained across uninstall/reinstall.
+    // GLPI core tables and operational repair history are never dropped.
     $tables = [
         'glpi_plugin_hh_general_quotelines',
         'glpi_plugin_hh_general_quotehistory',
