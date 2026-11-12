@@ -45,25 +45,6 @@ final class RepairAnalytics
             return ['by_asset' => $byAsset, 'part_history' => []];
         }
 
-        // Count only repair-ledger entries whose ticket still has the exact repair request origin.
-        if ($DB->tableExists('glpi_plugin_hh_repair_records')) {
-            foreach ($DB->request([
-                'SELECT' => ['tickets_id', 'itemtype', 'items_id', 'requesttypes_id'],
-                'FROM' => 'glpi_plugin_hh_repair_records',
-                'WHERE' => [
-                    'itemtype' => array_values($itemTypes),
-                    'items_id' => array_values($assetIds),
-                ],
-            ]) as $record) {
-                $key = (string)($record['itemtype'] ?? '') . ':' . (int)($record['items_id'] ?? 0);
-                $ticketId = (int)($record['tickets_id'] ?? 0);
-                $requestTypeId = (int)($record['requesttypes_id'] ?? 0);
-                if (isset($byAsset[$key]) && RepairWorkflow::isRepairTicket($ticketId, $requestTypeId)) {
-                    $byAsset[$key]['repair_count']++;
-                }
-            }
-        }
-
         if (!$DB->tableExists('glpi_plugin_hh_quotes')
             || !$DB->tableExists('glpi_plugin_hh_quotedetails')) {
             return ['by_asset' => $byAsset, 'part_history' => []];
@@ -87,7 +68,9 @@ final class RepairAnalytics
                 && RepairWorkflow::isRepairTicket($ticketId)
                 && self::hasCurrentAssetTicketLink($ticketId, (string)$quote['itemtype'], (int)$quote['items_id'])) {
                 $candidateQuotes[] = $quote;
+                // An approved quote is the only event that counts as a repair in HH history.
                 $byAsset[$key]['approved_quote_count']++;
+                $byAsset[$key]['repair_count']++;
             }
         }
 
@@ -319,7 +302,10 @@ final class RepairAnalytics
             ],
         ]) as $quote) {
             $key = (string)($quote['itemtype'] ?? '') . ':' . (int)($quote['items_id'] ?? 0);
-            if (isset($assetKeys[$key])) {
+            $ticketId = (int)($quote['tickets_id'] ?? 0);
+            if (isset($assetKeys[$key]) && $ticketId > 0
+                && RepairWorkflow::isRepairTicket($ticketId)
+                && self::hasCurrentAssetTicketLink($ticketId, (string)$quote['itemtype'], (int)$quote['items_id'])) {
                 $candidateQuotes[] = $quote;
             }
         }
