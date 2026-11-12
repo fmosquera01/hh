@@ -711,7 +711,7 @@ if (!$embedded) Html::header(__('Cotizaciones', 'hh'), $_SERVER['PHP_SELF'], 'pl
        <div class="col-md-4"><div class="small text-muted">Guía de salida</div><strong><?=hhQe((string)($editQuote['guide_number'] ?? '—'))?></strong></div>
        <div class="col-md-4"><div class="small text-muted">Envío al proveedor</div><strong><?=hhQe($detailDate($editQuote['sent_to_supplier_at'] ?? null))?></strong></div>
        <div class="col-md-4"><div class="small text-muted">Recepción por proveedor</div><strong><?=hhQe($detailDate($editQuote['supplier_received_at'] ?? null))?></strong></div>
-       <div class="col-md-4"><div class="small text-muted">Retorno del equipo</div><strong><?=hhQe($detailDate($editQuote['returned_at'] ?? null))?></strong></div>
+       <div class="col-md-4"><div class="small text-muted">Retorno del equipo</div><strong><?=(int)($editQuote['tickets_id'] ?? 0) > 0 && RepairWorkflow::isRepairTicket((int)$editQuote['tickets_id']) && RepairWorkflow::ensureRepairRecord((int)$editQuote['tickets_id'], (string)$editQuote['itemtype'], (int)$editQuote['items_id']) ? hhQe($detailDate($editQuote['returned_at'] ?? null)) : '—'?></strong></div>
        <div class="col-md-4"><div class="small text-muted">Total puntos</div><strong><?=number_format((float)$editQuote['total_points'], 2)?> pts</strong></div>
        <div class="col-md-4"><div class="small text-muted">Total USD</div><strong>$<?=number_format((float)$editQuote['total_amount_snapshot'], 2)?></strong></div>
       </div>
