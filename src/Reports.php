@@ -127,7 +127,7 @@ final class Reports
                         'purchase_date' => '',
                         'purchase_value' => null,
                         'warranty_end' => '',
-                        'repair_count' => 0,
+                        'approved_quote_count' => 0,
                         'points_consumed' => 0.0,
                     ];
                 }
@@ -229,7 +229,7 @@ final class Reports
                 }
             }
             if (isset($repairRows[$key])) {
-                $asset['repair_count'] = $repairRows[$key]['count'];
+                $asset['approved_quote_count'] = $repairRows[$key]['count'];
                 $asset['points_consumed'] = $repairRows[$key]['points'];
             }
         }
