@@ -32,33 +32,70 @@ final class RepairAlerts
     public static function getLastReturnDate(string $itemtype, int $itemsId): ?string
     {
         global $DB;
-        if ($itemtype === '' || $itemsId < 1) return null;
+        if ($itemtype === '' || $itemsId < 1
+            || !$DB->tableExists('glpi_plugin_hh_repair_records')
+            || !$DB->tableExists('glpi_plugin_fields_ticketreparacions')) {
+            return null;
+        }
+
+        $requiredFields = [
+            'fecharecepcionguiafieldtwo',
+            'items_id',
+            'itemtype',
+            'plugin_fields_containers_id',
+        ];
+        foreach ($requiredFields as $field) {
+            if (!$DB->fieldExists('glpi_plugin_fields_ticketreparacions', $field)) {
+                return null;
+            }
+        }
+
         $latest = null;
-        foreach ([
-            ['glpi_plugin_hh_quotes', ['approved']],
-            ['glpi_plugin_hh_general_quotes', ['approved', 'selected']],
-        ] as [$table, $statuses]) {
-            if (!$DB->tableExists($table) || !$DB->fieldExists($table, 'returned_at')) continue;
-            foreach ($DB->request(['SELECT' => ['returned_at'], 'FROM' => $table, 'WHERE' => ['itemtype' => $itemtype, 'items_id' => $itemsId, 'status' => $statuses]]) as $r) {
-                $date = self::validDate((string)($r['returned_at'] ?? ''));
-                if ($date !== null && ($latest === null || $date > $latest)) $latest = $date;
+        foreach ($DB->request([
+            'SELECT' => ['tickets_id', 'requesttypes_id', 'status', 'returned_at'],
+            'FROM' => 'glpi_plugin_hh_repair_records',
+            'WHERE' => [
+                'itemtype' => $itemtype,
+                'items_id' => $itemsId,
+                'status' => ['approved', 'completed'],
+            ],
+            'ORDER' => ['tickets_id DESC'],
+        ]) as $record) {
+            $ticketId = (int) ($record['tickets_id'] ?? 0);
+            $requestTypeId = (int) ($record['requesttypes_id'] ?? 0);
+            if ($ticketId < 1 || $requestTypeId < 1) {
+                continue;
+            }
+
+            // Revalidate the origin in GLPI in case the ticket was edited later.
+            $ticket = new \Ticket();
+            if (!$ticket->getFromDB($ticketId)
+                || (int) ($ticket->fields['requesttypes_id'] ?? 0) !== $requestTypeId) {
+                continue;
+            }
+
+            $dateValue = trim((string) ($record['returned_at'] ?? ''));
+            if ($dateValue === '') {
+                foreach ($DB->request([
+                    'SELECT' => ['fecharecepcionguiafieldtwo'],
+                    'FROM' => 'glpi_plugin_fields_ticketreparacions',
+                    'WHERE' => [
+                        'items_id' => $ticketId,
+                        'itemtype' => 'Ticket',
+                        'plugin_fields_containers_id' => 15,
+                    ],
+                    'LIMIT' => 1,
+                ]) as $fields) {
+                    $dateValue = trim((string) ($fields['fecharecepcionguiafieldtwo'] ?? ''));
+                }
+            }
+
+            $date = self::validDate($dateValue);
+            if ($date !== null && ($latest === null || $date > $latest)) {
+                $latest = $date;
             }
         }
-        $links = 'glpi_items_tickets';
-        $fields = 'glpi_plugin_fields_ticketreparacions';
-        if ($DB->tableExists($links) && $DB->tableExists($fields)
-            && $DB->fieldExists($fields, 'fecharecepcionguiafieldtwo')
-            && $DB->fieldExists($fields, 'items_id') && $DB->fieldExists($fields, 'itemtype')
-            && $DB->fieldExists($fields, 'plugin_fields_containers_id')) {
-            $ids = [];
-            foreach ($DB->request(['SELECT' => ['tickets_id'], 'FROM' => $links, 'WHERE' => ['itemtype' => $itemtype, 'items_id' => $itemsId]]) as $r) {
-                $id = (int)($r['tickets_id'] ?? 0); if ($id > 0) $ids[$id] = $id;
-            }
-            if ($ids !== []) foreach ($DB->request(['SELECT' => ['fecharecepcionguiafieldtwo'], 'FROM' => $fields, 'WHERE' => ['items_id' => array_values($ids), 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 15]]) as $r) {
-                $date = self::validDate((string)($r['fecharecepcionguiafieldtwo'] ?? ''));
-                if ($date !== null && ($latest === null || $date > $latest)) $latest = $date;
-            }
-        }
+
         return $latest;
     }
 
