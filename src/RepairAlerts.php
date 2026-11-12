@@ -90,8 +90,19 @@ final class RepairAlerts
             }
 
             $date = self::validDate($dateValue);
-            if ($date !== null && ($latest === null || $date > $latest)) {
-                $latest = $date;
+            if ($date !== null) {
+                // Store the verified return date in HH's persistent repair ledger.
+                $DB->update('glpi_plugin_hh_repair_records', [
+                    'returned_at' => $date,
+                    'status' => 'completed',
+                ], [
+                    'tickets_id' => $ticketId,
+                    'itemtype' => $itemtype,
+                    'items_id' => $itemsId,
+                ]);
+                if ($latest === null || $date > $latest) {
+                    $latest = $date;
+                }
             }
         }
 
