@@ -51,6 +51,7 @@ final class RepairTab extends CommonGLPI
                 static fn(array $contract): bool => self::isContractCurrent($contract, $today)
             ));
             $tracking = self::loadLatestRepairTracking($itemType, $itemId);
+            $repairCount = self::countRepairRecords($itemType, $itemId);
 
             echo "<div class='container-fluid hh-repairs'>";
             echo "<style>
@@ -94,6 +95,7 @@ final class RepairTab extends CommonGLPI
             self::assetDetail(__('Fecha de última reparación', 'hh'), self::displayDate($tracking['returned_at'] ?? null));
             self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($tracking['sent_at'] ?? null));
             self::assetDetail(__('Última guía de salida', 'hh'), (string) ($tracking['guide_number'] ?? '—') ?: '—');
+            self::assetDetail(__('Total de reparaciones', 'hh'), (string) $repairCount);
             echo "</div></div></div>";
             // El seguimiento operativo permanece en el historial nativo de GLPI;
             // esta vista general se concentra en las cotizaciones del activo.
@@ -141,6 +143,7 @@ final class RepairTab extends CommonGLPI
         $native = self::loadNativeAssetInfo($itemType, $itemId);
         $approvedPoints = self::loadApprovedRepairPoints($itemType, $itemId);
         $repairTracking = self::loadLatestRepairTracking($itemType, $itemId);
+        $repairCount = self::countRepairRecords($itemType, $itemId);
         $contracts = $native['contracts'];
         // La garantía propia del equipo se calcula aparte del contrato extendido.
         // La fecha de compra es el inicio preferente de la garantía nativa.
@@ -214,6 +217,7 @@ final class RepairTab extends CommonGLPI
         self::assetDetail(__('Fecha de última reparación', 'hh'), self::displayDate($repairTracking['returned_at'] ?? null));
         self::assetDetail(__('Fecha de envío al proveedor', 'hh'), self::displayDate($repairTracking['sent_at'] ?? null));
         self::assetDetail(__('Última guía de salida', 'hh'), (string)($repairTracking['guide_number'] ?? '—') ?: '—');
+        self::assetDetail(__('Total de reparaciones', 'hh'), (string) $repairCount);
         echo "</div></div></div>";
         RepairWorkflow::renderAssetPanel($item);
 
@@ -342,6 +346,35 @@ final class RepairTab extends CommonGLPI
         return $total;
     }
 
+    /** Count unique repair-ledger entries after revalidating the live ticket origin. */
+    private static function countRepairRecords(string $itemType, int $itemId): int
+    {
+        global $DB;
+
+        if ($itemId < 1 || !$DB->tableExists('glpi_plugin_hh_repair_records')) {
+            return 0;
+        }
+
+        $tickets = [];
+        foreach ($DB->request([
+            'SELECT' => ['tickets_id', 'requesttypes_id'],
+            'FROM' => 'glpi_plugin_hh_repair_records',
+            'WHERE' => [
+                'itemtype' => $itemType,
+                'items_id' => $itemId,
+            ],
+        ]) as $record) {
+            $ticketId = (int) ($record['tickets_id'] ?? 0);
+            $requestTypeId = (int) ($record['requesttypes_id'] ?? 0);
+            if ($ticketId > 0 && !isset($tickets[$ticketId])
+                && RepairWorkflow::isRepairTicket($ticketId, $requestTypeId)) {
+                $tickets[$ticketId] = true;
+            }
+        }
+
+        return count($tickets);
+    }
+
     /** Latest guide, supplier-send date and confirmed return for this asset from its linked ticket Fields. */
     private static function loadLatestRepairTracking(string $itemType, int $itemId): array
     {
@@ -361,7 +394,11 @@ final class RepairTab extends CommonGLPI
             'ORDER' => ['tickets_id DESC'],
         ]) as $link) {
             $ticketId = (int) ($link['tickets_id'] ?? 0);
-            if ($ticketId < 1) {
+            // Never read return dates from ordinary tickets: only the exact
+            // FormularioReparacion request origin is part of the repair history.
+            if ($ticketId < 1
+                || !RepairWorkflow::isRepairTicket($ticketId)
+                || !RepairWorkflow::ensureRepairRecord($ticketId, $itemType, $itemId)) {
                 continue;
             }
 
