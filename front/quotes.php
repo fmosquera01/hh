@@ -89,9 +89,11 @@ function hhQNormalizeFieldDate(string $value): ?string
     try { return (new DateTimeImmutable($value))->format('Y-m-d H:i:s'); } catch (Throwable $e) { return null; }
 }
 
-function hhQRepairTrackingForTicket(int $ticketId): ?array
+function hhQRepairTrackingForTicket(int $ticketId, string $itemtype = '', int $itemsId = 0): ?array
 {
-    if ($ticketId < 1) return null;
+    if ($ticketId < 1 || !RepairWorkflow::isRepairTicket($ticketId)) return null;
+    if ($itemtype !== '' && $itemsId > 0
+        && !RepairWorkflow::ensureRepairRecord($ticketId, $itemtype, $itemsId)) return null;
     foreach (hhQRows('glpi_plugin_fields_ticketreparacions', [
         'items_id' => $ticketId, 'itemtype' => 'Ticket', 'plugin_fields_containers_id' => 15,
     ], ['nmerodeguafield', 'fechaenvioaproveedorfieldtwo', 'fecharecepcionproveedorfieldtwo', 'fecharecepcionguiafieldtwo']) as $fields) {
@@ -112,11 +114,7 @@ function hhQRepairTrackingForTicket(int $ticketId): ?array
 function hhQRepairTicketForAsset(string $type, int $id): ?array
 {
     if (!in_array($type, ['Computer', 'Phone'], true) || $id < 1) return null;
-    foreach (hhQRows('glpi_items_tickets', ['itemtype' => $type, 'items_id' => $id], ['tickets_id'], ['tickets_id DESC']) as $link) {
-        $tracking = hhQRepairTrackingForTicket((int)($link['tickets_id'] ?? 0));
-        if ($tracking !== null) return $tracking;
-    }
-    return null;
+    return RepairWorkflow::getSupplierTrackingForAsset($type, $id, true);
 }
 
 function hhQHasActivePlatinumContract(string $type, int $id): bool
@@ -547,7 +545,7 @@ if ($defaultItemType !== '' && $defaultItemsId > 0 && $currentSendValue !== '') 
             if ((int)($priorQuote['id'] ?? 0) === (int)($editQuote['id'] ?? 0)) continue;
             $returnValue = trim((string)($priorQuote['returned_at'] ?? ''));
             if ($returnValue === '' && (int)($priorQuote['tickets_id'] ?? 0) > 0) {
-                $tracking = hhQRepairTrackingForTicket((int)$priorQuote['tickets_id']);
+                $tracking = hhQRepairTrackingForTicket((int)$priorQuote['tickets_id'], $defaultItemType, $defaultItemsId);
                 $returnValue = trim((string)($tracking['returned_at'] ?? ''));
             }
             if ($returnValue === '') continue;
