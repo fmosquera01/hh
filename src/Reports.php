@@ -189,7 +189,7 @@ final class Reports
         $repairRows = [];
         if ($itemTypes !== [] && $itemIds !== [] && $DB->tableExists('glpi_plugin_hh_quotes')) {
             foreach ($DB->request([
-                'SELECT' => ['itemtype', 'items_id', 'status', 'total_points'],
+                'SELECT' => ['itemtype', 'items_id', 'tickets_id', 'status', 'total_points'],
                 'FROM' => 'glpi_plugin_hh_quotes',
                 'WHERE' => [
                     'itemtype' => array_values($itemTypes),
@@ -203,7 +203,11 @@ final class Reports
                 if (!isset($repairRows[$key])) {
                     $repairRows[$key] = ['count' => 0, 'points' => 0.0];
                 }
-                if ((string) ($quote['status'] ?? '') === 'approved') {
+                $ticketId = (int)($quote['tickets_id'] ?? 0);
+                if ((string) ($quote['status'] ?? '') === 'approved'
+                    && $ticketId > 0
+                    && RepairWorkflow::isRepairTicket($ticketId)
+                    && RepairWorkflow::ensureRepairRecord($ticketId, (string)$quote['itemtype'], (int)$quote['items_id'])) {
                     $repairRows[$key]['count']++;
                     $repairRows[$key]['points'] += (float) ($quote['total_points'] ?? 0);
                 }
