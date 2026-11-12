@@ -68,9 +68,8 @@ final class RepairAlerts
             }
 
             // Revalidate the origin in GLPI in case the ticket was edited later.
-            $ticket = new \Ticket();
-            if (!$ticket->getFromDB($ticketId)
-                || (int) ($ticket->fields['requesttypes_id'] ?? 0) !== $requestTypeId) {
+            if (!RepairWorkflow::isRepairTicket($ticketId, $requestTypeId)
+                || !RepairWorkflow::ensureRepairRecord($ticketId, $itemtype, $itemsId)) {
                 continue;
             }
 
