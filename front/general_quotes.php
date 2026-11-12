@@ -31,8 +31,9 @@ if ($itemtype === 'Phone') {
     }
 }
 $assetName = (string) ($asset->fields['name'] ?? ($itemtype . ' #' . $itemsId));
+$repairTracking = RepairWorkflow::getSupplierTrackingForAsset($itemtype, (int) $itemsId, false);
 $isEligibleForQuote = RepairWorkflow::isInSupplierRepairState($itemtype, (int) $itemsId)
-    && RepairWorkflow::getSupplierTrackingForAsset($itemtype, (int) $itemsId, false) !== null;
+    && $repairTracking !== null;
 $eligibilityMessage = !$isEligibleForQuote
     ? 'No se puede crear ni editar una cotización: el activo debe estar en estado REPARACIÓN Proveedor y tener un ticket asociado con guía de salida y fecha de salida registradas.'
     : '';
@@ -258,6 +259,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'approved_by' => in_array($newStatus, ['approved', 'selected'], true) ? (int) Session::getLoginUserID() : (int) ($quote['approved_by'] ?? 0),
         'approved_at' => in_array($newStatus, ['approved', 'selected'], true) ? date('Y-m-d H:i:s') : ($quote['approved_at'] ?? null),
     ], ['id' => $quoteId]);
+
+    // Update only the repair record tied to the ticket used for this supplier dispatch.
+    if ($DB->tableExists('glpi_plugin_hh_repair_records') && $repairTracking !== null) {
+        $repairStatus = in_array($newStatus, ['approved', 'selected'], true)
+            ? 'approved'
+            : ($newStatus === 'rejected' ? 'rejected' : ($newStatus === 'cancelled' ? 'cancelled' : 'pending'));
+        $DB->update('glpi_plugin_hh_repair_records', [
+            'status' => $repairStatus,
+        ], [
+            'tickets_id' => (int) $repairTracking['tickets_id'],
+            'itemtype' => $itemtype,
+            'items_id' => (int) $itemsId,
+        ]);
+    }
+
     hhGeneralQuoteHistory($quoteId, $oldStatus, $newStatus, $comment);
     Session::addMessageAfterRedirect('Estado de cotización actualizado.', true, INFO);
     Html::redirect($backUrl);
