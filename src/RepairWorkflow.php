@@ -222,7 +222,7 @@ final class RepairWorkflow
                 $received = trim((string) ($fields['fecharecepcionproveedorfieldtwo'] ?? ''));
                 $validDate = static function (string $value): bool {
                     if ($value === '' || str_starts_with($value, '0000-00-00')) return false;
-                    try { new DateTimeImmutable($value); return true; } catch (Throwable $e) { return false; }
+                    try { new \\DateTimeImmutable($value); return true; } catch (\\Throwable $e) { return false; }
                 };
                 if ($guide !== '' && $validDate($sent) && (!$requireSupplierReceived || $validDate($received))) {
                     return [
