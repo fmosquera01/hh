@@ -451,6 +451,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!hhQWriteHistory((int)$quoteId, 'draft', $decision, $comment)) {
                     throw new RuntimeException('No se pudo registrar el historial de la decisión.');
                 }
+
+                // Keep the independent repair ledger aligned with the final HH quote decision.
+                if ($DB->tableExists('glpi_plugin_hh_repair_records')) {
+                    $recordUpdated = $DB->update('glpi_plugin_hh_repair_records', [
+                        'status' => $decision,
+                    ], [
+                        'tickets_id' => (int) ($quote['tickets_id'] ?? 0),
+                        'itemtype' => (string) $quote['itemtype'],
+                        'items_id' => (int) $quote['items_id'],
+                    ]);
+                    if (!$recordUpdated) {
+                        throw new RuntimeException('No se pudo actualizar el estado del historial de reparación.');
+                    }
+                }
+
                 $DB->commit();
                 $transactionStarted = false;
                 $notice = 'Cotización ' . (string)$quote['name'] . ' ' . ($decision === 'approved' ? 'aprobada' : 'rechazada') . '. Queda bloqueada y disponible en el historial.';
