@@ -91,6 +91,7 @@ foreach ($inventory as &$asset) {
     $key = $asset['itemtype'] . ':' . (int)$asset['id'];
     $stats = $repairAnalytics['by_asset'][$key] ?? [];
     $asset['repair_count'] = (int)($stats['repair_count'] ?? 0);
+    $asset['approved_quote_count'] = (int)($stats['approved_quote_count'] ?? 0);
     $asset['completed_repairs'] = (int)($stats['completed_repairs'] ?? 0);
     $asset['parts_units'] = (float)($stats['parts_units'] ?? 0);
     $asset['parts_lines'] = (int)($stats['parts_lines'] ?? 0);
@@ -133,7 +134,7 @@ unset($asset);
 $months = Reports::getPointMovements($year);
 $totalAssets = count($inventory);
 $totalAssetsInRepair = count($activeRepairsByAsset);
-$repairedAssets = count(array_filter($inventory, static fn(array $asset): bool => $asset['repair_count'] > 0));
+$repairedAssets = count(array_filter($inventory, static fn(array $asset): bool => $asset['approved_quote_count'] > 0));
 $totalRepairs = array_sum(array_column($inventory, 'repair_count'));
 $totalPoints = array_sum(array_column($inventory, 'points_consumed'));
 $totalCompletedRepairs = array_sum(array_column($inventory, 'completed_repairs'));
